@@ -312,7 +312,7 @@ function saveCatalogIngredient(e){
    line.ingredientId=ing.id;line.name=ing.name;line.productId=ing.productId
   }
  }));
- ingredientStoreTab=store;persist();closeModal();render();toast('Ingrédient enregistré dans la base !')
+ ingredientStoreTab=store;if(catalogueStoreFilter!=='all')catalogueStoreFilter=store;if(catalogueTypeFilter==='daily')catalogueTypeFilter='all';persist();closeModal();render();toast('Ingrédient enregistré dans la base !')
 }
 function productBadge(p){return (p.category==='Hygiène'?'🧴':p.category==='Maison'?'🧻':p.category==='Fruits et légumes'?'🥕':p.category==='Produits frais'?'🥛':p.category==='Viandes et poissons'?'🥩':'🛍️')}
 // Les références déjà liées à un ingrédient apparaissent uniquement
@@ -409,7 +409,7 @@ function saveProduct(e){
  if(ing){ing.productId=product.id;ing.store='carrefour';ingredientStoreTab='carrefour';
   state.recipes.forEach(r=>r.ingredients?.forEach(i=>{if(i.ingredientId===ing.id)i.productId=product.id}))
  }
- persist();closeModal();render();toast(ing?'Produit Carrefour associé à '+ing.name+' !':old?'Produit modifié !':'Produit ajouté au catalogue !')
+ if(catalogueStoreFilter!=='all')catalogueStoreFilter=ing?'carrefour':store;if(!ing&&catalogueTypeFilter==='ingredient')catalogueTypeFilter='all';persist();closeModal();render();toast(ing?'Produit Carrefour associé à '+ing.name+' !':old?'Produit modifié !':'Produit ajouté au catalogue !')
 }
 function addCatalogProduct(id){
  const p=productById(id);if(!p)return;
@@ -1453,7 +1453,7 @@ document.addEventListener('click',e=>{
    const item=isIngredient?ingredientById(id):productById(id),qty=Number($('#unifiedExtraQty')?.value),unit=$('#unifiedExtraUnit')?.value;
    if(!item||!Number.isFinite(qty)||qty<=0||!units.includes(unit)){toast('Vérifie la quantité et l’unité.');return}
    w.extras.push({id:uid(),name:item.name,qty,unit,productId:isIngredient?(item.productId||null):item.id,
-    ingredientId:isIngredient?item.id:null,fromCatalogue:!isIngredient});
+    ingredientId:isIngredient?item.id:null,fromCatalogue:true});
    persist();closeModal();render(true);toast(item.name+' ajouté aux courses !')
   }
   else if(mode==='add-product')productEditor(null);

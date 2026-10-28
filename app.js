@@ -4,11 +4,12 @@ const $ = (s, root=document) => root.querySelector(s);
 const html = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const days=['Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi','Dimanche'];
 const categories=['Autres','Épicerie','Fruits et légumes','Viandes et poissons','Produits frais','Hygiène','Maison'];
-const icons={'Pâtes':'🍝','Viande':'🥩','Poisson':'🐟','Légumes':'🥦','Salade':'🥗','Dessert':'🍰','Autre':'🍽️'};
+const recipeTypes=['Pâtes','Viande','Poisson','Légumes','Salades','Soupes','Snacks','Tartes','Crudités','Dessert'];
+const icons={'Pâtes':'🍝','Viande':'🥩','Poisson':'🐟','Légumes':'🥦','Salades':'🥗','Soupes':'🥣','Snacks':'🥪','Tartes':'🥧','Crudités':'🥕','Dessert':'🍰','Salade':'🥗','Autre':'🍽️'};
 const units=['g','kg','ml','cl','l','pièce','paquet','boîte','rouleau','bouteille','pot','sachet'];
 const contentUnits=['g','kg','ml','cl','l','pièce','rouleau'];
 const baseState=()=>({schema:1,recipes:[],products:[],weeks:{},staples:[],storePreferences:{},ingredientCatalog:[],coursesExplicitGenerationV1:false,settings:{people:2}});
-let state=baseState(), currentTab='menus', currentWeek='', search='', productSearch='', productCategory='Toutes', ingredientStoreTab='carrefour', db=null, usingFallback=false;
+let state=baseState(), currentTab='menus', currentWeek='', search='', recipeSort='az', recipeTypeFilter='all', productSearch='', productCategory='Toutes', ingredientStoreTab='carrefour', db=null, usingFallback=false;
 let pendingRecipeDraftImage='',pendingIngredientLinkId=null;
 let independentProductsOpen=false;const courseOpenSections=new Set();
 const app=$('#app'), modalRoot=$('#modalRoot');
@@ -121,12 +122,47 @@ function renderMenus(){const w=getWeek(),count=w.meals.filter(Boolean).length, l
   return out
 }
 function recipeImg(r){return '<div class="recipe-img">'+(r.image?'<img src="'+html(r.image)+'" alt="">':html(icons[r.category]||'🍽️'))+'</div>'}
-function recipeRows(){let list=state.recipes.filter(r=>r.name.toLocaleLowerCase('fr').includes(search.toLocaleLowerCase('fr'))).sort((a,b)=>a.name.localeCompare(b.name,'fr'));return list.map(r=>'<div class="recipe-card">'+recipeImg(r)+'<div class="grow"><h3>'+html(r.name)+'</h3><p>'+r.ingredients.length+' ingrédient'+(r.ingredients.length>1?'s':'')+' · recette pour '+r.people+' portions</p><span class="pill gray">'+html(r.category||'Autre')+'</span></div><div class="recipe-actions"><button class="icon-btn" data-action="edit-recipe" data-id="'+r.id+'" aria-label="Modifier '+html(r.name)+'">✎</button><button class="btn tiny secondary" data-action="duplicate-recipe" data-id="'+r.id+'">Dupliquer</button></div></div>').join('')||emptyView('🍲','Aucun plat trouvé',search?'Essaie un autre nom.':'Commence par ajouter votre premier plat.','<button class="btn" data-action="add-recipe">＋ Ajouter un plat</button>')}
-function renderPlats(){let out=pageHeading('Votre bibliothèque','Mes plats','Enregistre une seule fois les ingrédients de vos plats habituels.');
-  out+='<div class="toolbar"><button class="btn wide" data-action="add-recipe">＋ Ajouter un plat</button></div>';
-  out+='<div class="field"><input class="text-input" id="recipeSearch" value="'+html(search)+'" placeholder="⌕ Rechercher un plat…" aria-label="Rechercher un plat"></div>';
-  out+='<div class="section-head"><h2>Votre catalogue</h2><span class="pill">'+state.recipes.length+' plat'+(state.recipes.length===1?'':'s')+'</span></div><div id="recipeResults">'+recipeRows()+'</div>';
-  return out
+function normalRecipeType(value){
+ if(value==='Salade')return 'Salades';
+ return recipeTypes.includes(value)?value:'legacy'
+}
+function visibleRecipes(){
+ const term=search.trim().toLocaleLowerCase('fr');
+ const list=state.recipes.filter(r=>r.name.toLocaleLowerCase('fr').includes(term)&&
+  (recipeTypeFilter==='all'||normalRecipeType(r.category)===recipeTypeFilter));
+ const sortText=(a,b)=>a.name.localeCompare(b.name,'fr',{sensitivity:'base'});
+ return list.sort((a,b)=>recipeSort==='za'?-sortText(a,b):
+  recipeSort==='type'?
+   ((recipeTypes.indexOf(normalRecipeType(a.category))<0?recipeTypes.length:recipeTypes.indexOf(normalRecipeType(a.category)))-
+    (recipeTypes.indexOf(normalRecipeType(b.category))<0?recipeTypes.length:recipeTypes.indexOf(normalRecipeType(b.category)))||sortText(a,b)):
+   sortText(a,b))
+}
+function recipeRows(){
+ const list=visibleRecipes();
+ return list.map(r=>'<div class="recipe-card">'+recipeImg(r)+'<div class="grow"><h3>'+html(r.name)+'</h3><p>'+
+  r.ingredients.length+' ingrédient'+(r.ingredients.length>1?'s':'')+' · recette pour '+r.people+' portions</p>'+
+  '<span class="pill gray">'+html(normalRecipeType(r.category)==='legacy'?(r.category||'Autre'):normalRecipeType(r.category))+'</span></div>'+
+  '<div class="recipe-actions"><button class="icon-btn" data-action="edit-recipe" data-id="'+r.id+'" aria-label="Modifier '+html(r.name)+'">✎</button>'+
+  '<button class="btn tiny secondary" data-action="duplicate-recipe" data-id="'+r.id+'">Dupliquer</button></div></div>').join('')||
+  emptyView('🍲','Aucun plat trouvé',search||recipeTypeFilter!=='all'?'Essaie un autre nom ou un autre type.':'Commence par ajouter votre premier plat.',
+   '<button class="btn" data-action="add-recipe">＋ Ajouter un plat</button>')
+}
+function renderPlats(){
+ const legacy=state.recipes.some(r=>normalRecipeType(r.category)==='legacy');
+ let out=pageHeading('Votre bibliothèque','Mes plats','Retrouve les recettes par nom ou type de plat, sans modifier leur contenu.');
+ out+='<div class="toolbar"><button class="btn wide" data-action="add-recipe">＋ Ajouter un plat</button></div>';
+ out+='<div class="field"><input class="text-input" id="recipeSearch" value="'+html(search)+'" placeholder="⌕ Rechercher un plat…" aria-label="Rechercher un plat"></div>';
+ out+='<div class="recipe-filters">'+
+ '<div class="field"><label for="recipeTypeFilter">Type de plat</label><select id="recipeTypeFilter" aria-label="Filtrer par type de plat">'+
+ '<option value="all" '+(recipeTypeFilter==='all'?'selected':'')+'>Tous les types</option>'+
+ recipeTypes.map(t=>'<option value="'+html(t)+'" '+(recipeTypeFilter===t?'selected':'')+'>'+html(t)+'</option>').join('')+
+ (legacy?'<option value="legacy" '+(recipeTypeFilter==='legacy'?'selected':'')+'>Autres (anciens plats)</option>':'')+'</select></div>'+
+ '<div class="field"><label for="recipeSort">Trier par</label><select id="recipeSort" aria-label="Ordre de tri des plats">'+
+ '<option value="az" '+(recipeSort==='az'?'selected':'')+'>Nom : A → Z</option>'+
+ '<option value="za" '+(recipeSort==='za'?'selected':'')+'>Nom : Z → A</option>'+
+ '<option value="type" '+(recipeSort==='type'?'selected':'')+'>Type de plat</option></select></div></div>';
+ out+='<div class="section-head"><h2>Votre catalogue</h2><span id="recipeCount" class="pill">'+visibleRecipes().length+' / '+state.recipes.length+' plats</span></div><div id="recipeResults">'+recipeRows()+'</div>';
+ return out
 }
 
 const productCategories=['Épicerie','Fruits et légumes','Viandes et poissons','Produits frais','Hygiène','Maison','Autres'];
@@ -876,7 +912,10 @@ function recipeEditor(id,draft=null){
  pendingRecipeDraftImage=!old&&draft?draft.image||'':'';
  let body='<form id="recipeForm" data-id="'+(old?.id||'')+'">'+
  '<div class="field"><label for="recipeName">Nom du plat</label><input required maxlength="90" id="recipeName" placeholder="Ex. Poulet au curry" value="'+html(r?.name||'')+'"></div>'+
- '<div class="row" style="align-items:start;gap:11px"><div class="field grow"><label for="recipeCategory">Type de plat</label><select id="recipeCategory">'+selectOptions(Object.keys(icons),r?.category||'Autre')+'</select></div>'+
+ '<div class="row" style="align-items:start;gap:11px"><div class="field grow"><label for="recipeCategory">Type de plat</label><select id="recipeCategory">'+
+ selectOptions(recipeTypes,normalRecipeType(r?.category)==='legacy'?'':normalRecipeType(r?.category))+
+ (r&&normalRecipeType(r.category)==='legacy'?'<option value="'+html(r.category||'Autre')+'" selected>Ancien type : '+html(r.category||'Autre')+'</option>':'')+
+ '</select></div>'+
  '<div class="field" style="width:115px"><label for="recipePeople">Portions de base</label><input id="recipePeople" type="number" min="1" max="30" required value="'+(r?.people||4)+'"></div></div>'+
  '<div class="field"><label for="recipePhoto">Photo (facultatif)</label><div class="image-input"><input id="recipePhoto" type="file" accept="image/*"><div class="helper">Photo conservée sur ce téléphone. Format allégé automatiquement.</div></div></div>'+
  '<div class="row between" style="margin:15px 0 8px"><h3>Ingrédients</h3></div>'+
@@ -1315,7 +1354,9 @@ document.addEventListener('click',e=>{
   else if(mode==='add-ingredient'){
    const rows=$('#ingredientRows');if(!rows)return;
    rows.insertAdjacentHTML('beforeend',ingredientRow());
-   $('#addIngredientBottom')?.scrollIntoView?.({behavior:'smooth',block:'nearest'});
+   // L'ajout pousse le bouton vers le bas : le ramener au bas de la fenêtre
+   // déroulante pour que le nouveau champ et le prochain ajout restent visibles.
+   $('#addIngredientBottom')?.scrollIntoView?.({behavior:'smooth',block:'end',inline:'nearest'});
   }
   else if(mode==='remove-ingredient')a.closest('.ingredient-line')?.remove();
   else if(mode==='reuse-ingredient'){
@@ -1382,6 +1423,14 @@ document.addEventListener('click',e=>{
   else if(mode==='clear-all'){if(confirm('Effacer toutes les données actuelles ? Une copie locale sera conservée dans les versions précédentes.')){checkpoint('Avant effacement');state=baseState();persist();closeModal();render();toast('Données actuelles effacées.')}}
 });
 document.addEventListener('change',e=>{
+ if(e.target.id==='recipeSort'||e.target.id==='recipeTypeFilter'){
+  if(e.target.id==='recipeSort')recipeSort=['az','za','type'].includes(e.target.value)?e.target.value:'az';
+  else recipeTypeFilter=e.target.value;
+  const result=$('#recipeResults'),count=$('#recipeCount');
+  if(result)result.innerHTML=recipeRows();
+  if(count)count.textContent=visibleRecipes().length+' / '+state.recipes.length+' plats';
+  return
+ }
  if(e.target.id==='homeStockUnit'){
   const x=shopping().find(i=>i.id===$('#homeStockItemId')?.value),field=$('#homeStockAmount'),oldUnit=e.target.dataset.previous;
   if(x&&field&&field.value!==''){
@@ -1399,7 +1448,7 @@ document.addEventListener('change',e=>{
   linked.textContent=ingredientStore(match)==='grandfrais'?'Grand Frais : aucune fiche produit nécessaire.':p?'Produit Carrefour lié : '+p.name:'Pas encore de produit Carrefour lié (à associer dans la base).'
  }
  }else if(e.target.matches('[data-store-item]')){setShoppingStore(e.target.dataset.storeItem,e.target.value)}else if(e.target.matches('[data-check]')){const w=getWeek(),id=e.target.dataset.check;w.checked=e.target.checked?[...new Set([...w.checked,id])]:w.checked.filter(x=>x!==id);persist();render(true)}else if(e.target.id==='importFile')importData(e.target.files?.[0])});
-document.addEventListener('input',e=>{if(e.target.id==='homeStockAmount')refreshStockPreview();if(e.target.matches?.('.ingredient-name'))refreshIngredientEntry(e.target.closest('.ingredient-line'));if(e.target.matches?.('.ingredient-unit'))e.target.closest('.ingredient-line').dataset.unitSelected='true';if(e.target.id==='recipeSearch'){search=e.target.value;const result=$('#recipeResults');if(result)result.innerHTML=recipeRows()}else if(e.target.id==='productSearch'){productSearch=e.target.value;if(productSearch.trim()){independentProductsOpen=true;const section=document.querySelector('.catalog-independent');if(section)section.open=true}const result=$('#productResults');if(result)result.innerHTML=productRows();const ings=$('#ingredientCatalogResults');if(ings)ings.innerHTML=ingredientRowsCatalogue()}});
+document.addEventListener('input',e=>{if(e.target.id==='homeStockAmount')refreshStockPreview();if(e.target.matches?.('.ingredient-name'))refreshIngredientEntry(e.target.closest('.ingredient-line'));if(e.target.matches?.('.ingredient-unit'))e.target.closest('.ingredient-line').dataset.unitSelected='true';if(e.target.id==='recipeSearch'){search=e.target.value;const result=$('#recipeResults'),count=$('#recipeCount');if(result)result.innerHTML=recipeRows();if(count)count.textContent=visibleRecipes().length+' / '+state.recipes.length+' plats'}else if(e.target.id==='productSearch'){productSearch=e.target.value;if(productSearch.trim()){independentProductsOpen=true;const section=document.querySelector('.catalog-independent');if(section)section.open=true}const result=$('#productResults');if(result)result.innerHTML=productRows();const ings=$('#ingredientCatalogResults');if(ings)ings.innerHTML=ingredientRowsCatalogue()}});
 document.addEventListener('submit',e=>{if(e.target.id==='recipeForm')saveRecipe(e);if(e.target.id==='ingredientCatalogForm')saveCatalogIngredient(e);if(e.target.id==='extraForm')addExtra(e);if(e.target.id==='productForm')saveProduct(e)});
 window.addEventListener('hashchange',()=>importCarrefourProductFromHash());
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal()});

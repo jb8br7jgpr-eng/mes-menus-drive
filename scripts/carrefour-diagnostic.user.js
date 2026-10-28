@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Menus & Drive — Diagnostic Carrefour (lecture seule)
 // @namespace    https://github.com/jb8br7jgpr-eng/mes-menus-drive
-// @version      0.5.0
-// @description  Prévisualise uniquement les codes-barres et quantités depuis Menus & Drive, sans modifier le panier.
+// @version      0.6.0
+// @description  Vérifie les références et offres Carrefour en lecture seule, sans modifier le panier.
 // @match        https://www.carrefour.fr/*
 // @match        https://carrefour.fr/*
 // @run-at       document-idle
@@ -14,8 +14,9 @@
 (() => {
   'use strict';
 
-  // Sécurité de cette étape : aucun fetch/XHR, aucun cookie, aucun token,
-  // aucune donnée de compte collectée, aucun ajout/suppression d'article.
+  // Sécurité : requêtes GET Carrefour.fr uniquement sur clic pour rechercher les EAN.
+  // Aucune requête d'écriture, aucun cookie/token/profil lu ou conservé,
+  // aucun produit ajouté/supprimé du panier.
   if (!/^(www\.)?carrefour\.fr$/i.test(location.hostname)) return;
   if (document.getElementById('md-carrefour-diagnostic-root')) return;
 
@@ -111,6 +112,13 @@
     pasteConfirm.textContent='Vérifier la liste collée';
     const listStatus = document.createElement('p');
     listStatus.className='muted';listStatus.setAttribute('aria-live','polite');
+    const verifyBtn = document.createElement('button');
+    verifyBtn.type='button';verifyBtn.className='minor';verifyBtn.hidden=true;
+    verifyBtn.textContent='🔎 Vérifier mes références sur Carrefour';
+    const lookupStatus = document.createElement('p');
+    lookupStatus.className='muted';lookupStatus.setAttribute('aria-live','polite');
+    const verifiedProducts = document.createElement('div');
+    verifiedProducts.setAttribute('aria-label','Références retrouvées sur Carrefour');
     const listPreview = document.createElement('div');
     listPreview.setAttribute('aria-label','Aperçu de la liste sans modification du panier');
     let previewRows=[];
@@ -124,7 +132,7 @@
     close.type = 'button';
     close.className = 'close';
     close.textContent = 'Fermer le diagnostic';
-    panel.append(heading, status, domain, ean, preview, importBtn, manualCopy, listBtn, pasteField, pasteConfirm, listStatus, listPreview, notice, shop, close);
+    panel.append(heading, status, domain, ean, preview, importBtn, manualCopy, listBtn, pasteField, pasteConfirm, listStatus, verifyBtn, lookupStatus, listPreview, verifiedProducts, notice, shop, close);
 
     const trigger = document.createElement('button');
     trigger.type = 'button';
@@ -195,6 +203,10 @@
     function renderPreview(data){
       previewRows=data.rows;
       listPreview.replaceChildren();
+      verifiedProducts.replaceChildren();
+      lookupStatus.textContent='';
+      verifyBtn.hidden=!data.rows.length;
+      verifyBtn.disabled=false;
       listStatus.textContent=data.rows.length+' référence'+(data.rows.length!==1?'s':'')+' transférée'+(data.rows.length!==1?'s':'')+' (code-barres + quantité).';
       const note=document.createElement('p');
       note.className='muted';
@@ -217,8 +229,92 @@
     }
     function parseAndShow(raw){
       try{renderPreview(validateTransfer(raw));return true}
-      catch(e){listStatus.textContent='⚠️ '+String(e.message||'Liste non reconnue');listPreview.replaceChildren();return false}
+      catch(e){listStatus.textContent='⚠️ '+String(e.message||'Liste non reconnue');listPreview.replaceChildren();verifiedProducts.replaceChildren();verifyBtn.hidden=true;return false}
     }
+    // Protocole de test : lecture seule. Les API Carrefour ci-dessous sont non officielles,
+    // sujettes à changement et l'utilisateur doit sélectionner son magasin sur Carrefour.fr.
+    async function carrefourRead(path){
+      const response=await fetch(path,{
+        method:'GET',credentials:'same-origin',cache:'no-store',
+        headers:{'X-Requested-With':'XMLHttpRequest'}
+      });
+      if(!response.ok)throw Error('Réponse Carrefour : '+response.status);
+      if(!(response.headers.get('content-type')||'').includes('json'))throw Error('Format de réponse Carrefour inattendu');
+      return response.json()
+    }
+    function getSelectedStoreName(serviceId){
+      try{
+        const p=window.__INITIAL_STATE__?.pinia?.offline?.offlineStore;
+        if(p&&p.basketServiceId===serviceId&&!p.isVirtual&&typeof p.name==='string')
+          return p.name.slice(0,85);
+      }catch(e){/* Le site peut changer sa structure interne. */}
+      return '';
+    }
+    function resolveProduct(data,ean,serviceId){
+      const products=Array.isArray(data?.data?.products)?data.data.products:[];
+      const match=products.find(p=>String(p?.attributes?.ean||'')===ean);
+      if(!match)return {ean,status:'Référence introuvable',detail:'Aucun produit correspondant exactement à ce code.'};
+      const a=match.attributes||{},offers=a.offers?.[ean],local=serviceId&&offers?offers[serviceId]?.attributes:null;
+      const info={ean,name:String(a.title||a.shortTitle||'Produit sans nom').slice(0,130),brand:String(a.brand||'').slice(0,70),status:'Référence reconnue'};
+      if(local){
+        const price=Number(local.price?.price);
+        if(Number.isFinite(price)&&price>=0)info.price=price.toLocaleString('fr-FR',{style:'currency',currency:'EUR'});
+        const av=local.availability;
+        if(av?.purchasable===false||av?.stopped===true||av?.suspended===true)info.status='Offre indiquée indisponible';
+        else info.status='Offre trouvée — disponibilité à confirmer';
+      }else info.status='Référence trouvée — offre du Drive non confirmée';
+      return info;
+    }
+    function drawVerified(item,qty){
+      const el=document.createElement('div');el.className='line';
+      const title=document.createElement('strong');title.textContent=item.name||item.ean;
+      const details=document.createElement('small');
+      details.textContent='EAN : '+item.ean+' · Quantité : '+qty+
+        (item.brand?' · '+item.brand:'')+(item.price?' · Prix indicatif : '+item.price:'');
+      const state=document.createElement('small');state.textContent=item.status+(item.detail?' — '+item.detail:'');
+      state.className=/introuvable|indisponible|non confirmée/i.test(item.status)?'orangeTxt':'muted';
+      el.append(title,details,state);
+      verifiedProducts.append(el)
+    }
+    verifyBtn.addEventListener('click',async()=>{
+      if(!previewRows.length)return;
+      verifyBtn.disabled=true;verifiedProducts.replaceChildren();
+      lookupStatus.textContent='Recherche du Drive actif (lecture seule)…';
+      let serviceId='',storeName='';
+      try{
+        // Le panier est seulement lu pour connaître le Drive actif.
+        // Aucun élément, ID client ou montant du panier n'est affiché ni enregistré.
+        const response=await carrefourRead('/api/cart');
+        const cart=response?.cart;
+        if(!cart||!cart.facilityServiceId||String(cart.storeRef)==='6'||String(cart.facilityServiceId).endsWith('-6')){
+          lookupStatus.textContent='⚠️ Aucun Drive actif détecté. Sélectionne École-Valentin sur Carrefour.fr puis recommence.';
+          verifyBtn.disabled=false;return
+        }
+        serviceId=String(cart.facilityServiceId);
+        storeName=getSelectedStoreName(serviceId);
+      }catch(e){
+        lookupStatus.textContent='⚠️ Impossible de vérifier le Drive actif : '+String(e.message||'erreur Carrefour');
+        verifyBtn.disabled=false;return
+      }
+      const isExpected=/valentin/i.test(storeName);
+      lookupStatus.textContent=storeName
+        ?'Drive actif : '+storeName+(isExpected?' ✓':' — ⚠️ Vérifie que tu as choisi École-Valentin')
+        :'⚠️ Drive actif détecté, mais nom du magasin non lisible : vérifie École-Valentin manuellement.';
+      const limit=Math.min(previewRows.length,15);
+      for(let i=0;i<limit;i++){
+        const item=previewRows[i];
+        try{
+          const result=await carrefourRead('/autocomplete?q='+encodeURIComponent(item.ean)+'&maxResults=12&productCard=true');
+          drawVerified(resolveProduct(result,item.ean,serviceId),item.qty);
+        }catch(e){
+          drawVerified({ean:item.ean,status:'Vérification impossible',detail:'Carrefour ne répond pas pour ce code.'},item.qty)
+        }
+        // Limite volontaire du nombre de vérifications pour ménager le site et la batterie.
+        if(i<limit-1)await new Promise(resolve=>setTimeout(resolve,350));
+      }
+      if(previewRows.length>limit)lookupStatus.textContent+=' · '+limit+' premières références vérifiées sur '+previewRows.length+'.';
+      verifyBtn.disabled=false;
+    });
     listBtn.addEventListener('click',async()=>{
       pasteField.hidden=false;pasteConfirm.hidden=false;
       listStatus.textContent='Autorise le collage des codes-barres depuis Menus & Drive si Safari le demande.';

@@ -238,3 +238,13 @@ Le schéma `x-safari-https:` est reconnu par Safari sur plusieurs versions réce
 
 Ni le format de transfert, ni le fonctionnement de l'extension Userscripts 0.8, ni les données locales (recettes, produits, sauvegardes) n'ont été modifiés. Pour que le panier se remplisse depuis Safari, le script Userscripts doit être installé et autorisé **sur chaque iPhone**. Aucune validation de commande ou paiement automatique.
 
+
+
+## Bilan panier Carrefour — interface iPhone v0.9
+
+Le script Userscripts conserve **exactement le même mécanisme d'ajout au panier que la v0.8**. La version 0.9 modernise uniquement le récapitulatif, en affichant sa progression et quatre compteurs : **ajoutés**, **déjà présents**, **indisponibles/erreurs**, **quantités partielles**. Les problèmes apparaissent en premier et sont dépliés. Les ajouts réussis et les articles déjà présents sont listés séparément, avec leur EAN, la quantité demandée et la quantité réellement accordée quand elle est connue. Les groupes de succès de plus de quatre références sont repliés pour faciliter la lecture sur iPhone.
+
+Le bilan indique les lignes encore à traiter pendant l'exécution. Une fois terminé, il est ramené en haut du panneau pour être immédiatement visible. **Aucun mécanisme de paiement, aucune suppression d'article, aucune modification du moteur de calcul des quantités ou du stockage de Menus & Drive.**
+
+La version doit être actualisée **sur chaque iPhone** depuis le même lien Userscripts habituel. Les tests d'interface utilisent des données simulées (ajouté / déjà présent / indisponible / partiel), tandis que les ajouts réels ont été confirmés auparavant sur un essai de deux produits. La robustesse sur un panier de 5 à 10 références, dont une indisponible et une partielle, reste à vérifier en situation réelle.
+

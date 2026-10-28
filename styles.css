@@ -232,3 +232,12 @@
 @supports (-webkit-touch-callout:none){
  .stock-editor-row input,.stock-editor-row select{font-size:16px!important}
 }
+
+/* Formulaire de produit compact ; champs Carrefour toujours disponibles au besoin. */
+.daily-optional{border:1px solid #e0e9dc;border-radius:13px;background:#f7f9f5;padding:0 11px 10px;margin:10px 0}
+.daily-optional summary{list-style:none;cursor:pointer;min-height:42px;display:flex;align-items:center;font-weight:750;color:#48624d;font-size:12px;line-height:1.4}
+.daily-optional summary::-webkit-details-marker{display:none}
+.daily-optional summary:after{content:"⌄";margin-left:auto;font-size:17px}
+.daily-optional[open] summary:after{transform:rotate(180deg)}
+.daily-optional .card.soft{margin:5px 0 11px!important}
+.daily-optional .field{margin-top:8px}

@@ -569,7 +569,7 @@ function homeStockModal(itemId){
  '<div><small>Déjà à la maison</small><strong>'+html(quantity(x.stockAmount,x.stockUnit))+'</strong></div></div>'+
  '<div class="row stock-editor-row"><div class="field grow"><label for="homeStockAmount">Quantité disponible</label>'+
  '<input id="homeStockAmount" type="number" min="0" step="any" inputmode="decimal" value="'+html(Number(amount.toFixed(3)))+'"></div>'+
- '<div class="field grow"><label for="homeStockUnit">Unité</label><select id="homeStockUnit">'+
+ '<div class="field grow"><label for="homeStockUnit">Unité</label><select id="homeStockUnit" data-previous="'+html(selected)+'">'+
  choices.map(u=>'<option value="'+html(u)+'" '+(selected===u?'selected':'')+'>'+html(u==='paquet'?'paquet entier':u)+'</option>').join('')+'</select></div></div>';
  if(choices.includes('paquet')&&packSize>0)htmlBody+='<p class="helper">1 paquet = '+html(quantity(packSize,packUnit))+'. Tu peux indiquer un stock en paquets ou dans une unité de poids/volume.</p>';
  htmlBody+='<div class="stock-quick-actions"><button class="btn secondary" data-action="stock-zero">Aucun stock</button><button class="btn secondary" data-action="stock-all">✓ J’ai tout</button></div>'+
@@ -1274,7 +1274,15 @@ document.addEventListener('click',e=>{
   else if(mode==='restore-backup')restoreSnapshot(id);
   else if(mode==='clear-all'){if(confirm('Effacer toutes les données actuelles ? Une copie locale sera conservée dans les versions précédentes.')){checkpoint('Avant effacement');state=baseState();persist();closeModal();render();toast('Données actuelles effacées.')}}
 });
-document.addEventListener('change',e=>{if(e.target.id==='homeStockUnit'||e.target.id==='homeStockAmount')refreshStockPreview();if(e.target.matches('.ingredient-name')){
+document.addEventListener('change',e=>{
+ if(e.target.id==='homeStockUnit'){
+  const x=shopping().find(i=>i.id===$('#homeStockItemId')?.value),field=$('#homeStockAmount'),oldUnit=e.target.dataset.previous;
+  if(x&&field&&field.value!==''){
+   const base=stockInputToBase(x,Number(field.value),oldUnit);
+   if(base!==null)field.value=String(Number(stockBaseToUnit(x,base,e.target.value).toFixed(3)))
+  }
+  e.target.dataset.previous=e.target.value;refreshStockPreview()
+ }else if(e.target.id==='homeStockAmount')refreshStockPreview();if(e.target.matches('.ingredient-name')){
  const match=ingredientByName(e.target.value),row=e.target.closest('.ingredient-line');
  const store=row?.querySelector('.ingredient-store');
  if(match&&store)store.value=ingredientStore(match);

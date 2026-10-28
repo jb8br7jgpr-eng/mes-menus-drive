@@ -197,3 +197,26 @@ Le copier-coller entre l’icône iPhone et Safari n’est plus requis pour pré
 
 Le script n'ajoute aucun article au panier, ne vérifie pas définitivement les stocks et ne paie jamais. Si le script n'est pas installé ou encore à la version 0.6, la page Carrefour s'ouvre mais le transfert automatique ne sera pas intercepté. Mettre à jour **le script 0.7** et ne garder qu'une copie active.
 
+
+
+## Constitution automatique du panier Carrefour — Userscripts v0.8 (test réel à valider)
+
+**Le clic « 🛒 Constituer mon panier Carrefour » dans l'application installée déclenche désormais un essai d'ajout réel au panier du Drive Carrefour actif.** Seules les références complètes EAN-13 et les quantités entières achetables de la liste hebdomadaire sont envoyées. L'échange app → Safari continue à passer par le fragment d'URL (sans copier-coller).
+
+### Garde-fous
+
+- Sur Carrefour.fr, la nouvelle version v0.8 lit `GET /api/cart` pour identifier le **Drive actif** et son identifiant technique. Si le magasin affiché ne correspond pas à **École-Valentin / Besançon-Valentin**, **aucun article n'est ajouté**. Si le nom du Drive est inaccessible, une **confirmation manuelle explicite** est obligatoire après vérification visuelle sur Carrefour.
+- Pour chaque EAN, une recherche Carrefour à correspondance **exacte** précède la consultation de la fiche réelle du produit. La disponibilité de l'offre doit être explicitement confirmée par les informations de la fiche pour **ce magasin et cet EAN**. Si le site ne répond pas, si la référence est inconnue ou si les informations sont ambiguës, **aucun ajout** pour cette ligne.
+- Avant chaque écriture, une nouvelle lecture du panier vérifie que le Drive n'a pas changé ; les autres lignes du panier ne sont jamais supprimées ni diminuées. La quantité cible est **max(quantité déjà présente, quantité demandée)**. On ne cumule pas automatiquement d'unités supplémentaires lorsqu'on relance la même liste : une nouvelle tentative est **idempotente** pour les quantités déjà atteintes.
+- Pour les références disponibles à compléter, le script tente `PATCH /api/cart` avec une quantité cible **absolue et strictement positive**. Il analyse ensuite la réponse Carrefour, notamment les limites de stock et les quantités réellement accordées. Des refus et quantités partielles sont signalés.
+- Les erreurs d'autorisation, de protection HTTP 403/429, de panier non synchronisé HTTP 400 ou de changement de Drive arrêtent le transfert. Une erreur ponctuelle sur une fiche est signalée, sans affecter les autres produits.
+- La fenêtre affiche un **bilan** : ajouté(s), déjà présent(s), indisponibles/inconnus, partiels/erreurs et le nombre de lignes restantes si le traitement est interrompu.
+- Le script n'accède pas aux moyens de paiement et **n'effectue aucune commande, aucun paiement, aucune validation du créneau**. Le consommateur finalise lui-même sur Carrefour.fr.
+- Les appels utilisent les API front-end privées de Carrefour, **non documentées et susceptibles de changer**. Le comportement de modification du panier est **testé avec des réponses simulées**, pas encore sur la session Carrefour personnelle de l'utilisateur. Une **validation réelle sur l'iPhone**, d'abord avec 1–2 articles, est indispensable. Vérifier l'icône panier Carrefour et les quantités après chaque essai.
+
+### Utilisation
+
+Mettre à jour l'unique script Userscripts vers **v0.8**, ouvrir l'application de l'écran d'accueil, vérifier que le catalogue associe les bonnes références, puis cliquer **« Constituer mon panier Carrefour »**. La navigation ouvre la page Carrefour avec la liste, la vérification et les tentatives d'ajout. **Contrairement aux versions v0.1–0.7, cette version peut modifier réellement le panier dès l'ouverture du lien.**
+
+En cas de panne, la copie de secours reste disponible dans la fenêtre « Détails et copie de secours » ; après collage manuel dans Userscripts, il est possible de lancer l'ajout via le bouton explicite « Ajouter les produits disponibles au panier ».
+

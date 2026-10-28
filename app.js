@@ -269,6 +269,10 @@ function ingredientEditor(id,draftName=''){
  '<div class="field"><label for="catalogIngredientStore">Magasin habituel</label><select id="catalogIngredientStore">'+
  '<option value="carrefour" '+(store==='carrefour'?'selected':'')+'>🛒 Carrefour Drive</option>'+
  '<option value="grandfrais" '+(store==='grandfrais'?'selected':'')+'>🥬 Grand Frais</option></select></div>'+
+ '<div class="field"><label for="catalogIngredientCategory">Catégorie</label><select id="catalogIngredientCategory">'+selectOptions(productCategories,ing?.category||'Autres')+'</select></div>'+
+ '<div class="row stock-editor-row"><div class="field grow"><label for="catalogIngredientQty">Quantité habituelle (ajout aux courses)</label><input id="catalogIngredientQty" type="number" min=".01" step="any" value="'+html(ing?.qty||1)+'" required></div>'+
+ '<div class="field grow"><label for="catalogIngredientUnit">Unité</label><select id="catalogIngredientUnit">'+selectOptions(units,ing?.unit||preferredIngredientUnit(ing))+'</select></div></div>'+
+ '<p class="helper">Cette quantité est proposée seulement pour un ajout manuel. Chaque recette conserve ses propres quantités.</p>'+
  '<div class="field"><label for="catalogIngredientProduct">Produit Carrefour associé (facultatif pour Grand Frais)</label><select id="catalogIngredientProduct">'+
  '<option value="">Aucun produit associé</option>'+
  state.products.slice().sort((a,b)=>a.name.localeCompare(b.name,'fr')).map(p=>'<option value="'+html(p.id)+'" '+(ing?.productId===p.id?'selected':'')+'>'+html([p.name,p.brand,p.packaging].filter(Boolean).join(' · '))+'</option>').join('')+'</select>'+
@@ -278,13 +282,15 @@ function ingredientEditor(id,draftName=''){
  if(ing&&store==='carrefour')out+='<button class="btn secondary wide" style="margin-top:10px" data-action="import-linked-product" data-id="'+html(ing.id)+'">📋 Importer un produit depuis Carrefour</button>'+
  '<button class="btn secondary wide" style="margin-top:8px" data-action="new-linked-product" data-id="'+html(ing.id)+'">＋ Créer une fiche produit manuellement</button>';
  else out+='<p class="helper">Enregistre d’abord cet ingrédient, puis tu pourras créer ou lier sa référence Carrefour.</p>';
- out+='<p class="helper">La quantité en grammes ou en pièces se renseigne toujours dans chaque recette, et non dans cette base.</p>';
+ out+='<p class="helper">Les quantités nécessaires à une recette restent renseignées dans chaque plat, sans être remplacées par la quantité habituelle d’achat.</p>';
+ if(ing)out+='<button class="btn danger wide" style="margin-top:10px" data-action="delete-catalog-ingredient" data-id="'+html(ing.id)+'">Supprimer cet ingrédient</button>';
  showModal(ing?'Modifier l’ingrédient':'Nouvel ingrédient',out)
 }
 function saveCatalogIngredient(e){
  e.preventDefault();
- const name=$('#catalogIngredientName')?.value.trim(),store=$('#catalogIngredientStore')?.value,productId=$('#catalogIngredientProduct')?.value||null;
- if(!name||!['carrefour','grandfrais'].includes(store)||!(!productId||productById(productId))){
+ const name=$('#catalogIngredientName')?.value.trim(),store=$('#catalogIngredientStore')?.value,productId=$('#catalogIngredientProduct')?.value||null,
+  category=$('#catalogIngredientCategory')?.value,qty=Number($('#catalogIngredientQty')?.value),unit=$('#catalogIngredientUnit')?.value;
+ if(!name||!['carrefour','grandfrais'].includes(store)||!(!productId||productById(productId))||!productCategories.includes(category)||!Number.isFinite(qty)||qty<=0||!units.includes(unit)){
   toast('Vérifie le nom, le magasin et la référence Carrefour.');return
  }
  const old=ingredientById(e.target.dataset.id),duplicate=ingredientByName(name);
@@ -298,7 +304,7 @@ function saveCatalogIngredient(e){
  const ing=old||makeIngredient(name,store,productId);
  if(!ing)return;
  const previous=ing.name;
- Object.assign(ing,{name,store,productId});
+ Object.assign(ing,{name,store,productId,category,qty,unit});
  if(state.storePreferences)delete state.storePreferences['ingredient:'+ing.id];
  // Les plats utilisent toujours la fiche partagée, y compris après un renommage.
  state.recipes.forEach(r=>(r.ingredients||[]).forEach(line=>{
@@ -1464,6 +1470,16 @@ document.addEventListener('click',e=>{
    if(!ing||!Number.isFinite(qty)||qty<=0||!units.includes(unit)){toast('Vérifie la quantité et l’unité.');return}
    w.extras.push({id:uid(),ingredientId:ing.id,productId:ing.productId||null,name:ing.name,qty,unit});
    persist();closeModal();currentTab='courses';render();toast(ing.name+' ajouté aux courses !')
+  }
+  else if(mode==='delete-catalog-ingredient'){
+   const ing=ingredientById(id);if(!ing)return;
+   if(state.recipes.some(r=>(r.ingredients||[]).some(x=>x.ingredientId===id||norm(x.name)===norm(ing.name)))){
+    toast('Cet ingrédient est utilisé dans des recettes. Retire-le d’abord des plats concernés.');return
+   }
+   if(!confirm('Supprimer cet ingrédient ? Ses achats déjà ajoutés resteront dans les courses. Sa référence Carrefour, si présente, sera conservée.'))return;
+   checkpoint('Avant suppression d’un ingrédient');
+   state.ingredientCatalog=state.ingredientCatalog.filter(x=>x.id!==id);
+   persist();closeModal();render();toast('Ingrédient supprimé du catalogue.')
   }
   else if(mode==='edit-ingredient')ingredientEditor(id);
   else if(mode==='new-linked-product'){

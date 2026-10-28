@@ -332,7 +332,7 @@
     });
     let activeCartRun=false;
     const cartOutcomes=[];
-    const expectedDriveName=/\b(?:ecole|école)[-\s]?valentin\b|\bbesan[cç]on[-\s]?valentin\b/i;
+    const expectedDriveName=/(?:[eé]cole|besan[cç]on)[-\s]?valentin/i;
     function cartItems(cart){
       return (Array.isArray(cart?.items)?cart.items:[])
         .flatMap(group=>Array.isArray(group?.products)?group.products:[]);

@@ -8,7 +8,7 @@ const recipeTypes=['Pâtes','Viande','Poisson','Légumes','Salades','Soupes','Sn
 const icons={'Pâtes':'🍝','Viande':'🥩','Poisson':'🐟','Légumes':'🥦','Salades':'🥗','Soupes':'🥣','Snacks':'🥪','Tartes':'🥧','Crudités':'🥕','Dessert':'🍰','Salade':'🥗','Autre':'🍽️'};
 const units=['g','kg','ml','cl','l','pièce','paquet','boîte','rouleau','bouteille','pot','sachet'];
 const contentUnits=['g','kg','ml','cl','l','pièce','rouleau'];
-const baseState=()=>({schema:1,recipes:[],products:[],weeks:{},staples:[],storePreferences:{},ingredientCatalog:[],coursesExplicitGenerationV1:false,settings:{people:2}});
+const baseState=()=>({schema:1,recipes:[],products:[],weeks:{},staples:[],storePreferences:{},ingredientCatalog:[],favoritesUnifiedV29:false,coursesExplicitGenerationV1:false,settings:{people:2}});
 let state=baseState(), currentTab='menus', currentWeek='', search='', recipeSort='az', recipeTypeFilter='all', productSearch='', productCategory='Toutes', ingredientStoreTab='carrefour', catalogueTypeFilter='all', catalogueStoreFilter='all', db=null, usingFallback=false;
 let pendingRecipeDraftImage='',pendingIngredientLinkId=null;
 let independentProductsOpen=false;const courseOpenSections=new Set();
@@ -63,7 +63,7 @@ async function restoreSnapshot(id){
   if(!confirm('Remplacer tes données actuelles par cette sauvegarde locale ?'))return;
   await checkpoint('Avant restauration');
   state={...baseState(),...selected.data,products:Array.isArray(selected.data.products)?selected.data.products:[]};
-  normalizeIngredientCatalog();migrateLegacyGeneratedCourses();persist();await saveQueue;closeModal();render();toast('Version précédente restaurée !')
+  normalizeIngredientCatalog();migrateFrequentProducts();migrateLegacyGeneratedCourses();persist();await saveQueue;closeModal();render();toast('Version précédente restaurée !')
  }catch(e){toast('Restauration impossible. Exporte ton JSON si nécessaire.')}
 }
 let toastTimer;
@@ -506,6 +506,34 @@ function normalizeIngredientCatalog(){
  }
  return changed
 }
+// Migration non destructive des favoris historiques vers les fiches Produit.
+// Un seul favori (= attribut frequent) par fiche et aucun achat ajouté à une semaine.
+function migrateFrequentProducts(){
+ if(state.favoritesUnifiedV29===true)return false;
+ if(!Array.isArray(state.products))state.products=[];
+ if(!Array.isArray(state.ingredientCatalog))state.ingredientCatalog=[];
+ for(const fav of (Array.isArray(state.staples)?state.staples:[])){
+  if(!String(fav?.name||'').trim())continue;
+  const ing=ingredientByName(fav.name);
+  const product=state.products.find(p=>norm(p.name)===norm(fav.name));
+  const target=ing||product;
+  if(target){target.frequent=true;continue}
+  state.products.push({id:uid(),name:String(fav.name).trim().slice(0,100),brand:'',packaging:'',
+   store:'carrefour',category:'Autres',qty:Number(fav.qty)>0?Number(fav.qty):1,
+   unit:units.includes(fav.unit)?fav.unit:'pièce',url:'',ean:'',packAmount:null,packUnit:null,frequent:true})
+ }
+ state.staples=[];
+ state.favoritesUnifiedV29=true;
+ return true
+}
+function frequentCatalogueItems(){
+ const linked=new Set((state.ingredientCatalog||[]).map(i=>i.productId).filter(Boolean));
+ return [
+  ...(state.ingredientCatalog||[]).filter(i=>i.frequent).map(i=>({kind:'ingredient',id:i.id,name:i.name})),
+  ...(state.products||[]).filter(p=>p.frequent&&!linked.has(p.id)).map(p=>({kind:'daily',id:p.id,name:p.name}))
+ ].sort((a,b)=>a.name.localeCompare(b.name,'fr',{sensitivity:'base'}));
+}
+
 function canonicalIngredient(line){
  return ingredientById(line?.ingredientId)||ingredientByName(line?.name)
 }
@@ -801,9 +829,11 @@ function renderCourses(){
  out+='<div class="course-summary"><div class="course-shop-count carrefour"><strong>'+carrefour.length+'</strong><span>🛒 Carrefour Drive</span></div>'+
  '<div class="course-shop-count grand"><strong>'+grand.length+'</strong><span>🥬 Grand Frais</span></div></div>';
  out+='<button class="btn wide course-add-btn" data-action="add-extra">＋ Ajouter un article à cette semaine</button>';
- if(state.staples.length){
-  out+='<details class="course-optional" data-section="favorites" '+(courseOpenSections.has('favorites')?'open':'')+'><summary>☆ Ajouter depuis mes favoris <span class="pill gray">'+state.staples.length+'</span></summary>'+
-   '<div class="favorites">'+state.staples.map(x=>'<button class="favorite-chip" data-action="quick-staple" data-id="'+html(x.id)+'">＋ '+html(x.name)+'</button>').join('')+'</div></details>'
+ const favorites=frequentCatalogueItems();
+ if(favorites.length){
+  out+='<details class="course-optional" data-section="favorites" '+(courseOpenSections.has('favorites')?'open':'')+'><summary>☆ Mes achats fréquents <span class="pill gray">'+favorites.length+'</span></summary>'+
+   '<p class="helper">Des produits du catalogue, sans fiche en double. Retrouve-les ici pour les ajouter ponctuellement.</p><div class="favorites">'+
+   favorites.map(x=>'<button class="favorite-chip" data-action="frequent-to-courses" data-kind="'+x.kind+'" data-id="'+html(x.id)+'">＋ '+html(x.name)+'</button>').join('')+'</div></details>'
  }
  function section(store,title,icon,rows){
   const isDrive=store==='carrefour';
@@ -1340,7 +1370,7 @@ async function copyList(){const value=listText();if(!value){toast('Aucun produit
 function exportData(){const blob=new Blob([JSON.stringify({...state,exportedAt:new Date().toISOString()},null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='mes-menus-drive-sauvegarde-'+localDate(new Date())+'.json';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);toast('Sauvegarde créée. Conserve le fichier !')}
 async function importData(file){if(!file)return;try{if(file.size>25*1024*1024)throw Error('Fichier trop volumineux.');const raw=JSON.parse(await file.text());if(raw.schema!==1||!Array.isArray(raw.recipes)||!raw.weeks||typeof raw.weeks!=='object'||!Array.isArray(raw.staples))throw Error('Format de sauvegarde non reconnu.');
   if(!confirm('Remplacer les données actuelles par celles de ce fichier ?'))return;
-  checkpoint('Avant import JSON');state={schema:1,recipes:raw.recipes,products:Array.isArray(raw.products)?raw.products:[],weeks:raw.weeks,staples:raw.staples,storePreferences:raw.storePreferences&&typeof raw.storePreferences==='object'&&!Array.isArray(raw.storePreferences)?raw.storePreferences:{},ingredientCatalog:Array.isArray(raw.ingredientCatalog)?raw.ingredientCatalog:[],coursesExplicitGenerationV1:raw.coursesExplicitGenerationV1===true,settings:{people:2,...raw.settings}};normalizeIngredientCatalog();migrateLegacyGeneratedCourses();persist();closeModal();render();toast('Sauvegarde restaurée !')
+  checkpoint('Avant import JSON');state={schema:1,recipes:raw.recipes,products:Array.isArray(raw.products)?raw.products:[],weeks:raw.weeks,staples:raw.staples,storePreferences:raw.storePreferences&&typeof raw.storePreferences==='object'&&!Array.isArray(raw.storePreferences)?raw.storePreferences:{},ingredientCatalog:Array.isArray(raw.ingredientCatalog)?raw.ingredientCatalog:[],favoritesUnifiedV29:raw.favoritesUnifiedV29===true,coursesExplicitGenerationV1:raw.coursesExplicitGenerationV1===true,settings:{people:2,...raw.settings}};normalizeIngredientCatalog();migrateFrequentProducts();migrateLegacyGeneratedCourses();persist();closeModal();render();toast('Sauvegarde restaurée !')
 }catch(err){toast(err.message||'Importation impossible.')}}
 document.addEventListener('click',e=>{
  const summary=e.target.closest('summary');
@@ -1544,7 +1574,7 @@ document.addEventListener('click',e=>{
   else if(mode==='complete-week')populate();
   else if(mode==='repeat-week'){const prev=state.weeks[offsetDate(currentWeek,-7)];if(!prev?.meals?.some(Boolean)){toast('Aucun menu trouvé la semaine précédente.');return}if(w.meals.some(Boolean)&&!confirm('Remplacer les repas de cette semaine ?'))return;w.meals=JSON.parse(JSON.stringify(prev.meals));persist();render();toast('Menus de la semaine précédente repris !')}
   else if(mode==='add-extra')extraModal();
-  else if(mode==='quick-staple'){const s=state.staples.find(x=>x.id===id);if(s){w.extras.push({id:uid(),name:s.name,qty:s.qty,unit:s.unit});persist();render();toast(s.name+' ajouté !')}}
+  else if(mode==='frequent-to-courses')unifiedToCourses(a.dataset.kind,id);
   else if(mode==='edit-manual-row')editManualRowModal(id);
   else if(mode==='edit-manual-extra')editManualExtraModal(id);
   else if(mode==='save-manual-extra'){
@@ -1623,7 +1653,7 @@ window.addEventListener('hashchange',()=>importCarrefourProductFromHash());
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal()});
 $('#settingsBtn').addEventListener('click',settingsModal);
 (async function boot(){currentWeek=monday(new Date());try{db=await openDatabase();const stored=await readRecord();if(stored?.schema===1)state={...baseState(),...stored,products:Array.isArray(stored.products)?stored.products:[]}}catch(err){usingFallback=true;try{const raw=localStorage.getItem('menus-drive-backup');if(raw){const saved=JSON.parse(raw);state={...baseState(),...saved,products:Array.isArray(saved.products)?saved.products:[]}}}catch(e){}toast('Mode de sauvegarde local de secours activé.')}
-  const ingredientMigration=normalizeIngredientCatalog(),courseMigration=migrateLegacyGeneratedCourses();
-  if(ingredientMigration||courseMigration)persist();
+  const ingredientMigration=normalizeIngredientCatalog(),favoriteMigration=migrateFrequentProducts(),courseMigration=migrateLegacyGeneratedCourses();
+  if(ingredientMigration||favoriteMigration||courseMigration)persist();
   render();importCarrefourProductFromHash();if('serviceWorker' in navigator&&location.protocol==='https:')navigator.serviceWorker.register('./sw.js').catch(()=>{});
 })();

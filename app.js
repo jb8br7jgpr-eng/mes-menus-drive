@@ -499,10 +499,37 @@ function renderDrive(){const items=shopping().filter(x=>!x.checked&&!x.excluded&
 function showModal(title,body){modalRoot.innerHTML='<div class="modal-overlay" data-overlay="true"><div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle"><div class="modal-head"><h2 id="modalTitle">'+title+'</h2><button class="close-btn" aria-label="Fermer" data-action="close-modal">×</button></div>'+body+'</div></div>';const first=modalRoot.querySelector('input,button');if(first)first.focus()}
 function closeModal(){modalRoot.innerHTML=''}
 function selectOptions(values,value){return values.map(x=>'<option value="'+html(x)+'" '+(x===value?'selected':'')+'>'+html(x)+'</option>').join('')}
-function ingredientRow(item={name:'',qty:'',unit:'g'}){const choices='<option value="">Aucune référence liée</option>'+state.products.map(p=>'<option value="'+html(p.id)+'" '+(item.productId===p.id?'selected':'')+'>'+html([p.name,p.brand,p.packaging].filter(Boolean).join(' · '))+'</option>').join('');return '<div class="ingredient-line"><div class="ingredient-edit-row"><input class="ingredient-name" placeholder="Ingrédient" aria-label="Ingrédient" value="'+html(item.name)+'"><input class="ingredient-qty" type="number" min=".01" step="any" placeholder="Qté" aria-label="Quantité" value="'+html(item.qty)+'"><select class="ingredient-unit" aria-label="Unité">'+selectOptions(units,item.unit)+'</select><button type="button" class="icon-btn" aria-label="Retirer cet ingrédient" data-action="remove-ingredient">×</button></div><select class="ingredient-product" aria-label="Produit Carrefour associé">'+choices+'</select></div>'}
-function recipeEditor(id){const r=recipeById(id),title=r?'Modifier le plat':'Ajouter un plat',ingredients=r?.ingredients?.length?r.ingredients:[{name:'',qty:'',unit:'g'}];let body='<form id="recipeForm" data-id="'+(r?.id||'')+'"><div class="field"><label for="recipeName">Nom du plat</label><input required maxlength="90" id="recipeName" placeholder="Ex. Poulet au curry" value="'+html(r?.name||'')+'"></div><div class="row" style="align-items:start;gap:11px"><div class="field grow"><label for="recipeCategory">Type de plat</label><select id="recipeCategory">'+selectOptions(Object.keys(icons),r?.category||'Autre')+'</select></div><div class="field" style="width:115px"><label for="recipePeople">Portions de base</label><input id="recipePeople" type="number" min="1" max="30" required value="'+(r?.people||4)+'"></div></div><div class="field"><label for="recipePhoto">Photo (facultatif)</label><div class="image-input"><input id="recipePhoto" type="file" accept="image/*"><div class="helper">Photo conservée sur ce téléphone. Format allégé automatiquement.</div></div></div><div class="row between" style="margin:15px 0 8px"><h3>Ingrédients</h3></div><div id="ingredientRows">'+ingredients.map(ingredientRow).join('')+'</div><button id="addIngredientBottom" type="button" class="btn secondary wide ingredient-add-bottom" data-action="add-ingredient">＋ Ajouter un ingrédient</button><div class="divider"></div><button class="btn wide" type="submit">✓ Enregistrer le plat</button></form>';
-  if(r)body+='<button class="btn danger wide" style="margin-top:10px" data-action="delete-recipe" data-id="'+r.id+'">Supprimer ce plat</button>';
-  showModal(title,body)
+function ingredientRow(item={name:'',qty:'',unit:'g'}){
+ const ing=canonicalIngredient(item);
+ const store=ing?ingredientStore(ing):(item.store==='grandfrais'?'grandfrais':ingredientDefaultStore(item.name,item.productId));
+ const linked=ing?productById(ing.productId):productById(item.productId);
+ return '<div class="ingredient-line">'+
+ '<div class="ingredient-edit-row"><input class="ingredient-name" list="ingredientNames" placeholder="Ingrédient de la base" aria-label="Nom de l’ingrédient" value="'+html(ing?.name||item.name)+'">'+
+ '<input class="ingredient-qty" type="number" min=".01" step="any" placeholder="Qté" aria-label="Quantité dans cette recette" value="'+html(item.qty)+'">'+
+ '<select class="ingredient-unit" aria-label="Unité">'+selectOptions(units,item.unit)+'</select>'+
+ '<button type="button" class="icon-btn" aria-label="Retirer cet ingrédient" data-action="remove-ingredient">×</button></div>'+
+ '<div class="ingredient-store-row"><label>Magasin habituel :</label><select class="ingredient-store" aria-label="Magasin habituel de cet ingrédient">'+
+ '<option value="carrefour" '+(store==='carrefour'?'selected':'')+'>🛒 Carrefour</option>'+
+ '<option value="grandfrais" '+(store==='grandfrais'?'selected':'')+'>🥬 Grand Frais</option></select></div>'+
+ '<p class="ingredient-link-note">'+(store==='grandfrais'?'Grand Frais : aucune fiche produit nécessaire.':
+  linked?'Produit Carrefour : '+html(linked.name)+(linked.packAmount?' · '+html(quantity(linked.packAmount,linked.packUnit))+'/paquet':' · contenu du paquet à préciser'):
+  'Aucun produit Carrefour lié : tu pourras l’associer dans la base.')+'</p></div>'
+}
+function recipeEditor(id){
+ const r=recipeById(id),title=r?'Modifier le plat':'Ajouter un plat',ingredients=r?.ingredients?.length?r.ingredients:[{name:'',qty:'',unit:'g'}];
+ let body='<form id="recipeForm" data-id="'+(r?.id||'')+'">'+
+ '<div class="field"><label for="recipeName">Nom du plat</label><input required maxlength="90" id="recipeName" placeholder="Ex. Poulet au curry" value="'+html(r?.name||'')+'"></div>'+
+ '<div class="row" style="align-items:start;gap:11px"><div class="field grow"><label for="recipeCategory">Type de plat</label><select id="recipeCategory">'+selectOptions(Object.keys(icons),r?.category||'Autre')+'</select></div>'+
+ '<div class="field" style="width:115px"><label for="recipePeople">Portions de base</label><input id="recipePeople" type="number" min="1" max="30" required value="'+(r?.people||4)+'"></div></div>'+
+ '<div class="field"><label for="recipePhoto">Photo (facultatif)</label><div class="image-input"><input id="recipePhoto" type="file" accept="image/*"><div class="helper">Photo conservée sur ce téléphone. Format allégé automatiquement.</div></div></div>'+
+ '<div class="row between" style="margin:15px 0 8px"><h3>Ingrédients</h3></div>'+
+ '<p class="helper">Commence à écrire un nom déjà enregistré pour réutiliser cet ingrédient. Sinon il sera créé une seule fois dans la base, dans le magasin sélectionné.</p>'+
+ '<datalist id="ingredientNames">'+(state.ingredientCatalog||[]).slice().sort((a,b)=>a.name.localeCompare(b.name,'fr')).map(x=>'<option value="'+html(x.name)+'"></option>').join('')+'</datalist>'+
+ '<div id="ingredientRows">'+ingredients.map(ingredientRow).join('')+'</div>'+
+ '<button id="addIngredientBottom" type="button" class="btn secondary wide ingredient-add-bottom" data-action="add-ingredient">＋ Ajouter un ingrédient</button>'+
+ '<div class="divider"></div><button class="btn wide" type="submit">✓ Enregistrer le plat</button></form>';
+ if(r)body+='<button class="btn danger wide" style="margin-top:10px" data-action="delete-recipe" data-id="'+r.id+'">Supprimer ce plat</button>';
+ showModal(title,body)
 }
 function pickMeal(index){
  const meal=getWeek().meals[index],dishes=mealDishes(meal),leftovers=mealLeftovers(meal),extraDefault=dishes.length?1:4;
@@ -685,14 +712,37 @@ function populate(mode){
  persist();render();toast(mode==='generate'?'Semaine variée générée !':'Les repas manquants sont complétés !')
 }
 async function compressImage(file){if(!file)return null;if(file.size>12*1024*1024)throw Error('Photo trop volumineuse (12 Mo maximum).');return new Promise((resolve,reject)=>{const reader=new FileReader();reader.onerror=()=>reject(Error('Impossible de lire la photo.'));reader.onload=()=>{const img=new Image();img.onerror=()=>reject(Error('Photo non reconnue.'));img.onload=()=>{const max=640,scale=Math.min(1,max/Math.max(img.width,img.height)),can=document.createElement('canvas');can.width=Math.round(img.width*scale);can.height=Math.round(img.height*scale);can.getContext('2d').drawImage(img,0,0,can.width,can.height);resolve(can.toDataURL('image/jpeg',.76))};img.src=reader.result};reader.readAsDataURL(file)})}
-async function saveRecipe(e){e.preventDefault();const form=e.target,name=$('#recipeName').value.trim(),people=Number($('#recipePeople').value),category=$('#recipeCategory').value;const ingredients=[...$('#ingredientRows').children].map(row=>({name:$('.ingredient-name',row).value.trim(),qty:Number($('.ingredient-qty',row).value),unit:$('.ingredient-unit',row).value,productId:$('.ingredient-product',row).value||null}));
-  if(!name||!Number.isFinite(people)||people<1||people>30){toast('Vérifie le nom et le nombre de personnes.');return}
-  if(!ingredients.length||ingredients.some(x=>!x.name||!Number.isFinite(x.qty)||x.qty<=0)){toast('Chaque ingrédient doit avoir un nom et une quantité positive.');return}
-  const old=recipeById(form.dataset.id);let image=old?.image||'';
-  try{if($('#recipePhoto').files[0])image=await compressImage($('#recipePhoto').files[0])}catch(err){toast(err.message);return}
-  const recipe={id:old?.id||uid(),name,people,category,ingredients,image};
-  if(old)state.recipes=state.recipes.map(x=>x.id===old.id?recipe:x);else state.recipes.push(recipe);
-  persist();closeModal();render();toast(old?'Plat modifié !':'Plat ajouté !')
+async function saveRecipe(e){
+ e.preventDefault();
+ const form=e.target,name=$('#recipeName').value.trim(),people=Number($('#recipePeople').value),category=$('#recipeCategory').value;
+ const rows=[...$('#ingredientRows').children].map(row=>({
+  name:$('.ingredient-name',row).value.trim(),qty:Number($('.ingredient-qty',row).value),
+  unit:$('.ingredient-unit',row).value,store:$('.ingredient-store',row).value
+ }));
+ if(!name||!Number.isFinite(people)||people<1||people>30){toast('Vérifie le nom et le nombre de portions.');return}
+ if(!rows.length||rows.some(x=>!x.name||!Number.isFinite(x.qty)||x.qty<=0||!units.includes(x.unit)||!['carrefour','grandfrais'].includes(x.store))){
+  toast('Chaque ingrédient doit avoir un nom, une quantité et un magasin.');return
+ }
+ const old=recipeById(form.dataset.id);let image=old?.image||'';
+ try{if($('#recipePhoto').files[0])image=await compressImage($('#recipePhoto').files[0])}catch(err){toast(err.message);return}
+ // Ne modifier la base que lorsque toute la recette est validée.
+ const ingredients=[],unique=new Map();
+ for(const x of rows){
+  let ing=ingredientByName(x.name);
+  if(!ing)ing=makeIngredient(x.name,x.store,null);
+  ing.store=x.store;
+  if(state.storePreferences)delete state.storePreferences['ingredient:'+ing.id];
+  const row={ingredientId:ing.id,name:ing.name,qty:x.qty,unit:x.unit,productId:ing.productId||null};
+  const key=ing.id+'|'+converted(x.qty,x.unit)[1];
+  const before=unique.get(key);
+  if(before&&before.unit===row.unit){before.qty+=row.qty;continue}
+  // Même ingrédient répété dans une recette : regrouper lorsque les unités coïncident.
+  if(!before)unique.set(key,row);
+  ingredients.push(row)
+ }
+ const recipe={id:old?.id||uid(),name,people,category,ingredients,image};
+ if(old)state.recipes=state.recipes.map(x=>x.id===old.id?recipe:x);else state.recipes.push(recipe);
+ persist();closeModal();render();toast(old?'Plat modifié !':'Plat ajouté et ingrédients enregistrés !')
 }
 function addExtra(e){e.preventDefault();const name=$('#extraName').value.trim(),qty=Number($('#extraQty').value),unit=$('#extraUnit').value;
   if(!name||!Number.isFinite(qty)||qty<=0){toast('Renseigne un produit et sa quantité.');return}

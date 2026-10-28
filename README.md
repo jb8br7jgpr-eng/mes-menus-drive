@@ -426,3 +426,16 @@ Cette version remplace la synchronisation automatique Menus → Courses par une 
 - **Travail validé en simulation** : absence d'ingrédients recettes avant génération ; capture pour quatre portions ; liste de courses initiale ; modification de menus sans réécriture ; confirmation/cancel ; conservation des ajouts, stocks, coches et exclusions ; isolation entre deux semaines ; sauvegarde JSON et migration ancienne idempotente. Contrôle visuel sur iPhone à effectuer.
 
 Le moteur panier Carrefour et Userscripts 0.9.0, la banque des ingrédients et des produits, l'import Carrefour, la liste Notes Grand Frais, les autres jeux et la branche `main` restent inchangés.
+
+
+## V23 — Suppression du doublon « Compléter ma semaine / Générer les 14 repas » (28/10/2026)
+
+Une seule commande contextuelle est affichée dans le bandeau **Menus** :
+- **Semaine entièrement vide :** « ✦ Générer mes 14 repas » remplit les 14 cases avec des plats du catalogue (2 portions par repas, sans placement automatique des restes).
+- **Semaine partiellement remplie :** « ✦ Compléter les repas manquants » remplit uniquement les cases vides, sans écraser les plats ni les restes déjà placés librement.
+- **14 cases renseignées :** aucun bouton de génération superflu ; une petite confirmation « ✓ Les 14 repas sont renseignés » remplace l'action.
+- « ↻ Reprendre la semaine passée » et « 🗑️ Vider tous les repas » sont conservés en bas, car ils répondent à des besoins distincts.
+- **Ne pas confondre** la génération des **repas** (planifier les menus) avec le bouton **« Générer les courses de cette semaine »** (capturer volontairement les ingrédients à acheter) : ce dernier reste inchangé.
+- Tests simulés : génération à vide, complément d’une semaine incomplète, conservation des repas occupés et des restes manuels, absence d'effet sur la liste de courses déjà générée, message de semaine complète et distinction des boutons de courses.
+
+Aucun changement du moteur Carrefour, du stockage, des recettes, des produits ni des commandes de paiement.

@@ -102,6 +102,34 @@ function validCarrefourLink(raw){
   try{const u=new URL(value);if(u.protocol!=='https:'||!(u.hostname==='carrefour.fr'||u.hostname.endsWith('.carrefour.fr'))||u.username||u.password)throw Error('Lien invalide');return u.href}
   catch(e){throw Error('Utilise un lien HTTPS provenant de carrefour.fr.')}
 }
+// Échange volontaire depuis Safari Carrefour : fragment d’URL, jamais d'accès au stockage d'un autre site.
+function importCarrefourProductFromHash(){
+  const prefix='#carrefour-product=';
+  if(!location.hash.startsWith(prefix))return false;
+  const raw=location.hash.slice(prefix.length);
+  // Retirer immédiatement le fragment du navigateur pour ne pas laisser les données dans l'historique courant.
+  if(typeof history!=='undefined'&&history.replaceState)history.replaceState(null,'',location.pathname+location.search);
+  if(raw.length>5000){toast('Lien de produit trop long.');return true}
+  try{
+    const data=JSON.parse(decodeURIComponent(raw));
+    if(!data||data.v!==1||typeof data.url!=='string')throw Error('Format non reconnu');
+    const url=validCarrefourLink(data.url);
+    if(!new URL(url).pathname.startsWith('/p/'))throw Error('Ce lien n’est pas une fiche produit');
+    const name=String(data.name||'').trim().slice(0,100);
+    const brand=String(data.brand||'').trim().slice(0,80);
+    const packaging=String(data.packaging||'').trim().slice(0,80);
+    const ean=/^\\d{13}$/.test(String(data.ean||''))?String(data.ean):'';
+    if(!name)throw Error('Nom de produit introuvable');
+    const already=state.products.find(p=>(p.url&&p.url.split(/[?#]/)[0]===url.split(/[?#]/)[0])||(ean&&p.ean===ean));
+    currentTab='produits';render();
+    if(already){
+      showModal('Produit déjà enregistré','<div class="note"><strong>'+html(already.name)+'</strong><p>Ce produit Carrefour est déjà présent dans ton catalogue. Tu peux modifier sa fiche, sans créer de doublon.</p></div><button class="btn wide" data-action="edit-product" data-id="'+html(already.id)+'">Modifier la fiche existante</button>');
+    }else{
+      productEditor(null,{name,brand,packaging,category:'Autres',qty:1,unit:'paquet',url,ean,packAmount:null,packUnit:null});
+    }
+    return true;
+  }catch(error){toast('Import Carrefour impossible : '+String(error.message||'lien invalide'));return true}
+}
 function productBadge(p){return (p.category==='Hygiène'?'🧴':p.category==='Maison'?'🧻':p.category==='Fruits et légumes'?'🥕':p.category==='Produits frais'?'🥛':p.category==='Viandes et poissons'?'🥩':'🛍️')}
 function productRows(){
   const list=(state.products||[]).filter(p=>(productCategory==='Toutes'||p.category===productCategory)&&[p.name,p.brand,p.packaging].some(v=>norm(v).includes(norm(productSearch)))).sort((a,b)=>a.name.localeCompare(b.name,'fr'));
@@ -117,17 +145,17 @@ function renderProduits(){
   out+='<p class="helper">Les liens Carrefour sont facultatifs. Ils ouvrent la fiche produit, sans ajouter automatiquement l’article au panier.</p>';
   return out
 }
-function productEditor(id){
- const p=productById(id),title=p?'Modifier le produit':'Ajouter un produit';
- const body='<form id="productForm" data-id="'+html(p?.id||'')+'"><div class="field"><label for="productName">Nom du produit</label><input id="productName" maxlength="100" required placeholder="Ex. Papier toilette" value="'+html(p?.name||'')+'"></div><div class="field"><label for="productBrand">Marque (facultatif)</label><input id="productBrand" maxlength="80" placeholder="Ex. Lotus" value="'+html(p?.brand||'')+'"></div><div class="field"><label for="productPackaging">Conditionnement (facultatif)</label><input id="productPackaging" maxlength="80" placeholder="Ex. Lot de 12 rouleaux" value="'+html(p?.packaging||'')+'"></div><div class="field"><label for="productCategory">Catégorie</label><select id="productCategory">'+selectOptions(productCategories,p?.category||'Autres')+'</select></div><div class="row" style="align-items:start"><div class="field grow"><label for="productQty">Quantité habituelle à acheter</label><input id="productQty" type="number" min=".01" step="any" required value="'+(p?.qty||1)+'"></div><div class="field grow"><label for="productUnit">Unité</label><select id="productUnit">'+selectOptions(units,p?.unit||'paquet')+'</select></div></div><div class="card soft" style="margin:12px 0"><strong>Contenu d’un emballage (facultatif)</strong><p class="helper">Exemple : un paquet contenant 1 kg de riz, pour calculer le nombre de paquets à acheter.</p><div class="row" style="align-items:start"><div class="field grow"><label for="packAmount">Contenu</label><input id="packAmount" type="number" min=".01" step="any" placeholder="Ex. 1" value="'+html(p?.packAmount??'')+'"></div><div class="field grow"><label for="packUnit">Unité de contenu</label><select id="packUnit">'+selectOptions(contentUnits,p?.packUnit||'g')+'</select></div></div></div><div class="field"><label for="productUrl">Lien du produit Carrefour (facultatif)</label><input id="productUrl" type="url" maxlength="2000" autocomplete="off" placeholder="https://www.carrefour.fr/p/..." value="'+html(p?.url||'')+'"><div class="helper">Colle le lien exact depuis Carrefour.fr. Aucune connexion à ton compte n’est demandée.</div></div><button class="btn wide" type="submit">✓ Enregistrer le produit</button></form>';
- showModal(title,body+(p?'<button class="btn danger wide" style="margin-top:10px" data-action="delete-product" data-id="'+html(p.id)+'">Supprimer ce produit</button>':''))
+function productEditor(id,draft=null){
+ const p=productById(id)||draft,title=id?'Modifier le produit':draft?'Importer depuis Carrefour':'Ajouter un produit';
+ const body='<form id="productForm" data-id="'+html(p?.id||'')+'"><div class="field"><label for="productName">Nom du produit</label><input id="productName" maxlength="100" required placeholder="Ex. Papier toilette" value="'+html(p?.name||'')+'"></div><div class="field"><label for="productBrand">Marque (facultatif)</label><input id="productBrand" maxlength="80" placeholder="Ex. Lotus" value="'+html(p?.brand||'')+'"></div><div class="field"><label for="productPackaging">Conditionnement (facultatif)</label><input id="productPackaging" maxlength="80" placeholder="Ex. Lot de 12 rouleaux" value="'+html(p?.packaging||'')+'"></div><div class="field"><label for="productCategory">Catégorie</label><select id="productCategory">'+selectOptions(productCategories,p?.category||'Autres')+'</select></div><div class="row" style="align-items:start"><div class="field grow"><label for="productQty">Quantité habituelle à acheter</label><input id="productQty" type="number" min=".01" step="any" required value="'+(p?.qty||1)+'"></div><div class="field grow"><label for="productUnit">Unité</label><select id="productUnit">'+selectOptions(units,p?.unit||'paquet')+'</select></div></div><div class="card soft" style="margin:12px 0"><strong>Contenu d’un emballage (facultatif)</strong><p class="helper">Exemple : un paquet contenant 1 kg de riz, pour calculer le nombre de paquets à acheter.</p><div class="row" style="align-items:start"><div class="field grow"><label for="packAmount">Contenu</label><input id="packAmount" type="number" min=".01" step="any" placeholder="Ex. 1" value="'+html(p?.packAmount??'')+'"></div><div class="field grow"><label for="packUnit">Unité de contenu</label><select id="packUnit">'+selectOptions(contentUnits,p?.packUnit||'g')+'</select></div></div></div><div class="field"><label for="productEan">Code-barres EAN-13 (facultatif)</label><input id="productEan" maxlength="13" inputmode="numeric" pattern="[0-9]{13}" placeholder="13 chiffres" value="'+html(p?.ean||'')+'"><div class="helper">Code de la fiche Carrefour, à vérifier sur l’emballage si nécessaire.</div></div><div class="field"><label for="productUrl">Lien du produit Carrefour (facultatif)</label><input id="productUrl" type="url" maxlength="2000" autocomplete="off" placeholder="https://www.carrefour.fr/p/..." value="'+html(p?.url||'')+'"><div class="helper">Colle le lien exact depuis Carrefour.fr. Aucune connexion à ton compte n’est demandée.</div></div><button class="btn wide" type="submit">✓ Enregistrer le produit</button></form>';
+ showModal(title,(draft&&!id?'<div class="note" style="margin-bottom:12px"><strong>Import depuis Carrefour.fr</strong><p>Vérifie le nom, la marque, la quantité et le conditionnement avant d’enregistrer. Aucun panier n’est modifié.</p></div>':'')+body+(id?'<button class="btn danger wide" style="margin-top:10px" data-action="delete-product" data-id="'+html(id)+'">Supprimer ce produit</button>':''))
 }
 function saveProduct(e){
  e.preventDefault();
- const id=e.target.dataset.id,old=productById(id),name=$('#productName').value.trim(),brand=$('#productBrand').value.trim(),packaging=$('#productPackaging').value.trim(),category=$('#productCategory').value,qty=Number($('#productQty').value),unit=$('#productUnit').value,packValue=$('#packAmount').value.trim(),packAmount=packValue?Number(packValue):null,packUnit=$('#packUnit').value;
- if(!name||!Number.isFinite(qty)||qty<=0||!units.includes(unit)||!productCategories.includes(category)||(packAmount!==null&&(!Number.isFinite(packAmount)||packAmount<=0||!contentUnits.includes(packUnit)))){toast('Vérifie le nom, la catégorie et la quantité.');return}
+ const id=e.target.dataset.id,old=productById(id),name=$('#productName').value.trim(),brand=$('#productBrand').value.trim(),packaging=$('#productPackaging').value.trim(),category=$('#productCategory').value,qty=Number($('#productQty').value),unit=$('#productUnit').value,packValue=$('#packAmount').value.trim(),packAmount=packValue?Number(packValue):null,packUnit=$('#packUnit').value,ean=$('#productEan').value.trim();
+ if(!name||!Number.isFinite(qty)||qty<=0||!units.includes(unit)||!productCategories.includes(category)||(packAmount!==null&&(!Number.isFinite(packAmount)||packAmount<=0||!contentUnits.includes(packUnit)))||(ean&&!/^\\d{13}$/.test(ean))){toast('Vérifie le nom, le code EAN et les quantités.');return}
  let url='';try{url=validCarrefourLink($('#productUrl').value)}catch(e){toast(e.message);return}
- const product={id:old?.id||uid(),name,brand,packaging,category,qty,unit,url,packAmount,packUnit:packAmount?packUnit:null};
+ const product={id:old?.id||uid(),name,brand,packaging,category,qty,unit,url,ean,packAmount,packUnit:packAmount?packUnit:null};
  if(old)state.products=state.products.map(p=>p.id===old.id?product:p);else state.products.push(product);
  persist();closeModal();render();toast(old?'Produit modifié !':'Produit ajouté au catalogue !')
 }
@@ -303,8 +331,9 @@ document.addEventListener('click',e=>{const tab=e.target.closest('[data-tab]');i
 document.addEventListener('change',e=>{if(e.target.matches('[data-check]')){const w=getWeek(),id=e.target.dataset.check;w.checked=e.target.checked?[...new Set([...w.checked,id])]:w.checked.filter(x=>x!==id);persist();render(true)}else if(e.target.id==='importFile')importData(e.target.files?.[0])});
 document.addEventListener('input',e=>{if(e.target.id==='recipeSearch'){search=e.target.value;const result=$('#recipeResults');if(result)result.innerHTML=recipeRows()}else if(e.target.id==='productSearch'){productSearch=e.target.value;const result=$('#productResults');if(result)result.innerHTML=productRows()}});
 document.addEventListener('submit',e=>{if(e.target.id==='recipeForm')saveRecipe(e);if(e.target.id==='extraForm')addExtra(e);if(e.target.id==='productForm')saveProduct(e)});
+window.addEventListener('hashchange',()=>importCarrefourProductFromHash());
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal()});
 $('#settingsBtn').addEventListener('click',settingsModal);
 (async function boot(){currentWeek=monday(new Date());try{db=await openDatabase();const stored=await readRecord();if(stored?.schema===1)state={...baseState(),...stored,products:Array.isArray(stored.products)?stored.products:[]}}catch(err){usingFallback=true;try{const raw=localStorage.getItem('menus-drive-backup');if(raw){const saved=JSON.parse(raw);state={...baseState(),...saved,products:Array.isArray(saved.products)?saved.products:[]}}}catch(e){}toast('Mode de sauvegarde local de secours activé.')}
-  render();if('serviceWorker' in navigator&&location.protocol==='https:')navigator.serviceWorker.register('./sw.js').catch(()=>{});
+  render();importCarrefourProductFromHash();if('serviceWorker' in navigator&&location.protocol==='https:')navigator.serviceWorker.register('./sw.js').catch(()=>{});
 })();

@@ -7,8 +7,8 @@ const categories=['Autres','Épicerie','Fruits et légumes','Viandes et poissons
 const icons={'Pâtes':'🍝','Viande':'🥩','Poisson':'🐟','Légumes':'🥦','Salade':'🥗','Dessert':'🍰','Autre':'🍽️'};
 const units=['g','kg','ml','cl','l','pièce','paquet','boîte','rouleau','bouteille','pot','sachet'];
 const contentUnits=['g','kg','ml','cl','l','pièce','rouleau'];
-const baseState=()=>({schema:1,recipes:[],products:[],weeks:{},staples:[],storePreferences:{},settings:{people:2}});
-let state=baseState(), currentTab='menus', currentWeek='', search='', productSearch='', productCategory='Toutes', db=null, usingFallback=false;
+const baseState=()=>({schema:1,recipes:[],products:[],weeks:{},staples:[],storePreferences:{},ingredientCatalog:[],settings:{people:2}});
+let state=baseState(), currentTab='menus', currentWeek='', search='', productSearch='', productCategory='Toutes', ingredientStoreTab='carrefour', db=null, usingFallback=false;
 const app=$('#app'), modalRoot=$('#modalRoot');
 const uid=()=>Math.random().toString(36).slice(2,10)+Date.now().toString(36);
 function localDate(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}
@@ -217,7 +217,70 @@ function norm(v){return String(v||'').normalize('NFD').replace(/[\u0300-\u036f]/
 function converted(q,u){q=Number(q)||0;return u==='kg'?[q*1000,'g']:u==='l'?[q*1000,'ml']:u==='cl'?[q*10,'ml']:[q,u||'pièce']}
 function quantity(q,u){const n=Math.round((Number(q)+Number.EPSILON)*100)/100;const s=n.toLocaleString('fr-FR',{maximumFractionDigits:2});const plurals={'pièce':'pièces','paquet':'paquets','boîte':'boîtes','bouteille':'bouteilles','pot':'pots','sachet':'sachets','rouleau':'rouleaux'};return s+' '+(n>1&&plurals[u]?plurals[u]:(u||'pièce'))}
 function defaultShoppingStore(category){return ['Fruits et légumes','Viandes et poissons'].includes(category)?'grandfrais':'carrefour'}
+// Chaque ingrédient physique est unique dans la base, même s'il apparaît
+// dans dix recettes. Les quantités restent propres à chaque plat.
+function ingredientById(id){return (state.ingredientCatalog||[]).find(i=>i.id===id)}
+function ingredientByName(name){return (state.ingredientCatalog||[]).find(i=>norm(i.name)===norm(name))}
+function ingredientDefaultStore(name,productId){
+ const p=productById(productId);
+ if(p?.store==='grandfrais'||p?.store==='carrefour')return p.store;
+ if(p)return 'carrefour';
+ return defaultShoppingStore(groupFor(name,'g'))
+}
+function ingredientStore(ing){
+ if(!ing)return 'carrefour';
+ const chosen=state.storePreferences?.['ingredient:'+ing.id];
+ return ['carrefour','grandfrais'].includes(chosen)?chosen:(ing.store==='grandfrais'?'grandfrais':'carrefour')
+}
+function makeIngredient(name,store,productId){
+ const clean=String(name||'').trim().slice(0,100);
+ if(!clean)return null;
+ const already=ingredientByName(clean);
+ if(already)return already;
+ const item={id:uid(),name:clean,store:store==='grandfrais'?'grandfrais':'carrefour',productId:productId||null};
+ state.ingredientCatalog.push(item);
+ return item
+}
+function normalizeIngredientCatalog(){
+ let changed=false;
+ if(!Array.isArray(state.ingredientCatalog)){state.ingredientCatalog=[];changed=true}
+ const distinct=new Map();
+ for(const record of state.ingredientCatalog){
+  const key=norm(record?.name);
+  if(!key)continue;
+  if(!distinct.has(key)){distinct.set(key,record);continue}
+  const master=distinct.get(key);
+  if(!master.productId&&record.productId)master.productId=record.productId;
+  state.recipes.forEach(r=>r.ingredients?.forEach(i=>{if(i.ingredientId===record.id)i.ingredientId=master.id}));
+  changed=true
+ }
+ if(distinct.size!==state.ingredientCatalog.length){state.ingredientCatalog=[...distinct.values()];changed=true}
+ for(const recipe of state.recipes){
+  for(const line of (recipe.ingredients||[])){
+   let ing=ingredientById(line.ingredientId);
+   if(!ing)ing=ingredientByName(line.name);
+   if(!ing){
+    ing=makeIngredient(line.name,ingredientDefaultStore(line.name,line.productId),line.productId||null);
+    if(ing)changed=true
+   }
+   if(!ing)continue;
+   if(!ing.productId&&line.productId&&productById(line.productId)){ing.productId=line.productId;changed=true}
+   if(line.ingredientId!==ing.id){line.ingredientId=ing.id;changed=true}
+  }
+ }
+ return changed
+}
+function canonicalIngredient(line){
+ return ingredientById(line?.ingredientId)||ingredientByName(line?.name)
+}
+function mergeIngredientInRecipe(line,store){
+ let ing=canonicalIngredient(line);
+ if(!ing){ing=makeIngredient(line.name,store||ingredientDefaultStore(line.name,line.productId),line.productId||null)}
+ return ing
+}
 function shoppingStore(x){
+ const ing=ingredientById(x.ingredientId);
+ if(ing)return ingredientStore(ing);
  const p=productById(x.productId);
  const key=p?'product:'+p.id:x.id;
  const saved=state.storePreferences?.[key];
@@ -229,9 +292,11 @@ function setShoppingStore(itemId,store){
  if(!['grandfrais','carrefour'].includes(store))return;
  const item=shopping().find(x=>x.id===itemId);
  if(!item)return;
- const key=item.productId?'product:'+item.productId:item.id;
+ const ing=ingredientById(item.ingredientId);
+ const key=ing?'ingredient:'+ing.id:(item.productId?'product:'+item.productId:item.id);
  if(!state.storePreferences)state.storePreferences={};
  state.storePreferences[key]=store;
+ if(ing)ing.store=store;
  // Le choix mémorisé s'applique aux prochaines semaines aussi.
  persist();render(true);toast(store==='grandfrais'?'Mis sur la liste Grand Frais':'Mis sur la liste Carrefour Drive')
 }

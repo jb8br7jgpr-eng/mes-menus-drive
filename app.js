@@ -93,7 +93,7 @@ function mealCard(meal,i){
  (names.length?names.map(n=>'<strong>'+html(n)+'</strong>').join(''):'<span class="add">＋ Ajouter un plat</span>')+'</button>';
 }
 function renderMenus(){const w=getWeek(),count=w.meals.filter(Boolean).length, last=offsetDate(currentWeek,6),isThis=currentWeek===monday(new Date());
-  let out='<div class="hero"><div class="eyebrow">Planificateur hebdomadaire</div><h1>Qu’est-ce qu’on mange cette semaine ?</h1><p>Pour vous deux : prépare 4 portions sur deux repas, un seul plat pour 2, ou deux plats différents au même repas !</p><button class="btn cream" data-action="complete-week">✦ Compléter ma semaine</button></div>';
+  let out='<div class="hero"><div class="eyebrow">Planificateur hebdomadaire</div><h1>Qu’est-ce qu’on mange cette semaine ?</h1><p>Pour vous deux : cuisine 4 portions, puis choisis librement quand manger les restes. Tu peux aussi faire deux plats différents au même repas !</p><button class="btn cream" data-action="complete-week">✦ Compléter ma semaine</button></div>';
   out+='<div class="section-head"><h2>Votre semaine</h2><span class="pill">'+count+' / 14 repas</span></div>';
   out+='<div class="week-control"><button class="icon-btn" aria-label="Semaine précédente" data-action="week-prev">‹</button><div class="week-label">Du '+niceDate(currentWeek)+' au '+niceDate(last)+(isThis?'<small>Cette semaine</small>':'<small>Planning personnalisé</small>')+'</div><button class="icon-btn" aria-label="Semaine suivante" data-action="week-next">›</button></div>';
   out+='<div class="status-bar"><span style="width:'+(count/14*100)+'%"></span></div>';
@@ -101,7 +101,7 @@ function renderMenus(){const w=getWeek(),count=w.meals.filter(Boolean).length, l
   for(let day=0;day<7;day++){const d=offsetDate(currentWeek,day);out+='<section class="day-card"><div class="day-title">'+days[day]+' <small>'+niceDate(d)+'</small></div><div class="day-meals">'+mealCard(w.meals[day*2],day*2)+mealCard(w.meals[day*2+1],day*2+1)+'</div></section>'}
   out+='</div><div class="toolbar"><button class="btn secondary" data-action="generate-week">✦ Générer les 14 repas</button><button class="btn secondary" data-action="repeat-week">↻ Reprendre la semaine passée</button></div>';
   out+='<button class="btn wide" data-action="go-courses">Voir ma liste de courses →</button>';
-  out+='<p class="helper">Chaque case peut contenir un ou plusieurs plats, avec un nombre de portions indépendant pour chacun. Pour une préparation unique de 4 portions, les restes sont proposés au repas suivant s’il est libre. Les ingrédients sont calculés une seule fois.</p>';
+  out+='<p class="helper">Choisis librement quand manger les restes : touche le repas souhaité, puis « Placer des restes ici ». La sélection indique les plats cuisinés et les portions encore disponibles. Aucun repas de restes n’est rempli automatiquement.</p>';
   return out
 }
 function recipeImg(r){return '<div class="recipe-img">'+(r.image?'<img src="'+html(r.image)+'" alt="">':html(icons[r.category]||'🍽️'))+'</div>'}
@@ -404,7 +404,7 @@ function showModal(title,body){modalRoot.innerHTML='<div class="modal-overlay" d
 function closeModal(){modalRoot.innerHTML=''}
 function selectOptions(values,value){return values.map(x=>'<option value="'+html(x)+'" '+(x===value?'selected':'')+'>'+html(x)+'</option>').join('')}
 function ingredientRow(item={name:'',qty:'',unit:'g'}){const choices='<option value="">Aucune référence liée</option>'+state.products.map(p=>'<option value="'+html(p.id)+'" '+(item.productId===p.id?'selected':'')+'>'+html([p.name,p.brand,p.packaging].filter(Boolean).join(' · '))+'</option>').join('');return '<div class="ingredient-line"><div class="ingredient-edit-row"><input class="ingredient-name" placeholder="Ingrédient" aria-label="Ingrédient" value="'+html(item.name)+'"><input class="ingredient-qty" type="number" min=".01" step="any" placeholder="Qté" aria-label="Quantité" value="'+html(item.qty)+'"><select class="ingredient-unit" aria-label="Unité">'+selectOptions(units,item.unit)+'</select><button type="button" class="icon-btn" aria-label="Retirer cet ingrédient" data-action="remove-ingredient">×</button></div><select class="ingredient-product" aria-label="Produit Carrefour associé">'+choices+'</select></div>'}
-function recipeEditor(id){const r=recipeById(id),title=r?'Modifier le plat':'Ajouter un plat',ingredients=r?.ingredients?.length?r.ingredients:[{name:'',qty:'',unit:'g'}];let body='<form id="recipeForm" data-id="'+(r?.id||'')+'"><div class="field"><label for="recipeName">Nom du plat</label><input required maxlength="90" id="recipeName" placeholder="Ex. Poulet au curry" value="'+html(r?.name||'')+'"></div><div class="row" style="align-items:start;gap:11px"><div class="field grow"><label for="recipeCategory">Type de plat</label><select id="recipeCategory">'+selectOptions(Object.keys(icons),r?.category||'Autre')+'</select></div><div class="field" style="width:115px"><label for="recipePeople">Portions de base</label><input id="recipePeople" type="number" min="1" max="30" required value="'+(r?.people||4)+'"></div></div><div class="field"><label for="recipePhoto">Photo (facultatif)</label><div class="image-input"><input id="recipePhoto" type="file" accept="image/*"><div class="helper">Photo conservée sur ce téléphone. Format allégé automatiquement.</div></div></div><div class="row between" style="margin:15px 0 8px"><h3>Ingrédients</h3><button type="button" class="btn secondary tiny" data-action="add-ingredient">＋ Ingrédient</button></div><div id="ingredientRows">'+ingredients.map(ingredientRow).join('')+'</div><div class="divider"></div><button class="btn wide" type="submit">✓ Enregistrer le plat</button></form>';
+function recipeEditor(id){const r=recipeById(id),title=r?'Modifier le plat':'Ajouter un plat',ingredients=r?.ingredients?.length?r.ingredients:[{name:'',qty:'',unit:'g'}];let body='<form id="recipeForm" data-id="'+(r?.id||'')+'"><div class="field"><label for="recipeName">Nom du plat</label><input required maxlength="90" id="recipeName" placeholder="Ex. Poulet au curry" value="'+html(r?.name||'')+'"></div><div class="row" style="align-items:start;gap:11px"><div class="field grow"><label for="recipeCategory">Type de plat</label><select id="recipeCategory">'+selectOptions(Object.keys(icons),r?.category||'Autre')+'</select></div><div class="field" style="width:115px"><label for="recipePeople">Portions de base</label><input id="recipePeople" type="number" min="1" max="30" required value="'+(r?.people||4)+'"></div></div><div class="field"><label for="recipePhoto">Photo (facultatif)</label><div class="image-input"><input id="recipePhoto" type="file" accept="image/*"><div class="helper">Photo conservée sur ce téléphone. Format allégé automatiquement.</div></div></div><div class="row between" style="margin:15px 0 8px"><h3>Ingrédients</h3></div><div id="ingredientRows">'+ingredients.map(ingredientRow).join('')+'</div><button id="addIngredientBottom" type="button" class="btn secondary wide ingredient-add-bottom" data-action="add-ingredient">＋ Ajouter un ingrédient</button><div class="divider"></div><button class="btn wide" type="submit">✓ Enregistrer le plat</button></form>';
   if(r)body+='<button class="btn danger wide" style="margin-top:10px" data-action="delete-recipe" data-id="'+r.id+'">Supprimer ce plat</button>';
   showModal(title,body)
 }
@@ -494,7 +494,7 @@ function availableLeftoverSources(w,targetIndex){
  w.meals.forEach((m,i)=>{
   if(i>=targetIndex)return;
   mealDishes(m).forEach(d=>{
-   const free=sourceBudget(w,i,d.recipeId)-usedLeftovers(w,i,d.recipeId,targetIndex);
+   const free=sourceBudget(w,i,d.recipeId)-usedLeftovers(w,i,d.recipeId);
    if(free>0&&recipeById(d.recipeId))results.push({sourceIndex:i,recipeId:d.recipeId,available:free})
   })
  });
@@ -562,15 +562,8 @@ function populate(mode){
  const w=getWeek();
  if(mode==='generate'&&w.meals.some(Boolean)&&!confirm('Remplacer les 14 repas de cette semaine ?'))return;
  if(mode==='generate')w.meals=Array(14).fill(null);
- else {
-  // Si un plat déjà choisi prévoit quatre portions, réserver le repas suivant
-  // comme restes avant de compléter les autres cases vides.
-  for(let i=0;i<w.meals.length-1;i++){
-   const meal=w.meals[i];
-   if(mealDishes(meal).length===1&&mealDishes(meal)[0].people>=4&&!w.meals[i+1])
-    w.meals[i+1]={type:'leftovers',recipeId:mealDishes(meal)[0].recipeId,fromIndex:i,leftoverPortions:Math.max(2,mealDishes(meal)[0].people-2)};
-  }
- }
+ // Aucun repas n'est réservé automatiquement aux restes : le calendrier
+ // laisse entièrement à l'utilisateur le choix de leur jour et de leur repas.
  const counts={},types={},history={};
  // Le générateur évite les plats récents, sans dépendance à une API ni aux données externes.
  [1,2,3].forEach((weeksAgo)=>{
@@ -590,9 +583,8 @@ function populate(mode){
   const selected=scored[0].r;
   counts[selected.id]=(counts[selected.id]||0)+1;
   types[selected.category||'Autre']=(types[selected.category||'Autre']||0)+1;
-  // Si le prochain repas est réservé, ne pas l'écraser : cuire 2 portions ici.
-  const canPair=i+1<w.meals.length&&!w.meals[i+1];
-  selectRecipeForMeal(w,i,selected.id,canPair?4:2);
+  // Un repas généré correspond à deux personnes, sans placement automatique de restes.
+  selectRecipeForMeal(w,i,selected.id,2);
  }
  persist();render();toast(mode==='generate'?'Semaine variée générée !':'Les repas manquants sont complétés !')
 }
@@ -638,10 +630,28 @@ document.addEventListener('click',e=>{const tab=e.target.closest('[data-tab]');i
   else if(mode==='add-catalog-product')addCatalogProduct(id);
   else if(mode==='filter-products'){productCategory=a.dataset.category;render(true)}
   else if(mode==='delete-product'){if(confirm('Supprimer ce produit du catalogue ? Les courses déjà saisies resteront.')){checkpoint('Avant suppression de produit');state.products=state.products.filter(x=>x.id!==id);state.recipes.forEach(r=>r.ingredients.forEach(i=>{if(i.productId===id)i.productId=null}));persist();closeModal();render();toast('Produit supprimé du catalogue.')}}
-  else if(mode==='add-ingredient')$('#ingredientRows').insertAdjacentHTML('beforeend',ingredientRow());
+  else if(mode==='add-ingredient'){
+   const rows=$('#ingredientRows');if(!rows)return;
+   rows.insertAdjacentHTML('beforeend',ingredientRow());
+   $('#addIngredientBottom')?.scrollIntoView?.({behavior:'smooth',block:'nearest'});
+  }
   else if(mode==='remove-ingredient')a.closest('.ingredient-line')?.remove();
   else if(mode==='choose-recipe'){if(!addRecipeToMeal(w,index,id,peopleInput())){toast('Ce plat est déjà présent dans ce repas. Modifie plutôt ses portions.');return}persist();closeModal();render()}
-  else if(mode==='choose-leftovers'){clearMealWithPair(w,index);w.meals[index]={type:'leftovers'};persist();closeModal();render()}
+  else if(mode==='choose-leftovers')pickLeftoverSource(index);
+  else if(mode==='apply-leftovers'){
+   const source=Number(a.dataset.source),qty=Number($('#leftoverPeople')?.value);
+   if(!Number.isInteger(qty)||qty<1||qty>30){toast('Choisis entre 1 et 30 portions de restes.');return}
+   if(!addLeftoversToMeal(w,index,source,id,qty)){toast('Cette quantité de restes n’est plus disponible.');pickLeftoverSource(index);return}
+   persist();closeModal();render();toast('Restes placés au repas choisi !')
+  }
+  else if(mode==='remove-leftover'){
+   const li=Number(a.dataset.leftover),parts=mealParts(w.meals[index]),left=mealLeftovers(w.meals[index]);
+   if(!Number.isInteger(li)||!left[li])return;
+   const removed=left[li];
+   const at=parts.findIndex(p=>p.type==='leftovers'&&p.recipeId===removed.recipeId&&p.fromIndex===removed.fromIndex);
+   if(at>=0)parts.splice(at,1);
+   storeMealParts(w,index,parts);persist();closeModal();render();toast('Restes retirés de ce repas.')
+  }
   else if(mode==='save-dish-portions'){
    const dishIndex=Number(a.dataset.dish),dishes=mealDishes(w.meals[index]),portions=portionInputForDish(dishIndex);
    if(!Number.isInteger(dishIndex)||!dishes[dishIndex]||portions===null){toast('Choisis entre 1 et 30 portions.');return}
@@ -672,8 +682,11 @@ document.addEventListener('click',e=>{const tab=e.target.closest('[data-tab]');i
   for(let i=0;i<week.meals.length;i++){
    const m=week.meals[i];
    if(m?.type==='leftovers'&&m.recipeId===id){week.meals[i]=null;continue}
-   const dishes=mealDishes(m);
-   if(dishes.some(d=>d.recipeId===id))setMealDishes(week,i,dishes.filter(d=>d.recipeId!==id))
+   const parts=mealParts(m);
+   if(parts.some(d=>d.recipeId===id)){
+    storeMealParts(week,i,parts.filter(d=>d.recipeId!==id));
+    reconcileLeftovers(week,i)
+   }
   }
  });persist();closeModal();render();toast('Plat supprimé.')}}
   else if(mode==='export-data')exportData();

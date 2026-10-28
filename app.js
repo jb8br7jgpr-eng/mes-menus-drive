@@ -9,7 +9,7 @@ const units=['g','kg','ml','cl','l','pièce','paquet','boîte','rouleau','boutei
 const contentUnits=['g','kg','ml','cl','l','pièce','rouleau'];
 const baseState=()=>({schema:1,recipes:[],products:[],weeks:{},staples:[],storePreferences:{},ingredientCatalog:[],settings:{people:2}});
 let state=baseState(), currentTab='menus', currentWeek='', search='', productSearch='', productCategory='Toutes', ingredientStoreTab='carrefour', db=null, usingFallback=false;
-let pendingRecipeDraftImage='';
+let pendingRecipeDraftImage='',pendingIngredientLinkId=null;
 const app=$('#app'), modalRoot=$('#modalRoot');
 const uid=()=>Math.random().toString(36).slice(2,10)+Date.now().toString(36);
 function localDate(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}
@@ -140,10 +140,14 @@ function openImportedCarrefourProduct(data){
   if(!name)throw Error('Nom du produit introuvable');
   const already=state.products.find(p=>(p.url&&p.url.split(/[?#]/)[0]===url.split(/[?#]/)[0])||(ean&&p.ean===ean));
   currentTab='produits';render();
+  const linked=ingredientById(pendingIngredientLinkId);
+  pendingIngredientLinkId=null;
   if(already){
-    showModal('Produit déjà enregistré','<div class="note"><strong>'+html(already.name)+'</strong><p>Cette référence Carrefour est déjà dans ton catalogue. Tu peux modifier sa fiche au lieu de créer un doublon.</p></div><button class="btn wide" data-action="edit-product" data-id="'+html(already.id)+'">Modifier la fiche existante</button>');
+    showModal('Produit déjà enregistré','<div class="note"><strong>'+html(already.name)+'</strong><p>Cette référence existe déjà, inutile de la créer deux fois.</p></div>'+
+      '<button class="btn wide" data-action="edit-product" data-id="'+html(already.id)+'">Modifier la fiche existante</button>'+
+      (linked?'<button class="btn secondary wide" style="margin-top:8px" data-action="link-imported-existing" data-id="'+html(already.id)+'" data-ingredient="'+html(linked.id)+'">✓ Associer à '+html(linked.name)+'</button>':''));
   }else{
-    productEditor(null,{name,brand,packaging,category:'Autres',qty:1,unit:'paquet',url,ean,packAmount:null,packUnit:null});
+    productEditor(null,{name,brand,packaging,category:'Autres',qty:1,unit:'paquet',url,ean,packAmount:null,packUnit:null},linked?.id||null);
   }
 }
 function importCarrefourProductFromHash(){
@@ -156,7 +160,8 @@ function importCarrefourProductFromHash(){
   catch(error){toast('Import Carrefour impossible : '+String(error.message||'lien invalide'))}
   return true
 }
-function carrefourClipboardModal(){
+function carrefourClipboardModal(ingredientId=null){
+ pendingIngredientLinkId=ingredientById(ingredientId)?.id||null;
   const body='<div class="note"><strong>Depuis l’icône sur ton iPhone</strong><p>Sur Carrefour.fr, copie le produit avec notre bouton vert. Reviens ici avec l’icône Menus & Drive, puis appuie sur « Coller et vérifier ».</p></div>'+
     '<button class="btn wide" data-action="read-carrefour-clipboard" style="margin:13px 0">📋 Coller et vérifier le produit</button>'+
     '<div class="field"><label for="carrefourPaste">Si le collage automatique ne marche pas</label><textarea id="carrefourPaste" class="text-input" rows="3" placeholder="Appuie ici longtemps puis choisis Coller"></textarea></div>'+
@@ -216,7 +221,8 @@ function ingredientEditor(id){
  state.products.slice().sort((a,b)=>a.name.localeCompare(b.name,'fr')).map(p=>'<option value="'+html(p.id)+'" '+(ing?.productId===p.id?'selected':'')+'>'+html([p.name,p.brand,p.packaging].filter(Boolean).join(' · '))+'</option>').join('')+'</select>'+
  '<div class="helper">Pour Carrefour, sélectionne la référence dont le code EAN et le poids ou contenu du paquet ont été renseignés. La même référence sera utilisée dans toutes les recettes contenant cet ingrédient.</div></div>'+
  '<button class="btn wide" type="submit">✓ Enregistrer dans la base</button></form>';
- if(ing)out+='<button class="btn secondary wide" style="margin-top:10px" data-action="new-linked-product" data-id="'+html(ing.id)+'">＋ Créer une fiche produit Carrefour pour cet ingrédient</button>';
+ if(ing&&store==='carrefour')out+='<button class="btn secondary wide" style="margin-top:10px" data-action="import-linked-product" data-id="'+html(ing.id)+'">📋 Importer un produit depuis Carrefour</button>'+
+ '<button class="btn secondary wide" style="margin-top:8px" data-action="new-linked-product" data-id="'+html(ing.id)+'">＋ Créer une fiche produit manuellement</button>';
  else out+='<p class="helper">Enregistre d’abord cet ingrédient, puis tu pourras créer ou lier sa référence Carrefour.</p>';
  out+='<p class="helper">La quantité en grammes ou en pièces se renseigne toujours dans chaque recette, et non dans cette base.</p>';
  showModal(ing?'Modifier l’ingrédient':'Nouvel ingrédient',out)
@@ -942,6 +948,13 @@ document.addEventListener('click',e=>{const tab=e.target.closest('[data-tab]');i
    productEditor(null,{name:ing.name,brand:'',packaging:'',category:'Autres',store:'carrefour',qty:1,unit:'paquet',url:'',ean:'',packAmount:null,packUnit:null},ing.id)
   }
   else if(mode==='open-carrefour-import')carrefourClipboardModal();
+  else if(mode==='import-linked-product')carrefourClipboardModal(id);
+  else if(mode==='link-imported-existing'){
+   const ing=ingredientById(a.dataset.ingredient),p=productById(id);if(!ing||!p)return;
+   ing.productId=p.id;ing.store='carrefour';
+   state.recipes.forEach(r=>(r.ingredients||[]).forEach(x=>{if(x.ingredientId===ing.id)x.productId=p.id}));
+   persist();closeModal();render();toast('Référence Carrefour associée à '+ing.name+' !')
+  }
   else if(mode==='read-carrefour-clipboard')readCarrefourClipboard();
   else if(mode==='import-pasted-carrefour')importCopiedCarrefourProduct($('#carrefourPaste')?.value);
   else if(mode==='edit-product')productEditor(id);

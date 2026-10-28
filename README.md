@@ -483,7 +483,7 @@ Le bouton **« Placer des restes ici »** ne dépend pas des filtres et reste vi
 **Données** : aucune modification du schéma de stockage : chaque achat conserve son ID, son unité et sa quantité dans `weeks[date].extras`. Les favoris restent distincts des ajouts manuels de la semaine. Tests simulés : import et réutilisation de 3 paquets depuis le cumul recette+manuel, modification d'un des deux achats identiques, suppression avec confirmation, protection des ingrédients calculés, stock couvrant l'article, exclusion, filtre par type et recherche dans Menus, catégories anciennes. Vérifier le confort final sur iPhone.
 
 
-## V28 — Produits réunis dans un catalogue unique (branche de travail, non déployée)
+## V28 — Produits réunis dans un catalogue unique (déployée)
 
 - **Un seul écran Produits** : les ingrédients et les achats du quotidien apparaissent dans une liste commune, triée par nom. Un produit Carrefour déjà lié à un ingrédient n'est pas affiché une seconde fois comme achat indépendant.
 - **Deux filtres cumulables** : `Tous / Ingrédients / Quotidien` et `Tous / Carrefour / Grand Frais`, plus la recherche instantanée.
@@ -493,4 +493,19 @@ Le bouton **« Placer des restes ici »** ne dépend pas des filtres et reste vi
 - **Compatibilité** : aucun changement de schéma IndexedDB/JSON, aucune conversion des fiches enregistrées, ni changement de la génération explicite des courses, des menus, des scripts Userscripts ou du fonctionnement du Drive.
 - **Vérifications de logique en environnement simulé** : 9 assertions initiales réussies (articles liés sans doublon, filtres, recherche, calcul de paquets, articles du quotidien et absence de génération spontanée). Validation du rendu sur iPhone à réaliser **avant tout déploiement**.
 
-Cette modification est enregistrée sur la branche `refonte-produits-unifies-v28` issue de `developpement-v1`. La branche utilisée par GitHub Pages et `main` restent inchangées jusqu'à validation explicite du déploiement.
+La V28 a été publiée sur GitHub Pages depuis developpement-v1. La branche main n'a pas été modifiée.
+
+## V29 — Ergonomie du catalogue, des courses et du Drive (branche de test)
+
+Points validés : 1, 2, 3, 4, 7 et 8. Les points 5 (stock de la semaine passée) et 6 (bandeaux de génération) restent hors périmètre.
+
+- **Favoris réunis dans Produits** : migration unique des favoris historiques vers une propriété frequent des ingrédients ou produits déjà enregistrés. Création d'une seule fiche quotidienne si le favori n'existe pas. Les achats fréquents dans Courses utilisent cette base commune. La migration est idempotente (favoritesUnifiedV29) et n'ajoute aucune course.
+- **Ajouts intelligents aux courses** : recherche instantanée et choix dans Produits, magasin et quantité habituelle repris, avec un parcours distinct « Article ponctuel » pour ne pas remplir inutilement la bibliothèque.
+- **Éditeur réellement commun** : mêmes champs de base pour les ingrédients et les produits quotidiens ; informations de référence Carrefour supplémentaires selon le type. Conservation des identifiants et des références existants, liens recettes inchangés.
+- **Courses plus aérées** : la coche, l'article, la quantité, le magasin et le bouton Modifier sur la ligne. La gestion de stock, des compléments manuels, du magasin et le retrait sont regroupés dans la fenêtre Modifier.
+- **Drive épuré** : compteurs de références prêtes / à compléter, action principale, liste repliable, options de secours regroupées, corrections des références manquantes conservées.
+- **Finition iPhone** : amélioration des contrastes, tailles de cibles tactiles, cartes et quantités ; transitions modérées avec respect du réglage de réduction des animations.
+
+Compatibilité : ni moteur de transfert Carrefour / Userscripts, ni calcul des portions, ni génération explicite des courses, ni schéma de stockage JSON 1 modifiés. Les versions des ressources et du cache PWA ont été préparées pour la V29. Vérification sur un vrai iPhone et contrôle de fonctionnement Carrefour toujours nécessaires avant toute mise en ligne.
+
+Statut : code uniquement sur la branche v29-ergonomie-produits-courses-drive ; aucune fusion ou publication sur la branche GitHub Pages developpement-v1 à ce stade.

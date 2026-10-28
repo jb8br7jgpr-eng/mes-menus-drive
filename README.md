@@ -164,3 +164,20 @@ Seuls les produits pour lesquels une référence EAN de 13 chiffres **et** une q
 
 Le précédent script v0.4 ne saura pas lire ce nouveau texte simplifié : installer/mettre à jour **v0.5**, en gardant une seule version active du script.
 
+
+
+## Vérification des références Carrefour en lecture seule (Userscripts v0.6)
+
+Après **Mon Drive → Copier les codes-barres et quantités** dans l'application installée, sur **Carrefour.fr dans Safari**, ouvrir Userscripts puis **« Coller mes codes-barres »**. Un nouveau bouton **« 🔎 Vérifier mes références sur Carrefour »** est proposé après le collage.
+
+**Lors d'un clic explicite :**
+
+1. Un `GET /api/cart` est utilisé **uniquement pour reconnaître l'identifiant du Drive actif**. Aucun ID de compte, ligne, quantité de panier ou montant du panier n'est affiché, transmis à un service tiers ou stocké par le script. Si aucun Drive réel n'est actif, le diagnostic s'arrête.
+2. Le nom du magasin est lu **si** le site expose ce champ dans son état initial, et seulement s'il correspond à l'identifiant du Drive actif. Le nom doit être vérifié visuellement par l'utilisateur : **École-Valentin**. L'affichage peut indiquer « nom non lisible ».
+3. Jusqu'à **15 EAN-13** sont recherchés séquentiellement avec `GET /autocomplete?q=<EAN>&maxResults=12&productCard=true` et l'en-tête `X-Requested-With: XMLHttpRequest`, côté Carrefour.fr uniquement. Il s'agit d'une API du site **non officielle et susceptible de changer**.
+4. Le nom du produit est affiché seulement si l'EAN correspond **exactement**. Le prix n'est montré, comme prix indicatif, que si une offre se rapporte à l'identifiant du magasin actif. Les verdicts d'offre sont présentés avec prudence.
+5. **Un EAN reconnu ou une offre affichée ne prouve pas le stock réel.** Les disponibilités positives remontées par la recherche Carrefour peuvent être périmées ou erronées. Il faut confirmer les produits en ouvrant leur vraie fiche avant tout futur ajout au panier.
+6. Aucune requête `POST`, `PATCH` ou `DELETE` ; **aucun changement de panier**. Aucun paiement, authentification supplémentaire, ou lecture de mots de passe / cookies.
+
+Le bouton de copie individuelle des fiches Carrefour vers l'application iPhone est conservé. Les tests locaux vérifient la classification « référence trouvée », « inconnue », « offre locale non confirmée » et « indiquée indisponible » sur des réponses simulées. **Il reste à valider en situation réelle** dans Safari, notamment la compatibilité de l'extension Userscripts iOS avec les réponses Carrefour.
+

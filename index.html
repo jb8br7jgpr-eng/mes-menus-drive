@@ -6,12 +6,13 @@
   <meta name="theme-color" content="#f9f7f1">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
-  <meta name="apple-mobile-web-app-title" content="Menus & Drive">
+  <meta name="apple-mobile-web-app-title" content="Speedrive">
   <meta name="description" content="Organise tes 14 repas et prépare tes courses Carrefour Drive en quelques minutes.">
-  <title>Menus & Drive — Mes courses simplifiées</title>
-  <link rel="manifest" href="./manifest.webmanifest">
-  <link rel="icon" href="./icon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="./styles.css?v=20261028-29">
+  <title>Speedrive — Menus et courses simplifiés</title>
+  <link rel="manifest" href="./manifest.webmanifest?v=20261028-30">
+  <link rel="icon" type="image/png" href="./speedrive-icon.PNG?v=20261028-30">
+  <link rel="apple-touch-icon" href="./speedrive-icon.PNG?v=20261028-30">
+  <link rel="stylesheet" href="./styles.css?v=20261028-30">
   <style>
     /* Navigation essentielle : 5 cases fixes, même si Safari conserve une ancienne feuille de style. */
     .bottom-nav { display: grid !important; grid-template-columns: repeat(5, minmax(0, 1fr)) !important; }
@@ -23,8 +24,7 @@
 <body>
   <div class="app-shell">
     <header class="topbar">
-      <div class="brand-mark" aria-hidden="true">✳</div>
-      <div class="brand-copy"><strong>Menus <span>&</span> Drive</strong><small>Moins de listes. Plus de temps.</small></div>
+      <div class="speedrive-brand"><img class="speedrive-logo" src="./speedrive-logo.PNG?v=20261028-30" alt="Speedrive — On fait la course pour les courses ?" width="1200" height="300"></div>
       <button class="round-btn" id="settingsBtn" aria-label="Sauvegardes et paramètres" title="Sauvegardes">⚙</button>
     </header>
     <main id="app" class="content" aria-live="polite">

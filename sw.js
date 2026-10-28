@@ -1,5 +1,5 @@
-const CACHE='menus-drive-v27-manual-edit-and-meal-picker-20261028';
-const ASSETS=['./','./index.html','./styles.css?v=20261028-27','./app.js?v=20261028-27','./manifest.webmanifest','./icon.svg'];
+const CACHE='menus-drive-v28-unified-product-catalog-20261028';
+const ASSETS=['./','./index.html','./styles.css?v=20261028-28','./app.js?v=20261028-28','./manifest.webmanifest','./icon.svg'];
 self.addEventListener('install',event=>{
   event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(ASSETS)).then(()=>self.skipWaiting()));
 });

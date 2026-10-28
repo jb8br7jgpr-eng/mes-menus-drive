@@ -495,7 +495,7 @@ function shoppingRow(x){
  return '<div class="shopping-row'+(x.checked?' checked':'')+'">'+
  '<input class="check" type="checkbox" data-check="'+html(x.id)+'" '+(x.checked?'checked':'')+' aria-label="Cocher '+html(x.name)+'">'+
  '<div class="grow"><div class="shopping-name">'+html(x.name)+'</div>'+
- '<div class="shopping-meta">'+(x.needed?'Besoin : '+html(x.needed)+' · ':'')+html(x.source.join(' + '))+
+ '<div class="shopping-meta">'+(x.grossNeeded?'Besoin total : '+html(x.grossNeeded)+' · ':'')+(x.needed?'Encore nécessaire : '+html(x.needed)+' · ':'')+html(x.source.join(' + '))+
  (p?' · '+html([p.brand,p.packaging].filter(Boolean).join(' · ')):'')+
  (p?.url&&x.store==='carrefour'?' · <a href="'+html(p.url)+'" target="_blank" rel="noopener noreferrer">Carrefour ↗</a>':'')+
  '</div><button class="home-stock-btn" data-action="home-stock" data-id="'+html(x.id)+'">🏠 Stock : '+html(quantity(x.stockAmount,x.stockUnit))+' · Modifier</button><label class="store-label" for="store-'+encodeURIComponent(x.id)+'">Magasin :</label>'+

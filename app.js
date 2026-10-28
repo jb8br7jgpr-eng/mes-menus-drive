@@ -17,7 +17,7 @@ function parseDate(s){const [y,m,d]=s.split('-').map(Number);return new Date(y,m
 function monday(d){const x=new Date(d.getFullYear(),d.getMonth(),d.getDate(),12);x.setDate(x.getDate()-((x.getDay()+6)%7));return localDate(x)}
 function offsetDate(s,n){const d=parseDate(s);d.setDate(d.getDate()+n);return localDate(d)}
 function niceDate(s){return parseDate(s).toLocaleDateString('fr-FR',{day:'numeric',month:'short'})}
-function getWeek(key=currentWeek){if(!state.weeks[key])state.weeks[key]={meals:Array(14).fill(null),extras:[],checked:[],excluded:[]};const w=state.weeks[key];if(!Array.isArray(w.meals))w.meals=Array(14).fill(null);if(!Array.isArray(w.extras))w.extras=[];if(!Array.isArray(w.checked))w.checked=[];if(!Array.isArray(w.excluded))w.excluded=[];return w}
+function getWeek(key=currentWeek){if(!state.weeks[key])state.weeks[key]={meals:Array(14).fill(null),extras:[],checked:[],excluded:[]};const w=state.weeks[key];if(!Array.isArray(w.meals))w.meals=Array(14).fill(null);if(!Array.isArray(w.extras))w.extras=[];if(!Array.isArray(w.checked))w.checked=[];if(!Array.isArray(w.excluded))w.excluded=[];if(!w.pantry||typeof w.pantry!=='object'||Array.isArray(w.pantry))w.pantry={};return w}
 // Données principales dans IndexedDB ; historique de points de restauration indépendants.
 function openDatabase(){return new Promise((resolve,reject)=>{const r=indexedDB.open('menus-drive-v1',2);r.onupgradeneeded=()=>{if(!r.result.objectStoreNames.contains('records'))r.result.createObjectStore('records');if(!r.result.objectStoreNames.contains('snapshots'))r.result.createObjectStore('snapshots',{keyPath:'id',autoIncrement:true})};r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error)})}
 function readRecord(){return new Promise((resolve,reject)=>{const req=db.transaction('records','readonly').objectStore('records').get('state');req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error)})}
@@ -456,17 +456,35 @@ function shopping(){
  }));
  w.extras.forEach(x=>add(x.name,x.qty,x.unit,'Ajout manuel',x.productId,Boolean(x.fromCatalogue),x.ingredientId));
  for(const [productId,item] of packs){
-  const p=item.p,n=item.needed>0&&item.size>0?Math.ceil(item.needed/item.size-1e-9):0,count=n+item.manualPacks;
-  if(count<=0)continue;
+  const p=item.p,stockUnit=item.needed>0?item.needUnit:(p.unit||'paquet');
+  const pantryKey='produit:'+productId+'|'+stockUnit;
+  const stockAmount=Math.max(0,Number(w.pantry[pantryKey])||0);
+  const netNeed=Math.max(0,item.needed-stockAmount);
+  const manualRemaining=item.needed>0?item.manualPacks:Math.max(0,item.manualPacks-stockAmount);
+  const count=(netNeed>0&&item.size>0?Math.ceil(netNeed/item.size-1e-9):0)+manualRemaining;
   const id='produit:'+productId+'|achat';
   map.set(id,{id,name:p.name,qty:count,unit:p.unit||'paquet',source:item.source,productId,ingredientId:item.ingredientId,
-   needed:item.needed>0?quantity(item.needed,item.needUnit):'',packageDescription:p.packaging||((p.packAmount>0)?quantity(p.packAmount,p.packUnit):'')})
+   needed:netNeed>0?quantity(netNeed,item.needUnit):'',grossNeeded:item.needed>0?quantity(item.needed,item.needUnit):'',
+   stockKey:pantryKey,stockAmount,stockUnit,covered:count<=0,
+   packageDescription:p.packaging||((p.packAmount>0)?quantity(p.packAmount,p.packUnit):'')})
  }
  return [...map.values()].sort((a,b)=>a.name.localeCompare(b.name,'fr')).map(x=>{
   const category=x.productId?productGroup(productById(x.productId)):groupFor(x.name,x.unit);
-  const item={...x,category,checked:w.checked.includes(x.id),excluded:w.excluded.includes(x.id)};
+  const stockKey=x.stockKey||x.id,stockAmount=Math.max(0,Number(w.pantry[stockKey])||0);
+  const fromPack=Boolean(x.stockKey),qty=fromPack?x.qty:Math.max(0,x.qty-stockAmount);
+  const item={...x,qty,stockKey,stockAmount:fromPack?x.stockAmount:stockAmount,stockUnit:fromPack?x.stockUnit:x.unit,
+   covered:fromPack?x.covered:qty<=0,grossQty:fromPack?x.qty:x.qty,
+   category,checked:w.checked.includes(x.id),excluded:w.excluded.includes(x.id)};
   return {...item,store:shoppingStore(item)}
  })
+}
+function homeStockModal(itemId){
+ const x=shopping().find(i=>i.id===itemId);if(!x)return;
+ const out='<p class="helper">Indique ce que vous avez déjà chez vous. La quantité sera déduite des courses de cette semaine avant le calcul des paquets.</p>'+
+ '<div class="field"><label for="homeStockAmount">Quantité déjà disponible ('+html(x.stockUnit)+')</label><input id="homeStockAmount" type="number" min="0" step="any" value="'+html(x.stockAmount||0)+'"></div>'+
+ '<div class="note">Un stock couvrant tout le besoin retirera automatiquement ce produit de Carrefour et Grand Frais. Tu pourras modifier ce stock ici.</div>'+
+ '<button class="btn wide" data-action="save-home-stock" data-id="'+html(x.id)+'">✓ Enregistrer mon stock</button>';
+ showModal('🏠 Stock maison · '+html(x.name),out)
 }
 function shoppingRow(x){
  const p=productById(x.productId);
@@ -476,7 +494,7 @@ function shoppingRow(x){
  '<div class="shopping-meta">'+(x.needed?'Besoin : '+html(x.needed)+' · ':'')+html(x.source.join(' + '))+
  (p?' · '+html([p.brand,p.packaging].filter(Boolean).join(' · ')):'')+
  (p?.url&&x.store==='carrefour'?' · <a href="'+html(p.url)+'" target="_blank" rel="noopener noreferrer">Carrefour ↗</a>':'')+
- '</div><label class="store-label" for="store-'+encodeURIComponent(x.id)+'">Magasin :</label>'+
+ '</div><button class="home-stock-btn" data-action="home-stock" data-id="'+html(x.id)+'">🏠 Stock : '+html(quantity(x.stockAmount,x.stockUnit))+' · Modifier</button><label class="store-label" for="store-'+encodeURIComponent(x.id)+'">Magasin :</label>'+
  '<select class="store-select" id="store-'+encodeURIComponent(x.id)+'" data-store-item="'+html(x.id)+'" aria-label="Magasin pour '+html(x.name)+'">'+
  '<option value="carrefour" '+(x.store==='carrefour'?'selected':'')+'>🛒 Carrefour Drive</option>'+
  '<option value="grandfrais" '+(x.store==='grandfrais'?'selected':'')+'>🥬 Grand Frais</option></select>'+ 
@@ -484,7 +502,7 @@ function shoppingRow(x){
  '<div class="shopping-qty">'+html(quantity(x.qty,x.unit))+'</div></div>'
 }
 function renderCourses(){
- const items=shopping(),available=items.filter(x=>!x.excluded),excluded=items.filter(x=>x.excluded),left=available.filter(x=>!x.checked),w=getWeek();
+ const items=shopping(),available=items.filter(x=>!x.excluded&&!x.covered),excluded=items.filter(x=>x.excluded),covered=items.filter(x=>x.covered&&!x.excluded),left=available.filter(x=>!x.checked),w=getWeek();
  const grand=available.filter(x=>x.store==='grandfrais'),drive=available.filter(x=>x.store==='carrefour');
  const todoGrand=grand.filter(x=>!x.checked).length,todoDrive=drive.filter(x=>!x.checked).length;
  let out=pageHeading('Liste intelligente','Mes courses','Deux magasins, une seule liste : choisis où acheter chaque produit.');
@@ -507,12 +525,14 @@ function renderCourses(){
  }
  out+=section('carrefour','Carrefour Drive','🛒',todoDrive,drive);
  out+=section('grandfrais','Grand Frais','🥬',todoGrand,grand);
+ if(covered.length)out+='<div class="section-head"><h2>🏠 Couvert par le stock maison</h2><span class="pill gray">'+covered.length+'</span></div>'+
+ covered.map(x=>'<div class="shopping-row"><span class="grow">'+html(x.name)+' · '+html(quantity(x.stockAmount,x.stockUnit))+' disponible</span><button class="btn tiny secondary" data-action="home-stock" data-id="'+html(x.id)+'">Modifier</button></div>').join('');
  if(excluded.length)out+='<div class="section-head"><h2>Déjà à la maison · retirés des achats</h2><span class="pill gray">'+excluded.length+'</span></div>'+excluded.map(x=>'<div class="shopping-row"><span class="grow muted">'+html(x.name)+' · '+html(quantity(x.qty,x.unit))+'</span><button class="btn tiny secondary" data-action="include" data-id="'+html(x.id)+'">Réintégrer</button></div>').join('');
  if(w.extras.length)out+='<div class="section-head"><h2>Produits ajoutés cette semaine</h2></div>'+w.extras.map(x=>'<div class="shopping-row"><span class="grow shopping-name">'+html(x.name)+'</span><span class="shopping-qty">'+html(quantity(x.qty,x.unit))+'</span><button class="icon-btn" data-action="delete-extra" data-id="'+x.id+'" aria-label="Supprimer">×</button></div>').join('');
  return out
 }
 function grandFraisText(){
- const items=shopping().filter(x=>!x.checked&&!x.excluded&&x.store==='grandfrais');
+ const items=shopping().filter(x=>!x.checked&&!x.excluded&&!x.covered&&x.store==='grandfrais');
  return items.length?'Grand Frais\n'+items.map(x=>'• '+x.name+' — '+quantity(x.qty,x.unit)+(x.needed?' (besoin : '+x.needed+')':'')).join('\n'):''
 }
 async function copyGrandFrais(){
@@ -521,9 +541,9 @@ async function copyGrandFrais(){
  try{await navigator.clipboard.writeText(value);toast('Liste Grand Frais copiée ! Colle-la dans Notes.')}
  catch(err){showModal('Liste Grand Frais à copier','<p class="helper">Sélectionne tout ce texte puis copie-le dans Notes :</p><textarea class="text-input" style="height:220px" readonly>'+html(value)+'</textarea>')}
 }
-function listText(){return shopping().filter(x=>!x.checked&&!x.excluded).map(x=>x.name+' — '+quantity(x.qty,x.unit)+(x.needed?' (besoin : '+x.needed+')':'')).join('\n')}
+function listText(){return shopping().filter(x=>!x.checked&&!x.excluded&&!x.covered).map(x=>x.name+' — '+quantity(x.qty,x.unit)+(x.needed?' (besoin : '+x.needed+')':'')).join('\n')}
 function driveTransferRows(){
- return shopping().filter(x=>!x.checked&&!x.excluded&&x.store==='carrefour').map(x=>{
+ return shopping().filter(x=>!x.checked&&!x.excluded&&!x.covered&&x.store==='carrefour').map(x=>{
   const p=productById(x.productId);
   const matchedEan=(p?.ean&&/^\d{13}$/.test(String(p.ean)))?String(p.ean):((p?.url||'').match(/(?:-|\/)(\d{13})(?:[/?#]|$)/)?.[1]||'');
   const qty=Number(x.qty),unit=x.unit;
@@ -909,6 +929,12 @@ document.addEventListener('click',e=>{const tab=e.target.closest('[data-tab]');i
   else if(mode==='go-drive'){currentTab='drive';render()}
   else if(mode==='go-menus'){currentTab='menus';render()}
   else if(mode==='go-products'){currentTab='produits';render()}
+  else if(mode==='home-stock')homeStockModal(id);
+  else if(mode==='save-home-stock'){
+   const x=shopping().find(i=>i.id===id),value=Number($('#homeStockAmount')?.value);
+   if(!x||!Number.isFinite(value)||value<0){toast('Indique une quantité positive ou zéro.');return}
+   w.pantry[x.stockKey]=value;persist();closeModal();render();toast('Stock maison déduit des courses !')
+  }
   else if(mode==='week-prev'||mode==='week-next'){currentWeek=offsetDate(currentWeek,mode==='week-prev'?-7:7);render()}
   else if(mode==='clear-day'){
    const day=Number(a.dataset.day);

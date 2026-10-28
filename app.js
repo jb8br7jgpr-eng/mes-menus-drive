@@ -965,6 +965,16 @@ function mealRecipePickerResults(index,searchTerm='',type='all'){
  return '<div class="meal-picker-section-heading">🕘 Récemment utilisés</div>'+recent.map(renderItem).join('')+
   (rest.length?'<div class="meal-picker-section-heading">Tous les autres plats</div>'+rest.map(renderItem).join(''):'')
 }
+function refreshMealRecipePicker(){
+ const results=$('#mealRecipeResults'),count=$('#mealRecipeCount');
+ if(!results)return;
+ const index=Number(results.dataset.index),term=$('#mealRecipeSearch')?.value||'',type=$('#mealRecipeType')?.value||'all';
+ if(!Number.isInteger(index)||index<0||index>13)return;
+ results.innerHTML=mealRecipePickerResults(index,term,type);
+ const used=new Set(mealDishes(getWeek().meals[index]).map(d=>d.recipeId));
+ const n=state.recipes.filter(r=>!used.has(r.id)&&norm(r.name).includes(norm(term))&&(type==='all'||normalRecipeType(r.category)===type)).length;
+ if(count)count.textContent=n+' plat'+(n>1?'s':'')+' disponible'+(n>1?'s':'')
+}
 function pickMeal(index){
  const meal=getWeek().meals[index],dishes=mealDishes(meal),leftovers=mealLeftovers(meal),extraDefault=dishes.length?1:4;
  let out='';
@@ -1003,7 +1013,7 @@ function pickMeal(index){
  '<button class="picker-item" data-action="choose-leftovers" data-index="'+index+'"><span class="emoji">🍱</span>'+
  '<span class="grow"><strong>Placer des restes ici</strong><small>Choisis leur plat d’origine et les portions disponibles</small></span>'+
  '<span class="end">＋</span></button>'+
- '<div id="mealRecipeResults">'+mealRecipePickerResults(index)+'</div></div>';
+ '<div id="mealRecipeResults" data-index="'+index+'">'+mealRecipePickerResults(index)+'</div></div>';
  if(!state.recipes.length)out+='<div class="note" style="margin-top:10px">Ajoute d’abord tes plats au catalogue, puis retrouve-les ici.</div>';
  if(meal)out+='<div class="meal-transfer-actions">'+
  '<button class="btn secondary" data-action="move-copy-meal" data-mode="copy" data-index="'+index+'" '+(!dishes.length?'disabled':'')+'>⧉ Copier</button>'+
@@ -1468,17 +1478,7 @@ document.addEventListener('click',e=>{
   else if(mode==='clear-all'){if(confirm('Effacer toutes les données actuelles ? Une copie locale sera conservée dans les versions précédentes.')){checkpoint('Avant effacement');state=baseState();persist();closeModal();render();toast('Données actuelles effacées.')}}
 });
 document.addEventListener('change',e=>{
- if(e.target.id==='mealRecipeType'){
-  const results=$('#mealRecipeResults'),count=$('#mealRecipeCount'),term=$('#mealRecipeSearch')?.value||'';
-  const type=e.target.value,index=Number($('#mealRecipeResults')?.closest?.('.modal')?.querySelector?.('[data-action="choose-leftovers"]')?.dataset.index);
-  if(results&&Number.isInteger(index)){
-   results.innerHTML=mealRecipePickerResults(index,term,type);
-   const reserved=new Set(mealDishes(getWeek().meals[index]).map(d=>d.recipeId));
-   const n=state.recipes.filter(r=>!reserved.has(r.id)&&(!term||norm(r.name).includes(norm(term)))&&(type==='all'||normalRecipeType(r.category)===type)).length;
-   if(count)count.textContent=n+' plat'+(n>1?'s':'')+' disponible'+(n>1?'s':'')
-  }
-  return
- }
+ if(e.target.id==='mealRecipeType'){refreshMealRecipePicker();return}
  if(e.target.id==='recipeSort'||e.target.id==='recipeTypeFilter'){
   if(e.target.id==='recipeSort')recipeSort=['az','za','type'].includes(e.target.value)?e.target.value:'az';
   else recipeTypeFilter=e.target.value;
@@ -1505,17 +1505,7 @@ document.addEventListener('change',e=>{
  }
  }else if(e.target.matches('[data-store-item]')){setShoppingStore(e.target.dataset.storeItem,e.target.value)}else if(e.target.matches('[data-check]')){const w=getWeek(),id=e.target.dataset.check;w.checked=e.target.checked?[...new Set([...w.checked,id])]:w.checked.filter(x=>x!==id);persist();render(true)}else if(e.target.id==='importFile')importData(e.target.files?.[0])});
 document.addEventListener('input',e=>{
- if(e.target.id==='mealRecipeSearch'){
-  const results=$('#mealRecipeResults'),count=$('#mealRecipeCount'),type=$('#mealRecipeType')?.value||'all';
-  const index=Number($('#mealRecipeResults')?.closest?.('.modal')?.querySelector?.('[data-action="choose-leftovers"]')?.dataset.index);
-  if(results&&Number.isInteger(index)){
-   results.innerHTML=mealRecipePickerResults(index,e.target.value,type);
-   const reserved=new Set(mealDishes(getWeek().meals[index]).map(d=>d.recipeId));
-   const n=state.recipes.filter(r=>!reserved.has(r.id)&&norm(r.name).includes(norm(e.target.value))&&(type==='all'||normalRecipeType(r.category)===type)).length;
-   if(count)count.textContent=n+' plat'+(n>1?'s':'')+' disponible'+(n>1?'s':'')
-  }
-  return
- }
+ if(e.target.id==='mealRecipeSearch'){refreshMealRecipePicker();return}
  if(e.target.id==='homeStockAmount')refreshStockPreview();if(e.target.matches?.('.ingredient-name'))refreshIngredientEntry(e.target.closest('.ingredient-line'));if(e.target.matches?.('.ingredient-unit'))e.target.closest('.ingredient-line').dataset.unitSelected='true';if(e.target.id==='recipeSearch'){search=e.target.value;const result=$('#recipeResults'),count=$('#recipeCount');if(result)result.innerHTML=recipeRows();if(count)count.textContent=visibleRecipes().length+' / '+state.recipes.length+' plats'}else if(e.target.id==='productSearch'){productSearch=e.target.value;if(productSearch.trim()){independentProductsOpen=true;const section=document.querySelector('.catalog-independent');if(section)section.open=true}const result=$('#productResults');if(result)result.innerHTML=productRows();const ings=$('#ingredientCatalogResults');if(ings)ings.innerHTML=ingredientRowsCatalogue()}});
 document.addEventListener('submit',e=>{if(e.target.id==='recipeForm')saveRecipe(e);if(e.target.id==='ingredientCatalogForm')saveCatalogIngredient(e);if(e.target.id==='extraForm')addExtra(e);if(e.target.id==='productForm')saveProduct(e)});
 window.addEventListener('hashchange',()=>importCarrefourProductFromHash());

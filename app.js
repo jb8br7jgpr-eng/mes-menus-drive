@@ -69,13 +69,33 @@ function render(preserveScroll=false){const scrollY=window.scrollY;document.quer
 function pageHeading(kicker,title,sub){return '<div class="eyebrow">'+kicker+'</div><h1>'+title+'</h1><p class="muted" style="font-size:13px">'+sub+'</p>'}
 function recipeById(id){return state.recipes.find(r=>r.id===id)}
 function emptyView(emoji,title,description,button){return '<div class="empty"><div class="illustration">'+emoji+'</div><strong>'+title+'</strong><p>'+description+'</p>'+button+'</div>'}
-function mealCard(meal,i){let label='',classes='',note='';
-  if(meal?.type==='leftovers'){const linked=meal.recipeId?recipeById(meal.recipeId):null;label=linked?'Restes : '+linked.name:'Restes';classes=' filled';note=(meal.leftoverPortions||2)+' portions · sans courses supplémentaires'}
-  else if(meal?.type==='recipe'){const r=recipeById(meal.recipeId);label=r?r.name:'Plat supprimé';classes=' filled';note=(meal.people||2)+' portions à cuisiner'}
-  return '<button class="meal-tile'+classes+'" data-action="pick-meal" data-index="'+i+'" aria-label="'+html(days[Math.floor(i/2)])+' '+(i%2?'soir':'midi')+', '+html(label||'ajouter un plat')+'"><span class="meal-type">'+(i%2?'Soir':'Midi')+(note?' · '+html(note):'')+'</span>'+(label?'<strong>'+html(label)+'</strong>':'<span class="add">＋ Ajouter un plat</span>')+'</button>';
+// Toutes les anciennes cases (un seul plat) restent lisibles après la mise à jour.
+function mealDishes(meal){
+ if(meal?.type==='recipe'&&meal.recipeId)return [{recipeId:meal.recipeId,people:Number(meal.people)||2}];
+ if(meal?.type==='multi'&&Array.isArray(meal.dishes))
+   return meal.dishes.filter(d=>d&&d.recipeId&&Number(d.people)>0)
+     .map(d=>({recipeId:d.recipeId,people:Number(d.people)}));
+ return []
+}
+function mealCard(meal,i){
+ let names=[],note='',classes='';
+ if(meal?.type==='leftovers'){
+  const r=meal.recipeId?recipeById(meal.recipeId):null;
+  names=[r?'Restes : '+r.name:'Restes'];classes=' filled';
+  note=(meal.leftoverPortions||2)+' portions · sans nouvelles courses'
+ }else{
+  const dishes=mealDishes(meal);
+  if(dishes.length){
+   names=dishes.map(d=>{const r=recipeById(d.recipeId);return (r?r.name:'Plat supprimé')+' · '+d.people+' portion'+(d.people>1?'s':'')});
+   classes=' filled';
+   note=dishes.length===1?'1 plat':' '+dishes.length+' plats pour ce repas'
+  }
+ }
+ return '<button class="meal-tile'+classes+'" data-action="pick-meal" data-index="'+i+'" aria-label="'+html(days[Math.floor(i/2)])+' '+(i%2?'soir':'midi')+', '+html(names.join(' et ')||'ajouter un plat')+'"><span class="meal-type">'+(i%2?'Soir':'Midi')+(note?' · '+html(note):'')+'</span>'+
+ (names.length?names.map(n=>'<strong>'+html(n)+'</strong>').join(''):'<span class="add">＋ Ajouter un plat</span>')+'</button>';
 }
 function renderMenus(){const w=getWeek(),count=w.meals.filter(Boolean).length, last=offsetDate(currentWeek,6),isThis=currentWeek===monday(new Date());
-  let out='<div class="hero"><div class="eyebrow">Planificateur hebdomadaire</div><h1>Qu’est-ce qu’on mange cette semaine ?</h1><p>Pour vous deux : cuisine 4 portions, mangez-en 2 et gardez les 2 autres pour le repas suivant.</p><button class="btn cream" data-action="complete-week">✦ Compléter ma semaine</button></div>';
+  let out='<div class="hero"><div class="eyebrow">Planificateur hebdomadaire</div><h1>Qu’est-ce qu’on mange cette semaine ?</h1><p>Pour vous deux : prépare 4 portions sur deux repas, un seul plat pour 2, ou deux plats différents au même repas !</p><button class="btn cream" data-action="complete-week">✦ Compléter ma semaine</button></div>';
   out+='<div class="section-head"><h2>Votre semaine</h2><span class="pill">'+count+' / 14 repas</span></div>';
   out+='<div class="week-control"><button class="icon-btn" aria-label="Semaine précédente" data-action="week-prev">‹</button><div class="week-label">Du '+niceDate(currentWeek)+' au '+niceDate(last)+(isThis?'<small>Cette semaine</small>':'<small>Planning personnalisé</small>')+'</div><button class="icon-btn" aria-label="Semaine suivante" data-action="week-next">›</button></div>';
   out+='<div class="status-bar"><span style="width:'+(count/14*100)+'%"></span></div>';
@@ -83,7 +103,7 @@ function renderMenus(){const w=getWeek(),count=w.meals.filter(Boolean).length, l
   for(let day=0;day<7;day++){const d=offsetDate(currentWeek,day);out+='<section class="day-card"><div class="day-title">'+days[day]+' <small>'+niceDate(d)+'</small></div><div class="day-meals">'+mealCard(w.meals[day*2],day*2)+mealCard(w.meals[day*2+1],day*2+1)+'</div></section>'}
   out+='</div><div class="toolbar"><button class="btn secondary" data-action="generate-week">✦ Générer les 14 repas</button><button class="btn secondary" data-action="repeat-week">↻ Reprendre la semaine passée</button></div>';
   out+='<button class="btn wide" data-action="go-courses">Voir ma liste de courses →</button>';
-  out+='<p class="helper">Par défaut, un plat prépare 4 portions pour 2 repas de 2 personnes : le repas suivant est automatiquement marqué « Restes » s’il est libre. Les ingrédients ne sont comptés qu’une fois. Le générateur respecte aussi cette organisation sans écraser les repas déjà choisis.</p>';
+  out+='<p class="helper">Chaque case peut contenir un ou plusieurs plats, avec un nombre de portions indépendant pour chacun. Pour une préparation unique de 4 portions, les restes sont proposés au repas suivant s’il est libre. Les ingrédients sont calculés une seule fois.</p>';
   return out
 }
 function recipeImg(r){return '<div class="recipe-img">'+(r.image?'<img src="'+html(r.image)+'" alt="">':html(icons[r.category]||'🍽️'))+'</div>'}
@@ -228,7 +248,7 @@ function shopping(){
   if(compatible||catalogue){if(!packs.has(p.id))packs.set(p.id,{p,needed:0,needUnit:packUnit||u,size,manualPacks:0,source:[]});const item=packs.get(p.id);if(catalogue)item.manualPacks+=Number(qty);else item.needed+=val;if(!item.source.includes(source))item.source.push(source);return}
   plain(name,qty,unit,source,productId)
  }
- w.meals.forEach(m=>{if(!m||m.type!=='recipe')return;const recipe=recipeById(m.recipeId);if(!recipe)return;const factor=(Number(m.people)||2)/Math.max(1,Number(recipe.people)||2);recipe.ingredients.forEach(x=>add(x.name,Number(x.qty)*factor,x.unit,'Recettes',x.productId))});
+ w.meals.forEach(m=>mealDishes(m).forEach(d=>{const recipe=recipeById(d.recipeId);if(!recipe)return;const factor=(Number(d.people)||2)/Math.max(1,Number(recipe.people)||2);recipe.ingredients.forEach(x=>add(x.name,Number(x.qty)*factor,x.unit,'Recettes',x.productId))}));
  w.extras.forEach(x=>add(x.name,x.qty,x.unit,'Ajout manuel',x.productId,Boolean(x.fromCatalogue)));
  for(const [productId,item] of packs){const p=item.p,n=item.needed>0&&item.size>0?Math.ceil(item.needed/item.size-1e-9):0,count=n+item.manualPacks;if(count<=0)continue;const id='produit:'+productId+'|achat';map.set(id,{id,name:p.name,qty:count,unit:p.unit||'paquet',source:item.source,productId,needed:item.needed>0?quantity(item.needed,item.needUnit):'',packageDescription:p.packaging||((p.packAmount>0)?quantity(p.packAmount,p.packUnit):'')})}
  return [...map.values()].sort((a,b)=>a.name.localeCompare(b.name,'fr')).map(x=>{const category=x.productId?productGroup(productById(x.productId)):groupFor(x.name,x.unit);const item={...x,category,checked:w.checked.includes(x.id),excluded:w.excluded.includes(x.id)};return {...item,store:shoppingStore(item)}})
@@ -390,15 +410,30 @@ function recipeEditor(id){const r=recipeById(id),title=r?'Modifier le plat':'Ajo
   if(r)body+='<button class="btn danger wide" style="margin-top:10px" data-action="delete-recipe" data-id="'+r.id+'">Supprimer ce plat</button>';
   showModal(title,body)
 }
-function pickMeal(index){const w=getWeek(),meal=w.meals[index],existing=meal?.type==='recipe'?recipeById(meal.recipeId):null,people=meal?.people||4;
-  let out='<div class="field"><label for="mealPeople">Portions à cuisiner (4 = 2 personnes × 2 repas)</label><input type="number" id="mealPeople" min="1" max="30" value="'+people+'"><div class="helper">Le repas suivant devient automatiquement « Restes » s’il est vide. Tu peux choisir 2 portions pour cuisiner une seule fois.</div></div>';
-  if(existing)out+='<div class="card soft" style="margin-bottom:12px"><strong>'+html(existing.name)+'</strong><p class="subtext">Recette sélectionnée</p><button class="btn secondary tiny" data-action="update-people" data-index="'+index+'">Mettre à jour les portions</button></div>';
-  out+='<div class="recipe-picker"><button class="picker-item" data-action="choose-leftovers" data-index="'+index+'"><span class="emoji">🍱</span><span class="grow"><strong>Restes d’un autre repas</strong><small>Ne rajoute aucun ingrédient aux courses</small></span><span class="end">＋</span></button>';
-  state.recipes.slice().sort((a,b)=>a.name.localeCompare(b.name,'fr')).forEach(r=>{out+='<button class="picker-item" data-action="choose-recipe" data-id="'+r.id+'" data-index="'+index+'"><span class="emoji">'+html(icons[r.category]||'🍽️')+'</span><span class="grow"><strong>'+html(r.name)+'</strong><small>'+r.ingredients.length+' ingrédients · base '+r.people+' pers.</small></span><span class="end">＋</span></button>'});
-  out+='</div>';
-  if(!state.recipes.length)out+='<div class="note" style="margin-top:10px">Ajoute d’abord tes plats au catalogue, puis retrouve-les ici.</div>';
-  if(meal)out+='<button class="btn secondary wide" style="margin-top:12px" data-action="remove-meal" data-index="'+index+'">Vider ce repas</button>';
-  showModal(days[Math.floor(index/2)]+' '+(index%2?'soir':'midi'),out)
+function pickMeal(index){
+ const meal=getWeek().meals[index],dishes=mealDishes(meal),extraDefault=dishes.length?1:4;
+ let out='';
+ if(meal?.type==='leftovers')out+='<div class="note" style="margin-bottom:12px"><strong>🍱 Restes de repas</strong><p>Ce repas n’ajoute pas de courses. Choisis un plat ci-dessous si tu veux le remplacer.</p></div>';
+ if(dishes.length){
+  out+='<div class="section-head"><h3>Plats prévus pour ce repas</h3><span class="pill">'+dishes.length+' plat'+(dishes.length>1?'s':'')+'</span></div>';
+  dishes.forEach((d,n)=>{
+   const r=recipeById(d.recipeId);
+   out+='<div class="meal-dish"><div class="grow"><strong>'+html(r?.name||'Plat supprimé')+'</strong><label class="helper" for="dishPortions'+n+'">Portions pour ce plat</label><input id="dishPortions'+n+'" class="meal-dish-qty" data-dish-qty="'+n+'" type="number" min="1" max="30" value="'+d.people+'"></div><div class="meal-dish-actions"><button class="btn tiny secondary" data-action="save-dish-portions" data-index="'+index+'" data-dish="'+n+'">✓ Modifier</button><button class="btn tiny ghost" data-action="remove-dish" data-index="'+index+'" data-dish="'+n+'">Retirer</button></div></div>'
+  })
+ }
+ out+='<div class="field"><label for="mealPeople">'+(dishes.length?'Portions du plat à ajouter':'Combien de portions pour le plat ?')+'</label>'+
+ '<input type="number" id="mealPeople" min="1" max="30" value="'+extraDefault+'">'+
+ '<div class="helper">1 portion par plat si vous mangez deux plats différents · 2 portions pour un repas à deux · 4 portions pour deux repas à deux. La quantité est propre à chaque plat.</div></div>';
+ out+='<div class="section-head"><h3>'+ (dishes.length?'Ajouter un autre plat':'Choisir un plat')+'</h3></div>';
+ out+='<div class="recipe-picker"><button class="picker-item" data-action="choose-leftovers" data-index="'+index+'"><span class="emoji">🍱</span><span class="grow"><strong>Restes d’un autre repas</strong><small>Remplace les plats de ce repas, sans ajouter de courses</small></span><span class="end">＋</span></button>';
+ state.recipes.slice().sort((a,b)=>a.name.localeCompare(b.name,'fr')).forEach(r=>{
+  if(dishes.some(d=>d.recipeId===r.id))return;
+  out+='<button class="picker-item" data-action="choose-recipe" data-id="'+r.id+'" data-index="'+index+'"><span class="emoji">'+html(icons[r.category]||'🍽️')+'</span><span class="grow"><strong>'+html(r.name)+'</strong><small>'+r.ingredients.length+' ingrédients · recette de base pour '+r.people+' portions</small></span><span class="end">＋</span></button>'
+ });
+ out+='</div>';
+ if(!state.recipes.length)out+='<div class="note" style="margin-top:10px">Ajoute d’abord tes plats au catalogue, puis retrouve-les ici.</div>';
+ if(meal)out+='<button class="btn secondary wide" style="margin-top:12px" data-action="remove-meal" data-index="'+index+'">Vider ce repas</button>';
+ showModal(days[Math.floor(index/2)]+' '+(index%2?'soir':'midi'),out)
 }
 function extraModal(){let out='<form id="extraForm"><div class="field"><label for="extraName">Produit</label><input id="extraName" maxlength="80" placeholder="Ex. papier toilette, baume à lèvres…" required></div><div class="row" style="align-items:start"><div class="field grow"><label for="extraQty">Quantité</label><input id="extraQty" type="number" min=".01" step="any" value="1" required></div><div class="field grow"><label for="extraUnit">Unité</label><select id="extraUnit">'+selectOptions(units,'paquet')+'</select></div></div><label class="row" style="font-size:13px;margin:5px 0 19px"><input type="checkbox" id="extraFavorite" checked> Mémoriser dans mes favoris</label><button class="btn wide" type="submit">＋ Ajouter aux courses</button></form>';showModal('Ajouter un produit',out)}
 function settingsModal(){
@@ -417,22 +452,42 @@ async function refreshBackupList(){
   $('#snapshotList').innerHTML=rows.length?rows.map(s=>'<div class="shopping-row"><div class="grow"><strong style="font-size:12px">'+html(s.label)+'</strong><div class="shopping-meta">'+new Date(s.time).toLocaleString('fr-FR')+'</div></div><button class="btn tiny secondary" data-action="restore-backup" data-id="'+s.id+'">Restaurer</button></div>').join(''):'Aucune version précédente pour le moment. Elles apparaissent au fil des modifications.';
  }catch(e){box.textContent='Impossible de lire les versions locales.'}
 }
-function peopleInput(){return Math.min(30,Math.max(1,Number($('#mealPeople')?.value)||4))}
-// Les « restes » liés à un repas suivent sa suppression ou son remplacement.
-// Les restes ajoutés manuellement restent indépendants.
+function peopleInput(){return Math.min(30,Math.max(1,Number($('#mealPeople')?.value)||1))}
+function portionInputForDish(dish){
+ const value=Number($('[data-dish-qty="'+dish+'"]')?.value);
+ return Number.isInteger(value)&&value>=1&&value<=30?value:null
+}
 function clearMealWithPair(w,index){
- const meal=w.meals[index];
- if(meal?.type==='recipe'&&w.meals[index+1]?.type==='leftovers'&&w.meals[index+1].fromIndex===index)
-   w.meals[index+1]=null;
+ if(index<0||index>=w.meals.length)return;
+ if(w.meals[index+1]?.type==='leftovers'&&w.meals[index+1].fromIndex===index)
+  w.meals[index+1]=null;
  w.meals[index]=null
 }
-function selectRecipeForMeal(w,index,recipeId,portions){
+function setMealDishes(w,index,dishes){
+ if(index<0||index>=w.meals.length)return;
+ const clean=dishes.filter(d=>d&&recipeById(d.recipeId)&&Number.isInteger(Number(d.people))&&Number(d.people)>=1&&Number(d.people)<=30)
+  .map(d=>({recipeId:d.recipeId,people:Number(d.people)}));
  clearMealWithPair(w,index);
- w.meals[index]={type:'recipe',recipeId,people:portions};
- if(portions>=4&&index+1<w.meals.length&&!w.meals[index+1])
-   w.meals[index+1]={type:'leftovers',recipeId,fromIndex:index,leftoverPortions:Math.max(2,portions-2)};
+ if(!clean.length)return;
+ if(clean.length===1){
+  w.meals[index]={type:'recipe',recipeId:clean[0].recipeId,people:clean[0].people};
+  // Restes automatiques uniquement pour une préparation unique de 4+ portions.
+  if(clean[0].people>=4&&index+1<w.meals.length&&!w.meals[index+1])
+   w.meals[index+1]={type:'leftovers',recipeId:clean[0].recipeId,fromIndex:index,leftoverPortions:Math.max(2,clean[0].people-2)};
+ }else{
+  w.meals[index]={type:'multi',dishes:clean};
+ }
 }
-
+function selectRecipeForMeal(w,index,recipeId,portions){
+ setMealDishes(w,index,[{recipeId,people:portions}])
+}
+function addRecipeToMeal(w,index,recipeId,portions){
+ if(!recipeById(recipeId))return false;
+ const current=mealDishes(w.meals[index]);
+ if(current.some(d=>d.recipeId===recipeId))return false;
+ setMealDishes(w,index,[...current,{recipeId,people:portions}]);
+ return true
+}
 function populate(mode){
  if(!state.recipes.length){toast('Ajoute d’abord quelques plats à ton catalogue.');currentTab='plats';render();return}
  const w=getWeek();
@@ -443,8 +498,8 @@ function populate(mode){
   // comme restes avant de compléter les autres cases vides.
   for(let i=0;i<w.meals.length-1;i++){
    const meal=w.meals[i];
-   if(meal?.type==='recipe'&&Number(meal.people)>=4&&!w.meals[i+1])
-    w.meals[i+1]={type:'leftovers',recipeId:meal.recipeId,fromIndex:i,leftoverPortions:Math.max(2,Number(meal.people)-2)};
+   if(mealDishes(meal).length===1&&mealDishes(meal)[0].people>=4&&!w.meals[i+1])
+    w.meals[i+1]={type:'leftovers',recipeId:mealDishes(meal)[0].recipeId,fromIndex:i,leftoverPortions:Math.max(2,mealDishes(meal)[0].people-2)};
   }
  }
  const counts={},types={},history={};
@@ -452,15 +507,15 @@ function populate(mode){
  [1,2,3].forEach((weeksAgo)=>{
   const old=state.weeks[offsetDate(currentWeek,-7*weeksAgo)];
   if(!old||!Array.isArray(old.meals))return;
-  old.meals.forEach(m=>{if(m?.type==='recipe'&&recipeById(m.recipeId))history[m.recipeId]=(history[m.recipeId]||0)+(weeksAgo===1?36:weeksAgo===2?16:7)})
+  old.meals.forEach(m=>mealDishes(m).forEach(d=>{if(recipeById(d.recipeId))history[d.recipeId]=(history[d.recipeId]||0)+(weeksAgo===1?36:weeksAgo===2?16:7)}))
  });
- w.meals.forEach(m=>{if(m?.type!=='recipe')return;const r=recipeById(m.recipeId);if(!r)return;counts[r.id]=(counts[r.id]||0)+1;types[r.category||'Autre']=(types[r.category||'Autre']||0)+1});
- const chosenByDay=day=>[w.meals[day*2],w.meals[day*2+1]].filter(m=>m?.type==='recipe').map(m=>m.recipeId);
+ w.meals.forEach(m=>mealDishes(m).forEach(d=>{const r=recipeById(d.recipeId);if(!r)return;counts[r.id]=(counts[r.id]||0)+1;types[r.category||'Autre']=(types[r.category||'Autre']||0)+1}));
+ const chosenByDay=day=>[w.meals[day*2],w.meals[day*2+1]].flatMap(mealDishes).map(d=>d.recipeId);
  for(let i=0;i<w.meals.length;i++){
   if(w.meals[i])continue;
-  const day=Math.floor(i/2),previous=i>0?w.meals[i-1]:null;
+  const day=Math.floor(i/2),previousDishes=i>0?mealDishes(w.meals[i-1]):[];
   const scored=state.recipes.map(r=>{
-   const count=counts[r.id]||0,cat=r.category||'Autre',nearby=chosenByDay(day).includes(r.id),sameCategory=previous?.recipeId&&recipeById(previous.recipeId)?.category===cat;
+   const count=counts[r.id]||0,cat=r.category||'Autre',nearby=chosenByDay(day).includes(r.id),sameCategory=previousDishes.some(d=>recipeById(d.recipeId)?.category===cat);
    return {r,score:count*100+(history[r.id]||0)+(types[cat]||0)*5+(nearby?180:0)+(sameCategory?18:0)+Math.random()*7}
   }).sort((a,b)=>a.score-b.score);
   const selected=scored[0].r;
@@ -516,9 +571,18 @@ document.addEventListener('click',e=>{const tab=e.target.closest('[data-tab]');i
   else if(mode==='delete-product'){if(confirm('Supprimer ce produit du catalogue ? Les courses déjà saisies resteront.')){checkpoint('Avant suppression de produit');state.products=state.products.filter(x=>x.id!==id);state.recipes.forEach(r=>r.ingredients.forEach(i=>{if(i.productId===id)i.productId=null}));persist();closeModal();render();toast('Produit supprimé du catalogue.')}}
   else if(mode==='add-ingredient')$('#ingredientRows').insertAdjacentHTML('beforeend',ingredientRow());
   else if(mode==='remove-ingredient')a.closest('.ingredient-line')?.remove();
-  else if(mode==='choose-recipe'){selectRecipeForMeal(w,index,id,peopleInput());persist();closeModal();render()}
+  else if(mode==='choose-recipe'){if(!addRecipeToMeal(w,index,id,peopleInput())){toast('Ce plat est déjà présent dans ce repas. Modifie plutôt ses portions.');return}persist();closeModal();render()}
   else if(mode==='choose-leftovers'){clearMealWithPair(w,index);w.meals[index]={type:'leftovers'};persist();closeModal();render()}
-  else if(mode==='update-people'){if(w.meals[index]?.type==='recipe'){const recipeId=w.meals[index].recipeId;selectRecipeForMeal(w,index,recipeId,peopleInput());persist();closeModal();render();toast('Portions mises à jour !')}}
+  else if(mode==='save-dish-portions'){
+   const dishIndex=Number(a.dataset.dish),dishes=mealDishes(w.meals[index]),portions=portionInputForDish(dishIndex);
+   if(!Number.isInteger(dishIndex)||!dishes[dishIndex]||portions===null){toast('Choisis entre 1 et 30 portions.');return}
+   dishes[dishIndex].people=portions;setMealDishes(w,index,dishes);persist();closeModal();render();toast('Portions du plat enregistrées !')
+  }
+  else if(mode==='remove-dish'){
+   const dishIndex=Number(a.dataset.dish),dishes=mealDishes(w.meals[index]);
+   if(!Number.isInteger(dishIndex)||!dishes[dishIndex])return;
+   dishes.splice(dishIndex,1);setMealDishes(w,index,dishes);persist();closeModal();render();toast('Plat retiré de ce repas.')
+  }
   else if(mode==='remove-meal'){clearMealWithPair(w,index);persist();closeModal();render()}
   else if(mode==='generate-week')populate('generate');
   else if(mode==='complete-week')populate('complete');
@@ -534,7 +598,15 @@ document.addEventListener('click',e=>{const tab=e.target.closest('[data-tab]');i
   else if(mode==='open-drive-in-safari')openDriveInSafari();
   else if(mode==='copy-drive-url')copyDriveUrl();
   else if(mode==='copy-drive-transfer')copyDriveTransfer();
-  else if(mode==='delete-recipe'){if(confirm('Supprimer ce plat ? Il disparaîtra aussi des menus qui l’utilisent.')){checkpoint('Avant suppression de plat');state.recipes=state.recipes.filter(r=>r.id!==id);Object.values(state.weeks).forEach(week=>{week.meals=week.meals.map(m=>m?.recipeId===id?null:m)});persist();closeModal();render();toast('Plat supprimé.')}}
+  else if(mode==='delete-recipe'){if(confirm('Supprimer ce plat ? Il disparaîtra aussi des menus qui l’utilisent.')){checkpoint('Avant suppression de plat');state.recipes=state.recipes.filter(r=>r.id!==id);Object.values(state.weeks).forEach(week=>{
+  if(!Array.isArray(week.meals))return;
+  for(let i=0;i<week.meals.length;i++){
+   const m=week.meals[i];
+   if(m?.type==='leftovers'&&m.recipeId===id){week.meals[i]=null;continue}
+   const dishes=mealDishes(m);
+   if(dishes.some(d=>d.recipeId===id))setMealDishes(week,i,dishes.filter(d=>d.recipeId!==id))
+  }
+ });persist();closeModal();render();toast('Plat supprimé.')}}
   else if(mode==='export-data')exportData();
   else if(mode==='refresh-backups')refreshBackupList();
   else if(mode==='restore-backup')restoreSnapshot(id);

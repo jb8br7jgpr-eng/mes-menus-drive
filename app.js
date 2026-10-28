@@ -299,6 +299,8 @@ function ingredientById(id){return (state.ingredientCatalog||[]).find(i=>i.id===
 function ingredientByName(name){return (state.ingredientCatalog||[]).find(i=>norm(i.name)===norm(name))}
 function ingredientDefaultStore(name,productId){
  const p=productById(productId);
+ const oldStore=productId?state.storePreferences?.['product:'+productId]:null;
+ if(oldStore==='grandfrais'||oldStore==='carrefour')return oldStore;
  if(p?.store==='grandfrais'||p?.store==='carrefour')return p.store;
  if(p)return 'carrefour';
  return defaultShoppingStore(groupFor(name,'g'))

@@ -493,7 +493,7 @@ function shopping(){
  }));
  w.extras.forEach(x=>add(x.name,x.qty,x.unit,'Ajout manuel',x.productId,Boolean(x.fromCatalogue),x.ingredientId));
  for(const [productId,item] of packs){
-  const stockUnit=item.needed>0?item.needUnit:(p.unit||'paquet');
+  const p=item.p,stockUnit=item.needed>0?item.needUnit:(p.unit||'paquet');
   const pantryKey='produit:'+productId+'|'+stockUnit;
   const stockAmount=Math.max(0,Number(w.pantry[pantryKey])||0);
   const grossNeed=item.needed>0?item.needed+item.manualPacks*item.size:item.manualPacks;

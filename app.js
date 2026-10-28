@@ -118,7 +118,7 @@ function importCarrefourProductFromHash(){
     const name=String(data.name||'').trim().slice(0,100);
     const brand=String(data.brand||'').trim().slice(0,80);
     const packaging=String(data.packaging||'').trim().slice(0,80);
-    const ean=/^\\d{13}$/.test(String(data.ean||''))?String(data.ean):'';
+    const ean=/^\d{13}$/.test(String(data.ean||''))?String(data.ean):'';
     if(!name)throw Error('Nom de produit introuvable');
     const already=state.products.find(p=>(p.url&&p.url.split(/[?#]/)[0]===url.split(/[?#]/)[0])||(ean&&p.ean===ean));
     currentTab='produits';render();
@@ -153,7 +153,7 @@ function productEditor(id,draft=null){
 function saveProduct(e){
  e.preventDefault();
  const id=e.target.dataset.id,old=productById(id),name=$('#productName').value.trim(),brand=$('#productBrand').value.trim(),packaging=$('#productPackaging').value.trim(),category=$('#productCategory').value,qty=Number($('#productQty').value),unit=$('#productUnit').value,packValue=$('#packAmount').value.trim(),packAmount=packValue?Number(packValue):null,packUnit=$('#packUnit').value,ean=$('#productEan').value.trim();
- if(!name||!Number.isFinite(qty)||qty<=0||!units.includes(unit)||!productCategories.includes(category)||(packAmount!==null&&(!Number.isFinite(packAmount)||packAmount<=0||!contentUnits.includes(packUnit)))||(ean&&!/^\\d{13}$/.test(ean))){toast('Vérifie le nom, le code EAN et les quantités.');return}
+ if(!name||!Number.isFinite(qty)||qty<=0||!units.includes(unit)||!productCategories.includes(category)||(packAmount!==null&&(!Number.isFinite(packAmount)||packAmount<=0||!contentUnits.includes(packUnit)))||(ean&&!/^\d{13}$/.test(ean))){toast('Vérifie le nom, le code EAN et les quantités.');return}
  let url='';try{url=validCarrefourLink($('#productUrl').value)}catch(e){toast(e.message);return}
  const product={id:old?.id||uid(),name,brand,packaging,category,qty,unit,url,ean,packAmount,packUnit:packAmount?packUnit:null};
  if(old)state.products=state.products.map(p=>p.id===old.id?product:p);else state.products.push(product);

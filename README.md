@@ -525,3 +525,15 @@ Les deux fichiers graphiques déposés par l'utilisateur se trouvent à la racin
 **Attention iPhone :** si l'icône de l'app déjà installée ne se rafraîchit pas, faire une sauvegarde JSON dans Fichiers/iCloud Drive AVANT d'envisager de retirer ou réinstaller le raccourci. Une suppression peut supprimer les données locales de la PWA.
 
 **Statut :** préparation en branche `v30-identite-speedrive` uniquement. La branche GitHub Pages `developpement-v1` et la version en ligne ne changent pas avant validation explicite.
+
+ 
+## V31 — En-tête Speedrive centré et identité v2 (branche de test)
+
+- Les images ajoutées dans GitHub utilisent les noms exacts `speedrive-logo-v2.PNG` (horizontal 6:1) et `speedrive-icon-v2.PNG` (carré).
+- Logo horizontal agrandi et **centré par rapport à toute la largeur de l'application** : le bouton Paramètres ne réduit plus la largeur disponible.
+- Bouton Sauvegardes et paramètres conservé dans l'en-tête, mais déplacé sur une **ligne discrète en haut à droite**, distincte du logo. Accessible dans tous les onglets.
+- CSS adaptatif aux iPhones étroits et aux écrans plus grands, sans toucher aux dimensions de chaque écran métier.
+- Le nom Speedrive et l'identité de l'application restent identiques. Seuls les chemins des images dans le site, le manifeste PWA, le CSS de l'en-tête et les versions du cache changent.
+- Le moteur `app.js`, les fichiers Userscripts, les recettes, la liste des courses, la gestion des stocks, le Drive et les données IndexedDB ne sont pas modifiés.
+- L'icône installée sur l'écran d'accueil iPhone peut rester en cache indépendamment du site : ne pas supprimer l'application sans export préalable d'une sauvegarde JSON.
+- Statut : branche `v31-logo-centre-speedrive` en préparation ; aucune publication sans accord explicite.

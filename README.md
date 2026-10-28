@@ -1,4 +1,4 @@
-# Menus & Drive
+# Speedrive (anciennement Menus & Drive)
 
 Une application mobile pour préparer les menus de la semaine et la liste de courses en quelques minutes. Conçue pour un seul iPhone et pour les achats au **Carrefour Drive École-Valentin**.
 
@@ -509,3 +509,19 @@ Points validés : 1, 2, 3, 4, 7 et 8. Les points 5 (stock de la semaine passée)
 Compatibilité : ni moteur de transfert Carrefour / Userscripts, ni calcul des portions, ni génération explicite des courses, ni schéma de stockage JSON 1 modifiés. Les versions des ressources et du cache PWA ont été préparées pour la V29. Vérification sur un vrai iPhone et contrôle de fonctionnement Carrefour toujours nécessaires avant toute mise en ligne.
 
 Statut : code uniquement sur la branche v29-ergonomie-produits-courses-drive ; aucune fusion ou publication sur la branche GitHub Pages developpement-v1 à ce stade.
+
+## V30 — Identité visuelle Speedrive (branche de préparation)
+
+Les deux fichiers graphiques déposés par l'utilisateur se trouvent à la racine du dépôt, avec les majuscules exactes **speedrive-logo.PNG** (logo horizontal) et **speedrive-icon.PNG** (icône carrée).
+
+- Remplacement du monogramme et du texte « Menus & Drive » dans le haut de l'application par le logo original, avec le slogan déjà intégré à l'image. Le bouton de réglages reste accessible.
+- Nouveau titre du site et nom affiché lors de l'installation sur l'écran d'accueil iPhone : **Speedrive**.
+- Métadonnées Apple touch icon, favicon PNG et manifeste PWA alignés sur la même illustration du caddie.
+- Dimensions de l'en-tête et adaptation iPhone gérées uniquement par CSS, sans modification des mécanismes.
+- Incrémentation du cache PWA et des versions des ressources visuelles pour éviter les anciens fichiers en cache, sans recharger artificiellement le moteur JavaScript.
+
+**Protection des données :** ne pas modifier la base IndexedDB, les sauvegardes, les courses, les recettes, la logique Drive ou les menus. Le nom technique du stockage et le fichier d'export restent inchangés pour assurer la continuité des données.
+
+**Attention iPhone :** si l'icône de l'app déjà installée ne se rafraîchit pas, faire une sauvegarde JSON dans Fichiers/iCloud Drive AVANT d'envisager de retirer ou réinstaller le raccourci. Une suppression peut supprimer les données locales de la PWA.
+
+**Statut :** préparation en branche `v30-identite-speedrive` uniquement. La branche GitHub Pages `developpement-v1` et la version en ligne ne changent pas avant validation explicite.

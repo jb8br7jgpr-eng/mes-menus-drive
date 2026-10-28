@@ -459,3 +459,14 @@ Le bouton **« Générer les courses de cette semaine »** reste distinct : aucu
 **Saisie des ingrédients** : le bouton **« ＋ Ajouter un ingrédient »** demeure sous la liste. Lorsqu'un ingrédient est ajouté, la fenêtre de recette défile vers le bas avec un mouvement doux, aligné sur ce bouton, en gardant le nouveau champ et le bouton dans la zone visible sur iPhone. Un espace de défilement est réservé en bas du panneau pour éviter que les commandes soient collées à la bordure. Le zoom automatique iOS reste désactivé pour les champs, sans empêcher le zoom volontaire de l'utilisateur.
 
 Tests simulés : présence des dix catégories, tri A→Z / Z→A / par type, recherche combinée, catégorie « Salade » historique, conservation d'une catégorie historique dans l'éditeur, nombre de résultats, insertion d'une ligne d'ingrédient et défilement jusqu'au bas du bouton, aucune modification des recettes existantes ni des courses non générées. Le moteur Carrefour/Userscripts et les listes hebdomadaires n'ont pas changé.
+
+
+## V26 — Recherche et filtre intégrés au choix d'un plat dans Menus (28/10/2026)
+
+Lorsque l'utilisateur touche une case du calendrier pour choisir un plat, une barre **Rechercher un plat** et une liste **Type de plat** sont maintenant présentes dans la même fenêtre que le nombre de portions, sans détour par l'onglet Plats. La recherche se fait instantanément, sans accent ni distinction de casse. Les dix catégories validées sont disponibles : Pâtes, Viande, Poisson, Légumes, Salades, Soupes, Snacks, Tartes, Crudités, Dessert ; la catégorie historique « Salade » reste filtrable dans Salades et les anciens types non standard restent visibles via Autres (anciens plats).
+
+Sans recherche ni filtre, jusqu'à trois plats **récemment utilisés** sont placés en haut (repas précédents de la semaine ou trois semaines précédentes), puis tous les autres restent accessibles par ordre alphabétique. Un plat ne figure jamais deux fois. Une recherche sans résultat affiche un message explicite au lieu d'une liste vide.
+
+Le bouton **« Placer des restes ici »** ne dépend pas des filtres et reste visible. Les recettes déjà placées dans ce même repas sont exclues du catalogue proposé. La recherche ne recrée pas toute la fenêtre, de sorte que la quantité de portions saisie et les modifications du repas restent intactes. Aucun changement du moteur des menus, du calcul des restes, de la génération explicite des courses, de l'import Carrefour ou du stockage.
+
+**21 tests simulés réussis** : catégories, ancienne catégorie, recherche par nom, combinaison recherche/type, affichage des recettes récentes sans doublon, nombre de résultats, conservation des portions, ajout effectif d'un plat depuis les résultats filtrés, restes et recettes déjà choisies, aucune course générée automatiquement. Vérifier le ressenti de la fenêtre sur un véritable iPhone.

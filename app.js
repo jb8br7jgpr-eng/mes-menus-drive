@@ -7,7 +7,7 @@ const categories=['Autres','Épicerie','Fruits et légumes','Viandes et poissons
 const icons={'Pâtes':'🍝','Viande':'🥩','Poisson':'🐟','Légumes':'🥦','Salade':'🥗','Dessert':'🍰','Autre':'🍽️'};
 const units=['g','kg','ml','cl','l','pièce','paquet','boîte','rouleau','bouteille','pot','sachet'];
 const contentUnits=['g','kg','ml','cl','l','pièce','rouleau'];
-const baseState=()=>({schema:1,recipes:[],products:[],weeks:{},staples:[],settings:{people:2}});
+const baseState=()=>({schema:1,recipes:[],products:[],weeks:{},staples:[],storePreferences:{},settings:{people:2}});
 let state=baseState(), currentTab='menus', currentWeek='', search='', productSearch='', productCategory='Toutes', db=null, usingFallback=false;
 const app=$('#app'), modalRoot=$('#modalRoot');
 const uid=()=>Math.random().toString(36).slice(2,10)+Date.now().toString(36);
@@ -197,6 +197,25 @@ function addCatalogProduct(id){
 function norm(v){return String(v||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim().replace(/\s+/g,' ').toLowerCase()}
 function converted(q,u){q=Number(q)||0;return u==='kg'?[q*1000,'g']:u==='l'?[q*1000,'ml']:u==='cl'?[q*10,'ml']:[q,u||'pièce']}
 function quantity(q,u){const n=Math.round((Number(q)+Number.EPSILON)*100)/100;const s=n.toLocaleString('fr-FR',{maximumFractionDigits:2});const plurals={'pièce':'pièces','paquet':'paquets','boîte':'boîtes','bouteille':'bouteilles','pot':'pots','sachet':'sachets','rouleau':'rouleaux'};return s+' '+(n>1&&plurals[u]?plurals[u]:(u||'pièce'))}
+function defaultShoppingStore(category){return ['Fruits et légumes','Viandes et poissons'].includes(category)?'grandfrais':'carrefour'}
+function shoppingStore(x){
+ const p=productById(x.productId);
+ const key=p?'product:'+p.id:x.id;
+ const saved=state.storePreferences?.[key];
+ if(saved==='grandfrais'||saved==='carrefour')return saved;
+ if(p?.store==='grandfrais'||p?.store==='carrefour')return p.store;
+ return p?'carrefour':defaultShoppingStore(x.category)
+}
+function setShoppingStore(itemId,store){
+ if(!['grandfrais','carrefour'].includes(store))return;
+ const item=shopping().find(x=>x.id===itemId);
+ if(!item)return;
+ const key=item.productId?'product:'+item.productId:item.id;
+ if(!state.storePreferences)state.storePreferences={};
+ state.storePreferences[key]=store;
+ // Le choix mémorisé s'applique aux prochaines semaines aussi.
+ persist();render(true);toast(store==='grandfrais'?'Mis sur la liste Grand Frais':'Mis sur la liste Carrefour Drive')
+}
 function groupFor(name,unit){const s=norm(name);if(/pq|papier toilette|lessive|savon|shampo|dentifrice|baume|douche|mouchoir|deodorant/.test(s))return 'Hygiène et maison';if(/poulet|boeuf|bœuf|jambon|poisson|saumon|crevette|porc|steak|dinde/.test(s))return 'Viandes et poissons';if(/tomate|oignon|carotte|salade|pomme|banane|courgette|ail|citron|poivron|brocoli|champignon/.test(s))return 'Fruits et légumes';if(/lait|crème|creme|yaourt|fromage|beurre|mozzarella|oeuf|œuf/.test(s))return 'Produits frais';return 'Épicerie et divers'}
 function productGroup(p){if(['Hygiène','Maison'].includes(p?.category))return 'Hygiène et maison';if(p?.category==='Viandes et poissons')return 'Viandes et poissons';if(p?.category==='Fruits et légumes')return 'Fruits et légumes';if(p?.category==='Produits frais')return 'Produits frais';return 'Épicerie et divers'}
 function shopping(){
@@ -211,24 +230,64 @@ function shopping(){
  w.meals.forEach(m=>{if(!m||m.type!=='recipe')return;const recipe=recipeById(m.recipeId);if(!recipe)return;const factor=(Number(m.people)||2)/Math.max(1,Number(recipe.people)||2);recipe.ingredients.forEach(x=>add(x.name,Number(x.qty)*factor,x.unit,'Recettes',x.productId))});
  w.extras.forEach(x=>add(x.name,x.qty,x.unit,'Ajout manuel',x.productId,Boolean(x.fromCatalogue)));
  for(const [productId,item] of packs){const p=item.p,n=item.needed>0&&item.size>0?Math.ceil(item.needed/item.size-1e-9):0,count=n+item.manualPacks;if(count<=0)continue;const id='produit:'+productId+'|achat';map.set(id,{id,name:p.name,qty:count,unit:p.unit||'paquet',source:item.source,productId,needed:item.needed>0?quantity(item.needed,item.needUnit):'',packageDescription:p.packaging||((p.packAmount>0)?quantity(p.packAmount,p.packUnit):'')})}
- return [...map.values()].sort((a,b)=>a.name.localeCompare(b.name,'fr')).map(x=>({...x,category:x.productId?productGroup(productById(x.productId)):groupFor(x.name,x.unit),checked:w.checked.includes(x.id),excluded:w.excluded.includes(x.id)}))
+ return [...map.values()].sort((a,b)=>a.name.localeCompare(b.name,'fr')).map(x=>{const category=x.productId?productGroup(productById(x.productId)):groupFor(x.name,x.unit);const item={...x,category,checked:w.checked.includes(x.id),excluded:w.excluded.includes(x.id)};return {...item,store:shoppingStore(item)}})
 }
-function shoppingRow(x){return '<div class="shopping-row'+(x.checked?' checked':'')+'"><input class="check" type="checkbox" data-check="'+html(x.id)+'" '+(x.checked?'checked':'')+' aria-label="Cocher '+html(x.name)+'"><div class="grow"><div class="shopping-name">'+html(x.name)+'</div><div class="shopping-meta">'+(x.needed?'Besoin : '+html(x.needed)+' · ':'')+html(x.source.join(' + '))+(productById(x.productId)?' · '+html([productById(x.productId).brand,productById(x.productId).packaging].filter(Boolean).join(' · ')):'')+(productById(x.productId)?.url?' · <a href="'+html(productById(x.productId).url)+'" target="_blank" rel="noopener noreferrer">Carrefour ↗</a>':'')+'</div></div><div class="shopping-qty">'+html(quantity(x.qty,x.unit))+'</div><button class="icon-btn" data-action="exclude" data-id="'+html(x.id)+'" aria-label="Déjà à la maison : '+html(x.name)+'" title="Déjà à la maison">−</button></div>'}
-function renderCourses(){const items=shopping(),available=items.filter(x=>!x.excluded),excluded=items.filter(x=>x.excluded),left=available.filter(x=>!x.checked), w=getWeek();
-  let out=pageHeading('Liste intelligente','Mes courses','Tous les ingrédients de la semaine, plus vos produits du quotidien.');
-  out+='<div class="card soft"><div class="row between"><div><div class="eyebrow">À acheter</div><h1 style="margin:3px 0 0">'+left.length+' <span style="font-size:15px;color:#6f8174">produit'+(left.length!==1?'s':'')+'</span></h1></div><span style="font-size:35px">🛒</span></div><p class="subtext">Les quantités sont additionnées automatiquement entre les recettes.</p></div>';
-  out+='<div class="toolbar"><button class="btn" data-action="add-extra">＋ Ajouter un produit</button><button class="btn secondary" data-action="copy-list">⧉ Copier la liste</button></div><button class="btn ghost" data-action="go-products">Voir mes produits habituels →</button>';
-  if(state.staples.length){out+='<div class="section-head"><h2>Vos favoris</h2><span class="subtext">Appuyer pour ajouter</span></div><div class="favorites">'+state.staples.map(x=>'<button class="favorite-chip" data-action="quick-staple" data-id="'+x.id+'">＋ '+html(x.name)+'</button>').join('')+'</div>'}
-  if(available.length){const order=['Fruits et légumes','Viandes et poissons','Produits frais','Épicerie et divers','Hygiène et maison'];order.forEach(cat=>{const relevant=available.filter(x=>x.category===cat);if(relevant.length){out+='<div class="shopping-category">'+cat+'</div>'+relevant.map(shoppingRow).join('')}})}
-  else out+=emptyView('🧺','Votre liste est vide','Planifie des repas ou ajoute des produits du quotidien.','<button class="btn" data-action="add-extra">＋ Ajouter un produit</button>');
-  if(excluded.length)out+='<div class="section-head"><h2>Déjà à la maison</h2><span class="pill gray">'+excluded.length+'</span></div>'+excluded.map(x=>'<div class="shopping-row"><span class="grow muted">'+html(x.name)+' · '+html(quantity(x.qty,x.unit))+'</span><button class="btn tiny secondary" data-action="include" data-id="'+html(x.id)+'">Réintégrer</button></div>').join('');
-  if(w.extras.length)out+='<div class="section-head"><h2>Produits ajoutés cette semaine</h2></div>'+w.extras.map(x=>'<div class="shopping-row"><span class="grow shopping-name">'+html(x.name)+'</span><span class="shopping-qty">'+html(quantity(x.qty,x.unit))+'</span><button class="icon-btn" data-action="delete-extra" data-id="'+x.id+'" aria-label="Supprimer">×</button></div>').join('');
-  out+='<div class="toolbar"><button class="btn wide" data-action="go-drive">Préparer mon Drive →</button></div>';
-  return out
+function shoppingRow(x){
+ const p=productById(x.productId);
+ return '<div class="shopping-row'+(x.checked?' checked':'')+'">'+
+ '<input class="check" type="checkbox" data-check="'+html(x.id)+'" '+(x.checked?'checked':'')+' aria-label="Cocher '+html(x.name)+'">'+
+ '<div class="grow"><div class="shopping-name">'+html(x.name)+'</div>'+
+ '<div class="shopping-meta">'+(x.needed?'Besoin : '+html(x.needed)+' · ':'')+html(x.source.join(' + '))+
+ (p?' · '+html([p.brand,p.packaging].filter(Boolean).join(' · ')):'')+
+ (p?.url&&x.store==='carrefour'?' · <a href="'+html(p.url)+'" target="_blank" rel="noopener noreferrer">Carrefour ↗</a>':'')+
+ '</div><label class="store-label" for="store-'+encodeURIComponent(x.id)+'">Magasin :</label>'+
+ '<select class="store-select" id="store-'+encodeURIComponent(x.id)+'" data-store-item="'+html(x.id)+'" aria-label="Magasin pour '+html(x.name)+'">'+
+ '<option value="carrefour" '+(x.store==='carrefour'?'selected':'')+'>🛒 Carrefour Drive</option>'+
+ '<option value="grandfrais" '+(x.store==='grandfrais'?'selected':'')+'>🥬 Grand Frais</option></select></div>'+
+ '<div class="shopping-qty">'+html(quantity(x.qty,x.unit))+'</div>'+
+ '<button class="icon-btn" data-action="exclude" data-id="'+html(x.id)+'" aria-label="Déjà à la maison : '+html(x.name)+'" title="Déjà à la maison">−</button></div>'
+}
+function renderCourses(){
+ const items=shopping(),available=items.filter(x=>!x.excluded),excluded=items.filter(x=>x.excluded),left=available.filter(x=>!x.checked),w=getWeek();
+ const grand=available.filter(x=>x.store==='grandfrais'),drive=available.filter(x=>x.store==='carrefour');
+ const todoGrand=grand.filter(x=>!x.checked).length,todoDrive=drive.filter(x=>!x.checked).length;
+ let out=pageHeading('Liste intelligente','Mes courses','Deux magasins, une seule liste : choisis où acheter chaque produit.');
+ out+='<div class="card soft"><div class="row between"><div><div class="eyebrow">À acheter</div><h1 style="margin:3px 0 0">'+left.length+' <span style="font-size:15px;color:#6f8174">produit'+(left.length!==1?'s':'')+'</span></h1></div><span style="font-size:35px">🛒</span></div><p class="subtext">Quantités calculées pour vos recettes, réparties entre Carrefour Drive et Grand Frais. Le choix du magasin est mémorisé.</p></div>';
+ out+='<div class="toolbar"><button class="btn" data-action="add-extra">＋ Ajouter un produit</button><button class="btn secondary" data-action="copy-list">⧉ Tout copier</button></div><button class="btn ghost" data-action="go-products">Voir mes produits habituels →</button>';
+ if(state.staples.length)out+='<div class="section-head"><h2>Vos favoris</h2><span class="subtext">Appuyer pour ajouter</span></div><div class="favorites">'+state.staples.map(x=>'<button class="favorite-chip" data-action="quick-staple" data-id="'+x.id+'">＋ '+html(x.name)+'</button>').join('')+'</div>';
+ const order=['Fruits et légumes','Viandes et poissons','Produits frais','Épicerie et divers','Hygiène et maison'];
+ function section(store,title,emoji,count,rows){
+  let htmlSection='<div class="shop-heading '+(store==='grandfrais'?'fresh':'')+'"><span>'+emoji+' '+title+'</span><span class="pill">'+count+' à acheter</span></div>';
+  htmlSection+='<p class="helper">'+(store==='carrefour'?'Seuls ces produits sont envoyés au panier automatique Carrefour.':'Ces produits ne sont jamais envoyés au Drive. Copie-les directement dans Notes.')+'</p>';
+  if(store==='grandfrais')htmlSection+='<button class="btn wide" data-action="copy-grand-frais" '+(!count?'disabled':'')+'>📋 Copier la liste Grand Frais pour Notes</button>';
+  else htmlSection+='<button class="btn secondary wide" data-action="go-drive" '+(!count?'disabled':'')+'>🛒 Préparer le panier Carrefour</button>';
+  if(rows.length){
+   for(const cat of order){
+    const selected=rows.filter(x=>x.category===cat);
+    if(selected.length)htmlSection+='<div class="shopping-category">'+cat+'</div>'+selected.map(shoppingRow).join('')
+   }
+  }else htmlSection+='<div class="note">Aucun produit affecté à ce magasin pour le moment.</div>';
+  return htmlSection
+ }
+ out+=section('carrefour','Carrefour Drive','🛒',todoDrive,drive);
+ out+=section('grandfrais','Grand Frais','🥬',todoGrand,grand);
+ if(excluded.length)out+='<div class="section-head"><h2>Déjà à la maison</h2><span class="pill gray">'+excluded.length+'</span></div>'+excluded.map(x=>'<div class="shopping-row"><span class="grow muted">'+html(x.name)+' · '+html(quantity(x.qty,x.unit))+'</span><button class="btn tiny secondary" data-action="include" data-id="'+html(x.id)+'">Réintégrer</button></div>').join('');
+ if(w.extras.length)out+='<div class="section-head"><h2>Produits ajoutés cette semaine</h2></div>'+w.extras.map(x=>'<div class="shopping-row"><span class="grow shopping-name">'+html(x.name)+'</span><span class="shopping-qty">'+html(quantity(x.qty,x.unit))+'</span><button class="icon-btn" data-action="delete-extra" data-id="'+x.id+'" aria-label="Supprimer">×</button></div>').join('');
+ return out
+}
+function grandFraisText(){
+ const items=shopping().filter(x=>!x.checked&&!x.excluded&&x.store==='grandfrais');
+ return items.length?'Grand Frais\n'+items.map(x=>'• '+x.name+' — '+quantity(x.qty,x.unit)+(x.needed?' (besoin : '+x.needed+')':'')).join('\n'):''
+}
+async function copyGrandFrais(){
+ const value=grandFraisText();
+ if(!value){toast('La liste Grand Frais est vide.');return}
+ try{await navigator.clipboard.writeText(value);toast('Liste Grand Frais copiée ! Colle-la dans Notes.')}
+ catch(err){showModal('Liste Grand Frais à copier','<p class="helper">Sélectionne tout ce texte puis copie-le dans Notes :</p><textarea class="text-input" style="height:220px" readonly>'+html(value)+'</textarea>')}
 }
 function listText(){return shopping().filter(x=>!x.checked&&!x.excluded).map(x=>x.name+' — '+quantity(x.qty,x.unit)+(x.needed?' (besoin : '+x.needed+')':'')).join('\n')}
 function driveTransferRows(){
- return shopping().filter(x=>!x.checked&&!x.excluded).map(x=>{
+ return shopping().filter(x=>!x.checked&&!x.excluded&&x.store==='carrefour').map(x=>{
   const p=productById(x.productId);
   const matchedEan=(p?.ean&&/^\d{13}$/.test(String(p.ean)))?String(p.ean):((p?.url||'').match(/(?:-|\/)(\d{13})(?:[/?#]|$)/)?.[1]||'');
   const qty=Number(x.qty),unit=x.unit;
@@ -308,15 +367,15 @@ async function copyDriveTransfer(){
  try{await navigator.clipboard.writeText(text);toast('Codes et quantités copiés ! Ouvre Carrefour dans Safari.')}
  catch(e){toast('Utilise le champ de copie manuelle.');$('#driveTransferFallback')?.focus()}
 }
-function renderDrive(){const items=shopping().filter(x=>!x.checked&&!x.excluded),transfers=driveTransferRows(),ready=transfers.filter(x=>x.ready),directUrl=driveDirectUrl();
+function renderDrive(){const items=shopping().filter(x=>!x.checked&&!x.excluded&&x.store==='carrefour'),grandFraisCount=shopping().filter(x=>!x.checked&&!x.excluded&&x.store==='grandfrais').length,transfers=driveTransferRows(),ready=transfers.filter(x=>x.ready),directUrl=driveDirectUrl();
  let out=pageHeading('Carrefour École-Valentin','Mon Drive','Prépare les références et les quantités pour ton Carrefour Drive.');
  out+='<div class="card"><div class="drive-illustration">🛍️</div><div class="row between"><h2>'+items.length+' produit'+(items.length!==1?'s':'')+' à acheter</h2><span class="pill">Drive favori</span></div><p class="subtext">Carrefour Besançon-Valentin · École-Valentin (à vérifier sur Carrefour.fr)</p><div class="divider"></div>';
  out+='<p class="subtext">Notre extension peut maintenant afficher ta liste complète : '+ready.length+' référence'+(ready.length!==1?'s':'')+' avec une quantité exploitable, '+(transfers.length-ready.length)+' à compléter.</p>';
  out+=directUrl?'<button class="btn wide" data-action="open-drive-in-safari">🛒 Constituer mon panier Carrefour</button>':'<button class="btn wide" disabled>🛒 Constituer mon panier Carrefour</button>';
  out+='<button class="btn secondary wide" style="margin-top:9px" data-action="prepare-drive-transfer" '+(!items.length?'disabled':'')+'>📋 Détails et copie de secours</button>';
- out+='<button class="btn secondary wide" style="margin-top:9px" data-action="copy-list" '+(!items.length?'disabled':'')+'>⧉ Copier ma liste classique</button>';
+ out+='<button class="btn secondary wide" style="margin-top:9px" data-action="copy-grand-frais" '+(!grandFraisCount?'disabled':'')+'>🥬 Copier Grand Frais pour Notes ('+grandFraisCount+')</button>';
  out+='<a class="btn secondary wide" style="margin-top:9px" href="https://www.carrefour.fr/" target="_blank" rel="noopener noreferrer">Ouvrir Carrefour ↗</a></div>';
- out+='<div class="note" style="margin-top:16px"><strong>Ajout au panier réel — test.</strong> En appuyant sur le bouton principal, tu autorises Userscripts à ajouter les produits confirmés disponibles au panier Carrefour actif. Les absents seront signalés. Aucun paiement ni commande automatique. Vérifie le Drive École-Valentin avant de continuer.</div>';
+ out+='<div class="note" style="margin-top:16px"><strong>Grand Frais exclu du panier Carrefour.</strong> Seuls les produits affectés à Carrefour Drive sont transférés. <strong>Ajout au panier réel — test.</strong> En appuyant sur le bouton principal, tu autorises Userscripts à ajouter les produits confirmés disponibles au panier Carrefour actif. Les absents seront signalés. Aucun paiement ni commande automatique. Vérifie le Drive École-Valentin avant de continuer.</div>';
  out+='<div class="section-head"><h2>Ta liste à préparer</h2></div>';
  out+=items.length?'<div class="card">'+items.map(x=>'<div class="row between" style="padding:8px 0;border-bottom:1px solid #eef1ea"><span class="grow" style="font-size:13px">'+html(x.name)+(x.needed?' <small class="muted">(besoin : '+html(x.needed)+')</small>':'')+(productById(x.productId)?.url?'<br><a href="'+html(productById(x.productId).url)+'" target="_blank" rel="noopener noreferrer" style="font-size:11px">Voir sur Carrefour ↗</a>':'')+'</span><strong style="font-size:12px">'+html(quantity(x.qty,x.unit))+'</strong></div>').join('')+'</div>':emptyView('🥬','Rien à commander','Remplis ton planning et ta liste de courses.','<button class="btn" data-action="go-menus">Créer mes menus</button>');
  return out
@@ -423,7 +482,7 @@ async function copyList(){const value=listText();if(!value){toast('Aucun produit
 function exportData(){const blob=new Blob([JSON.stringify({...state,exportedAt:new Date().toISOString()},null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='mes-menus-drive-sauvegarde-'+localDate(new Date())+'.json';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);toast('Sauvegarde créée. Conserve le fichier !')}
 async function importData(file){if(!file)return;try{if(file.size>25*1024*1024)throw Error('Fichier trop volumineux.');const raw=JSON.parse(await file.text());if(raw.schema!==1||!Array.isArray(raw.recipes)||!raw.weeks||typeof raw.weeks!=='object'||!Array.isArray(raw.staples))throw Error('Format de sauvegarde non reconnu.');
   if(!confirm('Remplacer les données actuelles par celles de ce fichier ?'))return;
-  checkpoint('Avant import JSON');state={schema:1,recipes:raw.recipes,products:Array.isArray(raw.products)?raw.products:[],weeks:raw.weeks,staples:raw.staples,settings:{people:2,...raw.settings}};persist();closeModal();render();toast('Sauvegarde restaurée !')
+  checkpoint('Avant import JSON');state={schema:1,recipes:raw.recipes,products:Array.isArray(raw.products)?raw.products:[],weeks:raw.weeks,staples:raw.staples,storePreferences:raw.storePreferences&&typeof raw.storePreferences==='object'&&!Array.isArray(raw.storePreferences)?raw.storePreferences:{},settings:{people:2,...raw.settings}};persist();closeModal();render();toast('Sauvegarde restaurée !')
 }catch(err){toast(err.message||'Importation impossible.')}}
 document.addEventListener('click',e=>{const tab=e.target.closest('[data-tab]');if(tab){currentTab=tab.dataset.tab;render();return}
   const a=e.target.closest('[data-action]');if(!a){if(e.target.matches('[data-overlay]'))closeModal();return}
@@ -460,6 +519,7 @@ document.addEventListener('click',e=>{const tab=e.target.closest('[data-tab]');i
   else if(mode==='exclude'){if(!w.excluded.includes(id))w.excluded.push(id);persist();render(true)}
   else if(mode==='include'){w.excluded=w.excluded.filter(x=>x!==id);persist();render(true)}
   else if(mode==='copy-list')copyList();
+  else if(mode==='copy-grand-frais')copyGrandFrais();
   else if(mode==='prepare-drive-transfer')driveListModal();
   else if(mode==='open-drive-in-safari')openDriveInSafari();
   else if(mode==='copy-drive-url')copyDriveUrl();
@@ -470,7 +530,7 @@ document.addEventListener('click',e=>{const tab=e.target.closest('[data-tab]');i
   else if(mode==='restore-backup')restoreSnapshot(id);
   else if(mode==='clear-all'){if(confirm('Effacer toutes les données actuelles ? Une copie locale sera conservée dans les versions précédentes.')){checkpoint('Avant effacement');state=baseState();persist();closeModal();render();toast('Données actuelles effacées.')}}
 });
-document.addEventListener('change',e=>{if(e.target.matches('[data-check]')){const w=getWeek(),id=e.target.dataset.check;w.checked=e.target.checked?[...new Set([...w.checked,id])]:w.checked.filter(x=>x!==id);persist();render(true)}else if(e.target.id==='importFile')importData(e.target.files?.[0])});
+document.addEventListener('change',e=>{if(e.target.matches('[data-store-item]')){setShoppingStore(e.target.dataset.storeItem,e.target.value)}else if(e.target.matches('[data-check]')){const w=getWeek(),id=e.target.dataset.check;w.checked=e.target.checked?[...new Set([...w.checked,id])]:w.checked.filter(x=>x!==id);persist();render(true)}else if(e.target.id==='importFile')importData(e.target.files?.[0])});
 document.addEventListener('input',e=>{if(e.target.id==='recipeSearch'){search=e.target.value;const result=$('#recipeResults');if(result)result.innerHTML=recipeRows()}else if(e.target.id==='productSearch'){productSearch=e.target.value;const result=$('#productResults');if(result)result.innerHTML=productRows()}});
 document.addEventListener('submit',e=>{if(e.target.id==='recipeForm')saveRecipe(e);if(e.target.id==='extraForm')addExtra(e);if(e.target.id==='productForm')saveProduct(e)});
 window.addEventListener('hashchange',()=>importCarrefourProductFromHash());

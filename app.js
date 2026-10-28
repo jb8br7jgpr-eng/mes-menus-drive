@@ -83,11 +83,17 @@ function mealCard(meal,i){
  let names=[],note='',classes='';
  if(meal?.type==='leftovers'){
   const r=meal.recipeId?recipeById(meal.recipeId):null;
-  names=[r?'Restes : '+r.name:'Restes'];classes=' filled';
-  note=(meal.leftoverPortions||2)+' portions · sans nouvelles courses'
+  names=[r?'🍱 Restes : '+r.name:'🍱 Restes'];classes=' filled';
+  note=(meal.leftoverPortions||2)+' portion'+((meal.leftoverPortions||2)>1?'s':'')+' · sans nouvelles courses'
  }else{
   const dishes=mealDishes(meal);
-  if(dishes.length){names=dishes.map(d=>{const r=recipeById(d.recipeId);return (r?r.name:'Plat supprimé')+' · '+d.people+' portion'+(d.people>1?'s':'')})}
+  if(dishes.length){
+   names=dishes.map(d=>{
+    const r=recipeById(d.recipeId),here=portionsEatenHere(d,dishes),left=Math.max(0,d.people-here);
+    return (r?r.name:'Plat supprimé')+' · '+here+' portion'+(here>1?'s':'')+' ici'+
+     (left?' · '+left+' reste'+(left>1?'s':''):'')
+   })
+  }
   mealLeftovers(meal).forEach(x=>{const r=recipeById(x.recipeId);names.push('🍱 Restes : '+(r?.name||'Autre plat')+' · '+x.people+' portion'+(x.people>1?'s':''))});
   if(names.length){classes=' filled';note=names.length===1?'1 plat':names.length+' plats pour ce repas'}
  }
@@ -826,12 +832,15 @@ function pickMeal(index){
   out+='<div class="section-head"><h3>Plats prévus pour ce repas</h3><span class="pill">'+dishes.length+' plat'+(dishes.length>1?'s':'')+'</span></div>';
   dishes.forEach((d,n)=>{
    const r=recipeById(d.recipeId);
-   out+='<div class="meal-dish"><div class="grow"><strong>'+html(r?.name||'Plat supprimé')+'</strong><label class="helper" for="dishPortions'+n+'">Portions pour ce plat</label><input id="dishPortions'+n+'" class="meal-dish-qty" data-dish-qty="'+n+'" type="number" min="1" max="30" value="'+d.people+'"></div><div class="meal-dish-actions"><button class="btn tiny secondary" data-action="save-dish-portions" data-index="'+index+'" data-dish="'+n+'">✓ Modifier</button><button class="btn tiny ghost" data-action="remove-dish" data-index="'+index+'" data-dish="'+n+'">Retirer</button></div></div>'
+   const here=portionsEatenHere(d,dishes),remaining=sourceBudget(getWeek(),index,d.recipeId)-usedLeftovers(getWeek(),index,d.recipeId);
+   out+='<div class="meal-dish"><div class="grow"><strong>'+html(r?.name||'Plat supprimé')+'</strong><label class="helper" for="dishPortions'+n+'">Portions préparées (pour les courses)</label><input id="dishPortions'+n+'" class="meal-dish-qty" data-dish-qty="'+n+'" type="number" min="1" max="30" value="'+d.people+'">'+
+   '<div class="meal-portions-explainer">'+here+' mangée'+(here>1?'s':'')+' ici · '+Math.max(0,d.people-here)+' reste'+(d.people-here>1?'s':'')+' au total'+
+   (d.people>here?' · '+Math.max(0,remaining)+' encore disponible'+(remaining>1?'s':''):'')+'</div></div><div class="meal-dish-actions"><button class="btn tiny secondary" data-action="save-dish-portions" data-index="'+index+'" data-dish="'+n+'">✓ Modifier</button><button class="btn tiny ghost" data-action="remove-dish" data-index="'+index+'" data-dish="'+n+'">Retirer</button></div></div>'
   })
  }
- out+='<div class="field"><label for="mealPeople">'+(dishes.length?'Portions du plat à ajouter':'Combien de portions pour le plat ?')+'</label>'+
+ out+='<div class="field"><label for="mealPeople">'+(dishes.length?'Portions à préparer pour le plat supplémentaire':'Combien de portions veux-tu préparer ?')+'</label>'+
  '<input type="number" id="mealPeople" min="1" max="30" value="'+extraDefault+'">'+
- '<div class="helper">1 portion par plat si vous mangez deux plats différents · 2 portions pour un repas à deux · 4 portions pour deux repas à deux. La quantité est propre à chaque plat.</div></div>';
+ '<div class="helper">Exemple : 4 portions préparées = 2 mangées à ce repas + 2 restes à placer le jour de ton choix. Pour un repas à deux sans restes, choisis 2. Si vous mangez chacun un plat différent, choisis 1 portion par plat.</div></div>';
  out+='<div class="section-head"><h3>'+ (dishes.length?'Ajouter un autre plat':'Choisir un plat')+'</h3></div>';
  out+='<div class="recipe-picker"><button class="picker-item" data-action="choose-leftovers" data-index="'+index+'"><span class="emoji">🍱</span><span class="grow"><strong>Placer des restes ici</strong><small>Choisis leur plat d’origine et le nombre de portions, même plusieurs jours après</small></span><span class="end">＋</span></button>';
  state.recipes.slice().sort((a,b)=>a.name.localeCompare(b.name,'fr')).forEach(r=>{
@@ -885,11 +894,17 @@ function storeMealParts(w,index,parts){
   else w.meals[index]={type:'recipe',recipeId:p.recipeId,people:Number(p.people)}
  }else w.meals[index]={type:'multi',dishes:valid.map(p=>p.type==='leftovers'?{type:'leftovers',recipeId:p.recipeId||null,fromIndex:p.fromIndex,people:Number(p.people)}:{recipeId:p.recipeId,people:Number(p.people)})}
 }
+// « Préparées » = quantités cuisinées et achetées ; « ici » = portions mangées.
+// Pour un plat de 4 personnes : 2 ici, 2 portions de restes à placer librement.
+function portionsEatenHere(d,dishes){
+ const prepared=Math.max(0,Number(d?.people)||0);
+ return Math.min(prepared,prepared>=4?2:(dishes.length===1?2:1))
+}
 function sourceBudget(w,fromIndex,recipeId){
  const dishes=mealDishes(w.meals[fromIndex]);
  const d=dishes.find(x=>x.recipeId===recipeId);
  if(!d)return 0;
- return Math.max(0,d.people-(dishes.length===1?2:1))
+ return Math.max(0,d.people-portionsEatenHere(d,dishes))
 }
 function usedLeftovers(w,fromIndex,recipeId,exceptIndex=-1){
  let used=0;w.meals.forEach((m,i)=>{if(i!==exceptIndex)mealLeftovers(m).forEach(x=>{

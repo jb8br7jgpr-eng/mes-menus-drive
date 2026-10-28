@@ -145,3 +145,22 @@ Les unités de masse et de volume non converties en nombre de colis restent **à
 Le script ne sauvegarde pas le texte copié côté Carrefour. Il ne fait que l'afficher localement après collage. Ne pas installer deux versions du même userscript. **Ne pas prendre le mode aperçu pour un panier Carrefour rempli.**
 
 **Travail suivant :** identifier les références et la disponibilité dans le magasin sélectionné, en lecture seule et avec accord de l'utilisateur. Envisager ensuite des essais contrôlés d'ajout au panier, après validation explicite et sans jamais lancer le paiement.
+
+
+## Import simplifié vers Carrefour : EAN-13 et quantité uniquement (Userscripts v0.5)
+
+Les anciens transferts JSON `MD-DRIVE-LIST-V1:` ont été remplacés par un **texte brut** directement exploitable : **une ligne par référence Carrefour (13 chiffres), un espace, une quantité entière positive**. Exemple :
+
+```text
+3012345678901 2
+1234567890123 1
+```
+
+Depuis l'icône iPhone : **Mon Drive → Préparer mon panier Carrefour → Copier les codes-barres et quantités**. Puis dans Safari sur Carrefour.fr, avec Userscripts v0.5 : **Coller mes codes-barres**. L’aperçu affiche seulement le code et la quantité.
+
+Seuls les produits pour lesquels une référence EAN de 13 chiffres **et** une quantité entière d'unités d'achat cohérente avec l’unité du produit du catalogue sont transmis. Les ingrédients en grammes/ml non convertis, les références manquantes ou les unités incohérentes restent listés dans « Non transférés — à compléter » dans l'application, **sans être copiés**. Les doublons d’un EAN sont additionnés.
+
+**Attention :** un code au format EAN-13 n’est pas nécessairement une référence actuellement vendue par Carrefour. Le script n'interroge pas les disponibilités, les prix ou les stocks et **ne touche jamais au vrai panier**. Le site Carrefour doit être ouvert avec le bon Drive sélectionné. Aucun paiement n'est possible depuis ce transfert de test.
+
+Le précédent script v0.4 ne saura pas lire ce nouveau texte simplifié : installer/mettre à jour **v0.5**, en gardant une seule version active du script.
+

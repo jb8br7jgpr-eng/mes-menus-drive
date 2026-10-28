@@ -11,6 +11,23 @@ Une application mobile pour préparer les menus de la semaine et la liste de cou
 - **Mes courses** : somme des quantités pour tous les plats, conversion kg/g et l/ml/cl, produits manuels, favoris réutilisables, coches et retrait des produits déjà présents à la maison.
 - **Mon Drive** : récapitulatif des produits, copie de la liste, ouverture du site Carrefour et liens directs des références associées.
 
+## Améliorations : quantités et menus intelligents
+
+- Sur la fiche **Mes produits**, les champs facultatifs « contenu d’un emballage » et « unité de contenu » permettent de préciser par exemple **1 kg par paquet** ou **12 rouleaux par paquet**.
+- Quand un ingrédient est lié à une référence et que son unité est compatible avec le contenu du paquet, le nombre d’emballages est calculé automatiquement et arrondi à l’unité supérieure : **750 g de riz = 1 paquet de 1 kg**, **1 300 g = 2 paquets**.
+- Les références sans taille de conditionnement restent affichées comme auparavant (quantité brute), sans supposer une taille inconnue.
+- Un ajout volontaire du même produit depuis « Mes produits » s’ajoute à la quantité calculée à partir des recettes.
+- La génération hebdomadaire évite autant que possible les plats déjà consommés dans les trois dernières semaines et équilibre les catégories de plats. Elle préserve les cases choisies manuellement lorsque l’option « Compléter » est utilisée.
+
+## Sauvegarde automatique et restauration
+
+- La base IndexedDB est conservée sous le nom existant `menus-drive-v1` et mise à niveau **de version 1 à version 2**, sans suppression du contenu.
+- À chaque modification, l'état est enregistré automatiquement. L'application tente de conserver **jusqu’à 10 points de restauration locaux**, espacés de 10 minutes ; la sauvegarde locale principale reste prioritaire même en cas de quota insuffisant.
+- Les points de restauration sont affichés sous ⚙️ et peuvent être restaurés après confirmation.
+- Une copie est aussi prise avant les suppressions et restaurations importantes.
+- **Limitation impérative :** les points de restauration sont sur le même iPhone ; ils ne protègent pas contre la perte du téléphone, sa réinitialisation ou l'effacement des données Safari. Une sauvegarde externe automatisée exigerait une connexion à un service distant ; cela **n'est pas encore implémenté**.
+- L'exportation/importation manuelle JSON reste disponible et protège les données si le fichier est placé dans **iCloud Drive**. Ne pas supprimer ses anciens fichiers JSON.
+
 ## État de l'intégration Carrefour
 
 **Le panier automatique n'est pas disponible dans cette version.** L'application ne se connecte pas à Carrefour, ne connaît ni les stocks ni les prix, ne choisit pas les références de produits et ne modifie aucun panier réel. Une intégration dédiée sera évaluée séparément.
@@ -19,7 +36,7 @@ Une application mobile pour préparer les menus de la semaine et la liste de cou
 
 - Pas de Supabase, pas de compte utilisateur, pas de synchronisation.
 - Les données sont conservées **sur l'iPhone utilisé**, dans IndexedDB (ou localStorage de secours si nécessaire).
-- Les sauvegardes JSON peuvent être **exportées** et **réimportées** depuis la roue dentée de l'application. Le catalogue de produits est inclus ; les sauvegardes JSON de la version précédente sont également acceptées. Les photos éventuellement ajoutées sont incluses dans la sauvegarde.
+- Les sauvegardes JSON peuvent être **exportées** et **réimportées** depuis la roue dentée de l'application ; un historique de points de restauration locaux est désormais disponible. Le catalogue de produits est inclus ; les sauvegardes JSON de la version précédente sont également acceptées. Les photos éventuellement ajoutées sont incluses dans la sauvegarde.
 - **Important** : effacer les données du navigateur, utiliser la navigation privée, changer de téléphone ou supprimer le stockage du site peut effacer les recettes et les menus. Exporter régulièrement une sauvegarde, par exemple dans l'application Fichiers ou iCloud Drive.
 - Les données ne sont pas envoyées sur GitHub : GitHub Pages héberge uniquement le code public, sans les recettes personnelles enregistrées sur l'appareil.
 

@@ -303,6 +303,33 @@ function defaultShoppingStore(category){return ['Fruits et légumes','Viandes et
 // dans dix recettes. Les quantités restent propres à chaque plat.
 function ingredientById(id){return (state.ingredientCatalog||[]).find(i=>i.id===id)}
 function ingredientByName(name){return (state.ingredientCatalog||[]).find(i=>norm(i.name)===norm(name))}
+function ingredientSimilar(name){
+ const n=norm(name);if(n.length<3)return [];
+ const stem=s=>s.endsWith('s')&&s.length>4?s.slice(0,-1):s;
+ const distance=(a,b)=>{if(Math.abs(a.length-b.length)>2)return 3;
+  let old=Array.from({length:b.length+1},(_,i)=>i);
+  for(let i=1;i<=a.length;i++){const next=[i];for(let j=1;j<=b.length;j++)next[j]=Math.min(next[j-1]+1,old[j]+1,old[j-1]+(a[i-1]===b[j-1]?0:1));old=next}return old[b.length]
+ };
+ return (state.ingredientCatalog||[]).filter(i=>{const o=norm(i.name);return o!==n&&(stem(o)===stem(n)||(n.length>=5&&o.length>=5&&distance(n,o)<=(Math.min(n.length,o.length)>=9?2:1)))}).slice(0,4)
+}
+function preferredIngredientUnit(ing){
+ if(!ing)return 'g';const counts=new Map();
+ state.recipes.forEach(r=>(r.ingredients||[]).forEach(x=>{if(x.ingredientId===ing.id||norm(x.name)===norm(ing.name))counts.set(x.unit,(counts.get(x.unit)||0)+1)}));
+ return [...counts].sort((a,b)=>b[1]-a[1])[0]?.[0]||'g'
+}
+function frequentIngredients(){
+ const counts=new Map();state.recipes.forEach(r=>(r.ingredients||[]).forEach(x=>{const ing=canonicalIngredient(x);if(ing)counts.set(ing.id,(counts.get(ing.id)||0)+1)}));
+ return [...counts].sort((a,b)=>b[1]-a[1]).slice(0,6).map(([id])=>ingredientById(id)).filter(Boolean)
+}
+function refreshIngredientEntry(row){
+ if(!row)return;const inp=row.querySelector('.ingredient-name'),ing=ingredientByName(inp?.value||'');
+ const store=row.querySelector('.ingredient-store'),unit=row.querySelector('.ingredient-unit'),hint=row.querySelector('.ingredient-suggestions');
+ if(store){store.disabled=Boolean(ing);if(ing)store.value=ingredientStore(ing)}
+ if(ing&&unit&&!row.dataset.unitSelected)unit.value=preferredIngredientUnit(ing);
+ const note=row.querySelector('.ingredient-link-note');if(note){const p=ing?productById(ing.productId):null;note.textContent=ing?(p&&ingredientStore(ing)==='carrefour'?'✓ Produit lié : '+p.name:'✓ Fiche existante · magasin défini dans Produits'):'Nouvel ingrédient créé dans Produits à l’enregistrement.'}
+ if(hint){const sim=ing?[]:ingredientSimilar(inp?.value);hint.innerHTML=sim.map(i=>'<button type="button" class="ingredient-suggestion" data-action="reuse-ingredient" data-id="'+html(i.id)+'">✓ Utiliser '+html(i.name)+'</button>').join('')}
+}
+
 function ingredientDefaultStore(name,productId){
  const p=productById(productId);
  const oldStore=productId?state.storePreferences?.['product:'+productId]:null;
@@ -594,7 +621,7 @@ function ingredientRow(item={name:'',qty:'',unit:'g'}){
  '<div class="ingredient-edit-row"><input class="ingredient-name" list="ingredientNames" placeholder="Ingrédient de la base" aria-label="Nom de l’ingrédient" value="'+html(ing?.name||item.name)+'">'+
  '<input class="ingredient-qty" type="number" min=".01" step="any" placeholder="Qté" aria-label="Quantité dans cette recette" value="'+html(item.qty)+'">'+
  '<select class="ingredient-unit" aria-label="Unité">'+selectOptions(units,item.unit)+'</select>'+
- '<button type="button" class="icon-btn" aria-label="Retirer cet ingrédient" data-action="remove-ingredient">×</button></div>'+
+ '<button type="button" class="icon-btn" aria-label="Retirer cet ingrédient" data-action="remove-ingredient">×</button></div><div class="ingredient-suggestions"></div>'+
  '<div class="ingredient-store-row"><label>Ajouter dans Produits :</label><select class="ingredient-store" aria-label="Magasin habituel de cet ingrédient">'+
  '<option value="carrefour" '+(store==='carrefour'?'selected':'')+'>🛒 Carrefour</option>'+
  '<option value="grandfrais" '+(store==='grandfrais'?'selected':'')+'>🥬 Grand Frais</option></select></div>'+
@@ -831,9 +858,15 @@ async function saveRecipe(e){
  const ingredients=[],unique=new Map();
  for(const x of rows){
   let ing=ingredientByName(x.name);
-  if(!ing)ing=makeIngredient(x.name,x.store,null);
-  ing.store=x.store;
-  if(state.storePreferences)delete state.storePreferences['ingredient:'+ing.id];
+  if(!ing){
+   const sim=ingredientSimilar(x.name);
+   if(sim.length&&!confirm('« '+sim[0].name+' » existe déjà. Créer quand même « '+x.name+' » ? Appuie sur Annuler pour réutiliser la fiche existante.')){
+    toast('Choisis la fiche existante pour éviter le doublon.');return
+   }
+   ing=makeIngredient(x.name,x.store,null);
+  }
+  // La fiche partagée reste maître du magasin : aucune recette ne le change.
+  if(!ing)return;
   const row={ingredientId:ing.id,name:ing.name,qty:x.qty,unit:x.unit,productId:ing.productId||null};
   const key=ing.id+'|'+converted(x.qty,x.unit)[1];
   const before=unique.get(key);
@@ -904,6 +937,12 @@ document.addEventListener('click',e=>{const tab=e.target.closest('[data-tab]');i
    $('#addIngredientBottom')?.scrollIntoView?.({behavior:'smooth',block:'nearest'});
   }
   else if(mode==='remove-ingredient')a.closest('.ingredient-line')?.remove();
+  else if(mode==='reuse-ingredient'){
+   const ing=ingredientById(id),row=a.closest('.ingredient-line');if(!ing||!row)return;
+   row.querySelector('.ingredient-name').value=ing.name;
+   row.querySelector('.ingredient-unit').value=preferredIngredientUnit(ing);
+   refreshIngredientEntry(row);row.querySelector('.ingredient-qty')?.focus()
+  }
   else if(mode==='choose-recipe'){if(!addRecipeToMeal(w,index,id,peopleInput())){toast('Ce plat est déjà présent dans ce repas. Modifie plutôt ses portions.');return}persist();closeModal();render()}
   else if(mode==='choose-leftovers')pickLeftoverSource(index);
   else if(mode==='apply-leftovers'){
@@ -972,7 +1011,7 @@ document.addEventListener('change',e=>{if(e.target.matches('.ingredient-name')){
   linked.textContent=ingredientStore(match)==='grandfrais'?'Grand Frais : aucune fiche produit nécessaire.':p?'Produit Carrefour lié : '+p.name:'Pas encore de produit Carrefour lié (à associer dans la base).'
  }
  }else if(e.target.matches('[data-store-item]')){setShoppingStore(e.target.dataset.storeItem,e.target.value)}else if(e.target.matches('[data-check]')){const w=getWeek(),id=e.target.dataset.check;w.checked=e.target.checked?[...new Set([...w.checked,id])]:w.checked.filter(x=>x!==id);persist();render(true)}else if(e.target.id==='importFile')importData(e.target.files?.[0])});
-document.addEventListener('input',e=>{if(e.target.id==='recipeSearch'){search=e.target.value;const result=$('#recipeResults');if(result)result.innerHTML=recipeRows()}else if(e.target.id==='productSearch'){productSearch=e.target.value;const result=$('#productResults');if(result)result.innerHTML=productRows();const ings=$('#ingredientCatalogResults');if(ings)ings.innerHTML=ingredientRowsCatalogue()}});
+document.addEventListener('input',e=>{if(e.target.matches?.('.ingredient-name'))refreshIngredientEntry(e.target.closest('.ingredient-line'));if(e.target.matches?.('.ingredient-unit'))e.target.closest('.ingredient-line').dataset.unitSelected='true';if(e.target.id==='recipeSearch'){search=e.target.value;const result=$('#recipeResults');if(result)result.innerHTML=recipeRows()}else if(e.target.id==='productSearch'){productSearch=e.target.value;const result=$('#productResults');if(result)result.innerHTML=productRows();const ings=$('#ingredientCatalogResults');if(ings)ings.innerHTML=ingredientRowsCatalogue()}});
 document.addEventListener('submit',e=>{if(e.target.id==='recipeForm')saveRecipe(e);if(e.target.id==='ingredientCatalogForm')saveCatalogIngredient(e);if(e.target.id==='extraForm')addExtra(e);if(e.target.id==='productForm')saveProduct(e)});
 window.addEventListener('hashchange',()=>importCarrefourProductFromHash());
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal()});

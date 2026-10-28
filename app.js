@@ -10,6 +10,7 @@ const contentUnits=['g','kg','ml','cl','l','pièce','rouleau'];
 const baseState=()=>({schema:1,recipes:[],products:[],weeks:{},staples:[],storePreferences:{},ingredientCatalog:[],settings:{people:2}});
 let state=baseState(), currentTab='menus', currentWeek='', search='', productSearch='', productCategory='Toutes', ingredientStoreTab='carrefour', db=null, usingFallback=false;
 let pendingRecipeDraftImage='',pendingIngredientLinkId=null;
+let independentProductsOpen=false;const courseOpenSections=new Set();
 const app=$('#app'), modalRoot=$('#modalRoot');
 const uid=()=>Math.random().toString(36).slice(2,10)+Date.now().toString(36);
 function localDate(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}
@@ -294,7 +295,7 @@ function renderProduits(){
  out+='<div class="section-head"><h2>Ingrédients</h2><span class="pill">'+total+'</span></div>'+
  '<p class="helper catalog-help">'+(isCarrefour?'Associe une référence Carrefour une seule fois à chaque ingrédient.':'Aucun lien ni code-barres nécessaire pour Grand Frais.')+'</p>'+
  '<div id="ingredientCatalogResults">'+ingredientRowsCatalogue()+'</div>';
- out+='<details class="catalog-independent" '+(productSearch?'open':'')+'><summary>Articles indépendants <span class="pill gray">'+independent+'</span></summary>'+
+ out+='<details class="catalog-independent" '+(independentProductsOpen||productSearch?'open':'')+'><summary>Articles indépendants <span class="pill gray">'+independent+'</span></summary>'+
  '<p class="helper">Produits sans recette associée : boissons, entretien, produits habituels… Une référence déjà liée à un ingrédient ne s’affiche pas ici.</p>'+
  '<button class="btn secondary wide" data-action="add-product">＋ Ajouter un article indépendant</button>'+
  '<div id="productResults">'+productRows()+'</div></details>';
@@ -550,7 +551,7 @@ function renderCourses(){
  '<div class="course-shop-count grand"><strong>'+grand.length+'</strong><span>🥬 Grand Frais</span></div></div>';
  out+='<button class="btn wide course-add-btn" data-action="add-extra">＋ Ajouter un article à cette semaine</button>';
  if(state.staples.length){
-  out+='<details class="course-optional"><summary>☆ Ajouter depuis mes favoris <span class="pill gray">'+state.staples.length+'</span></summary>'+
+  out+='<details class="course-optional" data-section="favorites" '+(courseOpenSections.has('favorites')?'open':'')+'><summary>☆ Ajouter depuis mes favoris <span class="pill gray">'+state.staples.length+'</span></summary>'+
    '<div class="favorites">'+state.staples.map(x=>'<button class="favorite-chip" data-action="quick-staple" data-id="'+html(x.id)+'">＋ '+html(x.name)+'</button>').join('')+'</div></details>'
  }
  function section(store,title,icon,rows){
@@ -568,17 +569,17 @@ function renderCourses(){
  }
  out+=section('carrefour','Carrefour Drive','🛒',carrefour);
  out+=section('grandfrais','Grand Frais','🥬',grand);
- if(checked.length)out+='<details class="course-optional"><summary>✓ Articles cochés <span class="pill gray">'+checked.length+'</span></summary>'+
+ if(checked.length)out+='<details class="course-optional" data-section="checked" '+(courseOpenSections.has('checked')?'open':'')+'><summary>✓ Articles cochés <span class="pill gray">'+checked.length+'</span></summary>'+
   '<p class="helper">Décoche un article pour le remettre dans les achats.</p>'+checked.map(shoppingRow).join('')+'</details>';
  if(covered.length||excluded.length){
-  out+='<details class="course-optional"><summary>🏠 Déjà chez nous / retirés <span class="pill gray">'+(covered.length+excluded.length)+'</span></summary>'+
+  out+='<details class="course-optional" data-section="home" '+(courseOpenSections.has('home')?'open':'')+'><summary>🏠 Déjà chez nous / retirés <span class="pill gray">'+(covered.length+excluded.length)+'</span></summary>'+
    (covered.length?'<p class="helper">Couverts par votre stock : corrige la quantité si nécessaire.</p>'+
      covered.map(x=>'<div class="course-house-row"><span class="grow"><strong>'+html(x.name)+'</strong><small> · '+html(quantity(x.stockAmount,x.stockUnit))+' disponible</small></span><button class="btn tiny secondary" data-action="home-stock" data-id="'+html(x.id)+'">Modifier le stock</button></div>').join(''):'')+
    (excluded.length?'<p class="helper">Retirés manuellement des achats de cette semaine.</p>'+
      excluded.map(x=>'<div class="course-house-row"><span class="grow">'+html(x.name)+'</span><button class="btn tiny secondary" data-action="include" data-id="'+html(x.id)+'">Réintégrer</button></div>').join(''):'')+'</details>'
  }
  if(w.extras.length){
-  out+='<details class="course-optional"><summary>Gérer les ajouts manuels <span class="pill gray">'+w.extras.length+'</span></summary>'+
+  out+='<details class="course-optional" data-section="manual" '+(courseOpenSections.has('manual')?'open':'')+'><summary>Gérer les ajouts manuels <span class="pill gray">'+w.extras.length+'</span></summary>'+
    '<p class="helper">Ces articles figurent déjà dans les magasins ci-dessus. Ici, tu peux supprimer uniquement leur ajout manuel.</p>'+
    w.extras.map(x=>'<div class="course-house-row"><span class="grow">'+html(x.name)+' · '+html(quantity(x.qty,x.unit))+'</span><button class="btn tiny secondary" data-action="delete-extra" data-id="'+html(x.id)+'" aria-label="Supprimer l’ajout manuel">Supprimer</button></div>').join('')+'</details>'
  }
@@ -1027,7 +1028,17 @@ async function importData(file){if(!file)return;try{if(file.size>25*1024*1024)th
   if(!confirm('Remplacer les données actuelles par celles de ce fichier ?'))return;
   checkpoint('Avant import JSON');state={schema:1,recipes:raw.recipes,products:Array.isArray(raw.products)?raw.products:[],weeks:raw.weeks,staples:raw.staples,storePreferences:raw.storePreferences&&typeof raw.storePreferences==='object'&&!Array.isArray(raw.storePreferences)?raw.storePreferences:{},ingredientCatalog:Array.isArray(raw.ingredientCatalog)?raw.ingredientCatalog:[],settings:{people:2,...raw.settings}};normalizeIngredientCatalog();persist();closeModal();render();toast('Sauvegarde restaurée !')
 }catch(err){toast(err.message||'Importation impossible.')}}
-document.addEventListener('click',e=>{const tab=e.target.closest('[data-tab]');if(tab){currentTab=tab.dataset.tab;render();return}
+document.addEventListener('click',e=>{
+ const summary=e.target.closest('summary');
+ if(summary){
+  const parent=summary.parentElement;
+  if(parent?.matches('.catalog-independent'))independentProductsOpen=!parent.open;
+  if(parent?.matches('.course-optional')){
+   const name=parent.dataset.section;
+   if(name){if(parent.open)courseOpenSections.delete(name);else courseOpenSections.add(name)}
+  }
+ }
+ const tab=e.target.closest('[data-tab]');if(tab){currentTab=tab.dataset.tab;render();return}
   const a=e.target.closest('[data-action]');if(!a){if(e.target.matches('[data-overlay]'))closeModal();return}
   const mode=a.dataset.action,index=Number(a.dataset.index),w=getWeek(),id=a.dataset.id;
   if(mode==='close-modal')closeModal();
@@ -1199,7 +1210,7 @@ document.addEventListener('change',e=>{if(e.target.matches('.ingredient-name')){
   linked.textContent=ingredientStore(match)==='grandfrais'?'Grand Frais : aucune fiche produit nécessaire.':p?'Produit Carrefour lié : '+p.name:'Pas encore de produit Carrefour lié (à associer dans la base).'
  }
  }else if(e.target.matches('[data-store-item]')){setShoppingStore(e.target.dataset.storeItem,e.target.value)}else if(e.target.matches('[data-check]')){const w=getWeek(),id=e.target.dataset.check;w.checked=e.target.checked?[...new Set([...w.checked,id])]:w.checked.filter(x=>x!==id);persist();render(true)}else if(e.target.id==='importFile')importData(e.target.files?.[0])});
-document.addEventListener('input',e=>{if(e.target.matches?.('.ingredient-name'))refreshIngredientEntry(e.target.closest('.ingredient-line'));if(e.target.matches?.('.ingredient-unit'))e.target.closest('.ingredient-line').dataset.unitSelected='true';if(e.target.id==='recipeSearch'){search=e.target.value;const result=$('#recipeResults');if(result)result.innerHTML=recipeRows()}else if(e.target.id==='productSearch'){productSearch=e.target.value;const result=$('#productResults');if(result)result.innerHTML=productRows();const ings=$('#ingredientCatalogResults');if(ings)ings.innerHTML=ingredientRowsCatalogue()}});
+document.addEventListener('input',e=>{if(e.target.matches?.('.ingredient-name'))refreshIngredientEntry(e.target.closest('.ingredient-line'));if(e.target.matches?.('.ingredient-unit'))e.target.closest('.ingredient-line').dataset.unitSelected='true';if(e.target.id==='recipeSearch'){search=e.target.value;const result=$('#recipeResults');if(result)result.innerHTML=recipeRows()}else if(e.target.id==='productSearch'){productSearch=e.target.value;if(productSearch.trim()){independentProductsOpen=true;const section=document.querySelector('.catalog-independent');if(section)section.open=true}const result=$('#productResults');if(result)result.innerHTML=productRows();const ings=$('#ingredientCatalogResults');if(ings)ings.innerHTML=ingredientRowsCatalogue()}});
 document.addEventListener('submit',e=>{if(e.target.id==='recipeForm')saveRecipe(e);if(e.target.id==='ingredientCatalogForm')saveCatalogIngredient(e);if(e.target.id==='extraForm')addExtra(e);if(e.target.id==='productForm')saveProduct(e)});
 window.addEventListener('hashchange',()=>importCarrefourProductFromHash());
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal()});

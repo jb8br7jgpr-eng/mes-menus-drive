@@ -245,3 +245,16 @@
 /* Distinction visuelle entre la quantité cuisinée, mangée et gardée en restes. */
 .meal-portions-explainer{font-size:11px;line-height:1.45;color:#366d4b;font-weight:700;margin:6px 0 1px;padding:7px 9px;border-radius:9px;background:#edf6eb;border:1px solid #dce9d9;overflow-wrap:anywhere}
 @supports (-webkit-touch-callout:none){.meal-dish-qty{font-size:16px!important}}
+
+/* V22 : Génération explicite d'une liste d'achats par semaine. */
+.course-generation{border:1px solid #d4e5d1;border-radius:16px;padding:14px 13px;margin:12px 0 16px;background:linear-gradient(115deg,#edf7ea,#f8fbf5)}
+.course-generation>strong{display:block;color:#315b3e;font-size:14px;line-height:1.35}
+.course-generation>p{font-size:12px;line-height:1.55;color:#5a735f;margin:7px 0 11px}
+.course-generation.not-generated{background:#f7f9f4;border-color:#e1e7de}
+.course-generation.outdated{background:#fff9eb;border-color:#eedeb9}
+.course-generation.outdated>strong{color:#8b662c}
+.course-generation.outdated>p{color:#806d4f}
+.course-generation-actions{display:flex;gap:8px;align-items:stretch;flex-wrap:wrap}
+.course-generation-actions .btn{min-height:42px;flex:1;min-width:0;white-space:normal;font-size:12px;line-height:1.35}
+.course-generation-actions .btn.wide{flex-basis:100%}
+@media(max-width:380px){.course-generation{padding:12px 10px}.course-generation-actions .btn{font-size:11px}}

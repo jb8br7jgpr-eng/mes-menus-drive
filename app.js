@@ -353,6 +353,7 @@ function saveUnifiedCatalogue(e){
     packUnit:packAmount?packUnit:null,frequent};
   if(state.storePreferences)delete state.storePreferences['product:'+product.id];
   if(old)state.products=state.products.map(p=>p.id===old.id?product:p);else state.products.push(product);
+  if(product.frequent)state.ingredientCatalog.forEach(x=>{if(x.productId===product.id)x.frequent=true});
   const ing=ingredientById(e.target.dataset.ingredientId);
   if(ing){
    ing.productId=product.id;ing.store='carrefour';ing.frequent=Boolean(ing.frequent||product.frequent);ingredientStoreTab='carrefour';
@@ -402,7 +403,7 @@ function unifiedCatalogueRows(){
   const description=ing?(x.store==='grandfrais'?'Liste Grand Frais':p?'Référence Carrefour : '+p.name+(p.packAmount>0?' · '+quantity(p.packAmount,p.packUnit):' · contenu à préciser'):'Référence Carrefour à associer'):
     ([x.item.brand,x.item.packaging].filter(Boolean).join(' · ')||quantity(x.item.qty||1,x.item.unit||'paquet'));
   return '<article class="catalogue-unified-card"><div class="catalogue-unified-icon">'+(ing?'🥕':productBadge(x.item))+'</div>'+
-    '<div class="grow"><strong>'+html(x.name)+'</strong><div class="catalogue-unified-meta"><span class="catalogue-type-badge">'+(ing?'Ingrédient':'Quotidien')+'</span> · '+(x.store==='grandfrais'?'Grand Frais':'Carrefour Drive')+'</div>'+
+    '<div class="grow"><strong>'+html(x.name)+'</strong><div class="catalogue-unified-meta"><span class="catalogue-type-badge">'+(ing?'Ingrédient':'Quotidien')+'</span> · '+(x.store==='grandfrais'?'Grand Frais':'Carrefour Drive')+(x.item.frequent?' · ☆ Fréquent':'')+'</div>'+
     '<div class="catalogue-unified-desc">'+html(description)+'</div></div>'+
     '<div class="catalogue-unified-actions"><button class="btn tiny" data-action="add-unified-courses" data-kind="'+x.type+'" data-id="'+html(x.id)+'">＋ Courses</button>'+
     '<button class="btn tiny secondary" data-action="edit-unified-product" data-kind="'+x.type+'" data-id="'+html(x.id)+'">Gérer</button></div></article>';
@@ -436,7 +437,8 @@ function unifiedToCourses(type,id){
  const item=type==='ingredient'?ingredientById(id):productById(id);if(!item)return;
  const unit=item.unit||(type==='ingredient'?preferredIngredientUnit(item):'paquet');
  const amount=item.qty||1;
- const body='<p class="helper">Ajout manuel : les ingrédients des recettes ne sont pas générés automatiquement. Le stock maison pourra être renseigné dans Courses.</p>'+
+ const store=type==='ingredient'?ingredientStore(item):(state.storePreferences?.['product:'+item.id]||item.store||'carrefour');
+ const body='<p class="helper">Ajout manuel pour cette semaine · '+(store==='grandfrais'?'🥬 Grand Frais':'🛒 Carrefour Drive')+'. Le stock maison pourra être renseigné dans Courses. Les ingrédients des recettes ne sont pas générés automatiquement.</p>'+
  '<div class="row stock-editor-row"><div class="field grow"><label for="unifiedExtraQty">Quantité</label><input id="unifiedExtraQty" type="number" min=".01" step="any" value="'+html(amount)+'"></div>'+
  '<div class="field grow"><label for="unifiedExtraUnit">Unité</label><select id="unifiedExtraUnit">'+selectOptions(units,unit)+'</select></div></div>'+
  '<button class="btn wide" data-action="save-unified-courses" data-kind="'+type+'" data-id="'+html(id)+'">＋ Ajouter aux courses</button>';
@@ -554,8 +556,10 @@ function migrateFrequentProducts(){
   const linked=product?(state.ingredientCatalog||[]).find(i=>i.productId===product.id):null;
   const target=ing||linked||product;
   if(target){target.frequent=true;continue}
+  const category=groupFor(fav.name,fav.unit);
+  const store=['Fruits et légumes','Viandes et poissons'].includes(category)?'grandfrais':'carrefour';
   state.products.push({id:uid(),name:String(fav.name).trim().slice(0,100),brand:'',packaging:'',
-   store:'carrefour',category:'Autres',qty:Number(fav.qty)>0?Number(fav.qty):1,
+   store,category:['Fruits et légumes','Viandes et poissons','Produits frais'].includes(category)?category:'Autres',qty:Number(fav.qty)>0?Number(fav.qty):1,
    unit:units.includes(fav.unit)?fav.unit:'pièce',url:'',ean:'',packAmount:null,packUnit:null,frequent:true})
  }
  state.staples=[];

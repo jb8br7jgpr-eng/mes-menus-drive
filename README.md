@@ -121,3 +121,27 @@ Aucun mot de passe, cookie, token ni donnée de compte n’est lu, enregistré o
 **Compatibilité :** l’ancienne méthode via lien `#carrefour-product=...` reste disponible pour les ouvertures dans Safari, mais ne partage pas ses données avec l’application de l’écran d’accueil. Le presse-papiers assure le passage de la fiche entre les deux applications sans serveur, sans compte, sans connexion à un service tiers et sans effacer les anciennes recettes.
 
 **Sécurité :** transfert d'une seule fiche produit publique par action utilisateur ; jamais de cookies Carrefour, d’identifiant ou de mot de passe, ni d’ajout au panier. Les données envoyées au presse-papiers peuvent être lues par d’autres applications autorisées à y accéder ; recopier ensuite un autre texte si souhaité.
+
+
+## Exporter la liste complète de courses vers Userscripts (v0.4, préparation du panier)
+
+Le **mode aperçu est en lecture seule** et ne modifie ni le panier ni les données du compte Carrefour.
+
+1. Dans l’icône iPhone **Menus & Drive**, ouvrir **Drive → Préparer mon panier Carrefour**.
+2. Une fenêtre affiche le nombre de lignes prêtes (référence EAN-13 et quantité entière dans une unité achetable) et les lignes à associer ou à préciser.
+3. Cliquer **Copier la liste pour Carrefour**. En cas d’échec, sélectionner puis copier le code depuis la zone dédiée.
+4. Ouvrir **Carrefour.fr dans Safari** et le menu vert Userscripts. Cliquer **« Coller ma liste de courses »** puis autoriser le collage. Un champ manuel est disponible en cas de refus du presse-papiers.
+5. Le script affiche **toutes les lignes** avec quantité, EAN lorsque disponible, et avertissements. Il **ne contacte pas** les API Carrefour et n’interroge ni prix ni stocks.
+6. Toujours vérifier manuellement que le magasin Drive courant est **Carrefour École-Valentin**.
+
+### Format d'échange
+
+Préfixe `MD-DRIVE-LIST-V1:` suivi d'un JSON `{format:"mes-menus-drive-list",v:1,week,createdAt,items:[{name,qty,unit,ean,url,brand,packaging,needed,ready,reason}]}`.
+
+L'export inclut exclusivement les lignes **ni cochées ni exclues** de la liste hebdomadaire. Les recettes liées à des produits et disposant d’un contenu par paquet compatible sont préconverties en emballages. Une référence EAN peut provenir de la fiche du catalogue ou, en secours, des 13 chiffres à la fin du lien produit Carrefour.
+
+Les unités de masse et de volume non converties en nombre de colis restent **à associer** : une ligne « 750 g » n'est jamais envoyée comme « 750 paquets ». Les unités `pièce`, `paquet`, `boîte`, `rouleau`, `bouteille`, `pot`, `sachet` sont acceptées en quantités entières ; cela n'est **pas une validation de l'offre**, du stock ou du magasin.
+
+Le script ne sauvegarde pas le texte copié côté Carrefour. Il ne fait que l'afficher localement après collage. Ne pas installer deux versions du même userscript. **Ne pas prendre le mode aperçu pour un panier Carrefour rempli.**
+
+**Travail suivant :** identifier les références et la disponibilité dans le magasin sélectionné, en lecture seule et avec accord de l'utilisateur. Envisager ensuite des essais contrôlés d'ajout au panier, après validation explicite et sans jamais lancer le paiement.

@@ -335,3 +335,15 @@ La base utilise le **schéma JSON 1 existant**, avec un nouveau champ facultatif
 
 Le script Userscripts **v0.9**, la sélection du Drive École-Valentin, les protections du panier et l'absence de paiement automatisé restent inchangés. Tester l'interface sur les deux iPhone, notamment la recherche d'ingrédients dans la saisie d'une recette (datalist iOS), puis exporter un JSON vers iCloud Drive.
 
+
+
+## Ergonomie des ingrédients et suppression rapide du calendrier (v17)
+
+- **Navigation :** l’onglet « Base » s’appelle à nouveau **« Produits »**. Son contenu conserve les deux rubriques **Carrefour** et **Grand Frais** ; les références Carrefour habituelles et l’import via le bouton « 📋 Coller un produit Carrefour » restent inchangés.
+- **Ingrédient ajouté dans une recette :** on saisit son nom, la quantité, l’unité et le magasin dans la recette. À **l’enregistrement du plat**, si ce nom n’existe pas encore (comparaison normalisée insensible à la casse et aux accents), **une seule fiche partagée est créée automatiquement dans Produits**, directement sous Carrefour ou Grand Frais. Les recettes suivantes réutilisent la fiche, avec leurs propres quantités. L’interface d’édition affiche explicitement cette règle. Pour Carrefour, on peut ensuite associer la fiche à un produit importé, son EAN et son contenu d’emballage : le calcul des paquets est conservé. Aucune seconde saisie du nom dans Produits n’est nécessaire.
+- **Vider une journée :** chaque carte de jour dispose de « ✕ Vider le jour », désactivé si les deux cases sont vides. Après confirmation, les repas midi et soir sont vidés ; les éventuels restes liés à une préparation supprimée sont retirés du calendrier même s’ils avaient été placés plus tard. Les autres jours et les autres plats restent intacts.
+- **Vider une semaine :** un bouton « 🗑️ Vider tous les repas de cette semaine » sous le planning supprime, avec confirmation, **uniquement les 14 créneaux du planning affiché**. Les recettes, ingrédients, produits, ajouts manuels de courses, favoris, exclusions, cases cochées et les autres semaines restent intacts. Les listes de courses recalculent naturellement les ingrédients des repas qui demeurent.
+- **Sécurité :** une sauvegarde locale préalable est demandée via `checkpoint()` avant ces suppressions si la base IndexedDB le permet ; les anciennes sauvegardes JSON schéma 1 restent compatibles. Rien n’est modifié dans le script Userscripts, le panier réel Carrefour ou les deux jeux indépendants.
+
+Tests simulés validés : création d’une recette avec deux ingrédients vers des magasins différents, création unique du même ingrédient réutilisé par une seconde recette, préservation des produits existants, annulabilité des deux suppressions, suppression des restes liés, conservation des ajouts de courses et de tous les catalogues, conservation des autres semaines.
+

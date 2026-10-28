@@ -100,8 +100,8 @@ function mealCard(meal,i){
  return '<button class="meal-tile'+classes+'" data-action="pick-meal" data-index="'+i+'" aria-label="'+html(days[Math.floor(i/2)])+' '+(i%2?'soir':'midi')+', '+html(names.join(' et ')||'ajouter un plat')+'"><span class="meal-type">'+(i%2?'Soir':'Midi')+(note?' · '+html(note):'')+'</span>'+
  (names.length?names.map(n=>'<strong>'+html(n)+'</strong>').join(''):'<span class="add">＋ Ajouter un plat</span>')+'</button>';
 }
-function renderMenus(){const w=getWeek(),count=w.meals.filter(Boolean).length, last=offsetDate(currentWeek,6),isThis=currentWeek===monday(new Date());
-  let out='<div class="hero"><div class="eyebrow">Planificateur hebdomadaire</div><h1>Qu’est-ce qu’on mange cette semaine ?</h1><p>Pour vous deux : cuisine 4 portions, puis choisis librement quand manger les restes. Tu peux aussi faire deux plats différents au même repas !</p><button class="btn cream" data-action="complete-week">✦ Compléter ma semaine</button></div>';
+function renderMenus(){const w=getWeek(),count=w.meals.filter(Boolean).length, last=offsetDate(currentWeek,6),isThis=currentWeek===monday(new Date()),autoLabel=count===0?'✦ Générer mes 14 repas':'✦ Compléter les repas manquants';
+  let out='<div class="hero"><div class="eyebrow">Planificateur hebdomadaire</div><h1>Qu’est-ce qu’on mange cette semaine ?</h1><p>Pour vous deux : cuisine 4 portions, puis choisis librement quand manger les restes. Tu peux aussi faire deux plats différents au même repas !</p>'+(count<14?'<button class="btn cream" data-action="complete-week">'+autoLabel+'</button>':'<div class="week-complete-note">✓ Les 14 repas sont renseignés</div>')+'</div>';
   out+='<div class="section-head"><h2>Votre semaine</h2><span class="pill">'+count+' / 14 repas</span></div>';
   out+='<div class="week-control"><button class="icon-btn" aria-label="Semaine précédente" data-action="week-prev">‹</button><div class="week-label">Du '+niceDate(currentWeek)+' au '+niceDate(last)+(isThis?'<small>Cette semaine</small>':'<small>Planning personnalisé</small>')+'</div><button class="icon-btn" aria-label="Semaine suivante" data-action="week-next">›</button></div>';
   out+='<div class="status-bar"><span style="width:'+(count/14*100)+'%"></span></div>';
@@ -113,7 +113,7 @@ function renderMenus(){const w=getWeek(),count=w.meals.filter(Boolean).length, l
    '<button class="day-clear-btn" data-action="clear-day" data-day="'+day+'" aria-label="Vider les repas du '+html(days[day])+'" '+(!hasMeals?'disabled':'')+'>✕ Vider le jour</button></div>'+
    '<div class="day-meals">'+mealCard(w.meals[day*2],day*2)+mealCard(w.meals[day*2+1],day*2+1)+'</div></section>'
   }
-  out+='</div><div class="toolbar"><button class="btn secondary" data-action="generate-week">✦ Générer les 14 repas</button><button class="btn secondary" data-action="repeat-week">↻ Reprendre la semaine passée</button></div>'+
+  out+='</div><div class="toolbar"><button class="btn secondary" data-action="repeat-week">↻ Reprendre la semaine passée</button></div>'+
   '<button class="btn danger wide clear-week-btn" data-action="clear-week" '+(!count?'disabled':'')+'>🗑️ Vider tous les repas de cette semaine</button>';
   out+='<p class="helper">Choisis librement quand manger les restes : touche le repas souhaité, puis « Placer des restes ici ». La sélection indique les plats cuisinés et les portions encore disponibles. Aucun repas de restes n’est rempli automatiquement.</p>';
   return out
@@ -1103,11 +1103,10 @@ function pickLeftoverSource(index){
  body+='<button class="btn secondary wide" style="margin-top:14px" data-action="pick-meal" data-index="'+index+'">← Retour au repas</button>';
  showModal('🍱 Choisir les restes',body)
 }
-function populate(mode){
+function populate(){
  if(!state.recipes.length){toast('Ajoute d’abord quelques plats à ton catalogue.');currentTab='plats';render();return}
- const w=getWeek();
- if(mode==='generate'&&w.meals.some(Boolean)&&!confirm('Remplacer les 14 repas de cette semaine ?'))return;
- if(mode==='generate')w.meals=Array(14).fill(null);
+ const w=getWeek(),missing=w.meals.filter(m=>!m).length;
+ if(!missing){toast('Les 14 repas sont déjà renseignés.');return}
  // Aucun repas n'est réservé automatiquement aux restes : le calendrier
  // laisse entièrement à l'utilisateur le choix de leur jour et de leur repas.
  const counts={},types={},history={};
@@ -1132,7 +1131,7 @@ function populate(mode){
   // Un repas généré correspond à deux personnes, sans placement automatique de restes.
   selectRecipeForMeal(w,i,selected.id,2);
  }
- persist();render();toast(mode==='generate'?'Semaine variée générée !':'Les repas manquants sont complétés !')
+ persist();render();toast(missing===14?'Les 14 repas sont générés !':'Les repas manquants sont complétés !')
 }
 async function compressImage(file){if(!file)return null;if(file.size>12*1024*1024)throw Error('Photo trop volumineuse (12 Mo maximum).');return new Promise((resolve,reject)=>{const reader=new FileReader();reader.onerror=()=>reject(Error('Impossible de lire la photo.'));reader.onload=()=>{const img=new Image();img.onerror=()=>reject(Error('Photo non reconnue.'));img.onload=()=>{const max=640,scale=Math.min(1,max/Math.max(img.width,img.height)),can=document.createElement('canvas');can.width=Math.round(img.width*scale);can.height=Math.round(img.height*scale);can.getContext('2d').drawImage(img,0,0,can.width,can.height);resolve(can.toDataURL('image/jpeg',.76))};img.src=reader.result};reader.readAsDataURL(file)})}
 async function saveRecipe(e){
@@ -1350,8 +1349,7 @@ document.addEventListener('click',e=>{
    dishes.splice(dishIndex,1);setMealDishes(w,index,dishes);persist();closeModal();render();toast('Plat retiré de ce repas.')
   }
   else if(mode==='remove-meal'){clearMealWithPair(w,index);persist();closeModal();render()}
-  else if(mode==='generate-week')populate('generate');
-  else if(mode==='complete-week')populate('complete');
+  else if(mode==='complete-week')populate();
   else if(mode==='repeat-week'){const prev=state.weeks[offsetDate(currentWeek,-7)];if(!prev?.meals?.some(Boolean)){toast('Aucun menu trouvé la semaine précédente.');return}if(w.meals.some(Boolean)&&!confirm('Remplacer les repas de cette semaine ?'))return;w.meals=JSON.parse(JSON.stringify(prev.meals));persist();render();toast('Menus de la semaine précédente repris !')}
   else if(mode==='add-extra')extraModal();
   else if(mode==='quick-staple'){const s=state.staples.find(x=>x.id===id);if(s){w.extras.push({id:uid(),name:s.name,qty:s.qty,unit:s.unit});persist();render();toast(s.name+' ajouté !')}}

@@ -1,5 +1,5 @@
-const CACHE='menus-drive-v10-carrefour-cart-20261028';
-const ASSETS=['./','./index.html','./styles.css?v=20261028-10','./app.js?v=20261028-10','./manifest.webmanifest','./icon.svg'];
+const CACHE='menus-drive-v11-safari-direct-20261028';
+const ASSETS=['./','./index.html','./styles.css?v=20261028-11','./app.js?v=20261028-11','./manifest.webmanifest','./icon.svg'];
 self.addEventListener('install',event=>{
   event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(ASSETS)).then(()=>self.skipWaiting()));
 });

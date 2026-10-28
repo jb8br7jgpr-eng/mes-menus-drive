@@ -1,5 +1,5 @@
-const CACHE='menus-drive-v5-carrefour-import-20261028';
-const ASSETS=['./','./index.html','./styles.css?v=20261028-5','./app.js?v=20261028-5','./manifest.webmanifest','./icon.svg'];
+const CACHE='menus-drive-v6-iphone-clipboard-20261028';
+const ASSETS=['./','./index.html','./styles.css?v=20261028-6','./app.js?v=20261028-6','./manifest.webmanifest','./icon.svg'];
 self.addEventListener('install',event=>{
   event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(ASSETS)).then(()=>self.skipWaiting()));
 });

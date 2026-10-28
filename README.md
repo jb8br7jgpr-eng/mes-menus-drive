@@ -220,3 +220,21 @@ Mettre à jour l'unique script Userscripts vers **v0.8**, ouvrir l'application d
 
 En cas de panne, la copie de secours reste disponible dans la fenêtre « Détails et copie de secours » ; après collage manuel dans Userscripts, il est possible de lancer l'ajout via le bouton explicite « Ajouter les produits disponibles au panier ».
 
+
+
+## Ouverture DIRECTE dans Safari depuis l'icône iPhone — correction du navigateur intégré
+
+Certaines versions d’iOS ouvrent un lien `https://www.carrefour.fr/...` depuis une application Web installée dans **Safari View Controller**, la petite fenêtre avec boutons Partager / Fermer, au lieu de l'application Safari elle-même. Cette fenêtre n'exécute pas nécessairement l'extension Userscripts configurée dans Safari : le transfert du panier peut alors échouer.
+
+Le bouton principal **« 🛒 Constituer mon panier Carrefour »**, dans **Mon Drive** et dans la fenêtre de détails, appelle maintenant directement `openDriveInSafari()` lors du clic utilisateur. Sur iPhone/iPad en mode **application d'écran d'accueil** seulement, il tente d'ouvrir :
+
+```text
+x-safari-https://www.carrefour.fr/#md-drive-v1=<codes EAN+quantités encodés>
+```
+
+Le schéma `x-safari-https:` est reconnu par Safari sur plusieurs versions récentes d'iOS (notamment 17–26 selon des tests communautaires), mais son comportement dépend du système et n'est **pas garanti pour tous les iPhones / iOS**. Il faut valider l'ouverture directement **dans Safari sur le téléphone de l'utilisatrice**. En mode navigateur classique et hors iOS, le lien HTTPS ordinaire reste utilisé.
+
+**Secours amélioré :** dans **Mon Drive → Détails et copie de secours**, cliquer **« 🔗 Copier le lien pour Safari (secours) »**, puis ouvrir l'application Safari soi-même et coller ce lien **directement dans la barre d’adresse**. Le lien contient déjà toutes les références et leurs quantités : pas de deuxième collage dans Userscripts. L'ancienne copie des EAN seuls reste disponible comme dernier secours.
+
+Ni le format de transfert, ni le fonctionnement de l'extension Userscripts 0.8, ni les données locales (recettes, produits, sauvegardes) n'ont été modifiés. Pour que le panier se remplisse depuis Safari, le script Userscripts doit être installé et autorisé **sur chaque iPhone**. Aucune validation de commande ou paiement automatique.
+

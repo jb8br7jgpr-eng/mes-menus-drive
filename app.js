@@ -576,34 +576,35 @@ function courseGenerationBanner(w=getWeek(),where='courses'){
 }
 function shopping(){
  const w=getWeek(),map=new Map(),packs=new Map();
- function plain(name,qty,unit,source,productId,ingredientId,store){
+ function plain(name,qty,unit,source,productId,ingredientId,store,extraId=null){
   const clean=String(name||'').trim();if(!clean)return;
   const [v,u]=converted(qty,unit);if(!(v>0))return;
   const p=productById(productId),ing=ingredientById(ingredientId);
   const key=(ing?'ingredient:'+ing.id:(p?'produit:'+p.id:norm(clean)))+'|'+u;
-  if(!map.has(key))map.set(key,{id:key,name:ing?.name||clean,qty:0,unit:u,source:[],productId:p?.id||null,ingredientId:ing?.id||null,forcedStore:store||null});
-  const x=map.get(key);x.qty+=v;if(!x.source.includes(source))x.source.push(source)
+  if(!map.has(key))map.set(key,{id:key,name:ing?.name||clean,qty:0,unit:u,source:[],productId:p?.id||null,ingredientId:ing?.id||null,forcedStore:store||null,manualExtraIds:[]});
+  const x=map.get(key);x.qty+=v;if(extraId)x.manualExtraIds.push(extraId);if(!x.source.includes(source))x.source.push(source)
  }
- function add(name,qty,unit,source,productId,fromCatalogue=false,ingredientId=null){
+ function add(name,qty,unit,source,productId,fromCatalogue=false,ingredientId=null,extraId=null){
   const ing=ingredientById(ingredientId),store=ing?ingredientStore(ing):null;
   const selectedProductId=ing?(ing.productId||null):productId;
   const p=productById(selectedProductId);
   const [val,u]=converted(qty,unit),[size,packUnit]=p&&p.packAmount>0?converted(p.packAmount,p.packUnit):[0,''];
   const compatible=p&&size>0&&packUnit===u,catalogue=p&&fromCatalogue&&unit===p.unit;
   if((compatible||catalogue)&&(!ing||store==='carrefour')){
-   if(!packs.has(p.id))packs.set(p.id,{p,needed:0,needUnit:packUnit||u,size,manualPacks:0,source:[],ingredientId:ing?.id||null});
+   if(!packs.has(p.id))packs.set(p.id,{p,needed:0,needUnit:packUnit||u,size,manualPacks:0,source:[],ingredientId:ing?.id||null,manualExtraIds:[]});
    const item=packs.get(p.id);
    if(catalogue)item.manualPacks+=Number(qty);else item.needed+=val;
+   if(extraId)item.manualExtraIds.push(extraId);
    if(ing&&!item.ingredientId)item.ingredientId=ing.id;
    if(!item.source.includes(source))item.source.push(source);
    return
   }
-  plain(ing?.name||name,qty,unit,source,(store==='grandfrais')?null:p?.id,ing?.id||null,store)
+  plain(ing?.name||name,qty,unit,source,(store==='grandfrais')?null:p?.id,ing?.id||null,store,extraId)
  }
  (Array.isArray(w.generatedIngredients)?w.generatedIngredients:[]).forEach(x=>
   add(x.name,Number(x.qty),x.unit,'Recettes',x.productId,false,x.ingredientId)
  );
- w.extras.forEach(x=>add(x.name,x.qty,x.unit,'Ajout manuel',x.productId,Boolean(x.fromCatalogue),x.ingredientId));
+ w.extras.forEach(x=>add(x.name,x.qty,x.unit,'Ajout manuel',x.productId,Boolean(x.fromCatalogue),x.ingredientId,x.id));
  for(const [productId,item] of packs){
   const p=item.p,stockUnit=item.needed>0?item.needUnit:(p.unit||'paquet');
   const pantryKey='produit:'+productId+'|'+stockUnit;
@@ -612,7 +613,7 @@ function shopping(){
   const netNeed=Math.max(0,grossNeed-stockAmount);
   const count=item.needed>0&&item.size>0?Math.ceil(netNeed/item.size-1e-9):netNeed;
   const id='produit:'+productId+'|achat';
-  map.set(id,{id,name:p.name,qty:count,unit:p.unit||'paquet',source:item.source,productId,ingredientId:item.ingredientId,
+  map.set(id,{id,name:p.name,qty:count,unit:p.unit||'paquet',source:item.source,productId,ingredientId:item.ingredientId,manualExtraIds:item.manualExtraIds,
    needed:netNeed>0?quantity(netNeed,stockUnit):'',grossNeeded:grossNeed>0?quantity(grossNeed,stockUnit):'',
    totalNeedAmount:grossNeed,totalNeedUnit:stockUnit,
    stockKey:pantryKey,stockAmount,stockUnit,covered:count<=0,
@@ -698,6 +699,33 @@ function homeStockModal(itemId){
  '<button class="btn wide" data-action="save-home-stock" data-id="'+html(x.id)+'">✓ Enregistrer mon stock</button>';
  showModal('🏠 Stock maison · '+x.name,htmlBody)
 }
+
+function manualEditControl(item,small=false){
+ return item?.manualExtraIds?.length?
+  '<button class="'+(small?'btn tiny secondary':'manual-edit-btn')+'" data-action="edit-manual-row" data-id="'+html(item.id)+'" aria-label="Modifier l’ajout manuel de '+html(item.name)+'">✎ Modifier l’ajout</button>':''
+}
+function editManualRowModal(itemId){
+ const item=shopping().find(x=>x.id===itemId);
+ if(!item?.manualExtraIds?.length){toast('Aucun ajout manuel à modifier sur cette ligne.');return}
+ const entries=item.manualExtraIds.map(id=>getWeek().extras.find(x=>x.id===id)).filter(Boolean);
+ if(entries.length===1){editManualExtraModal(entries[0].id);return}
+ let out='<p class="helper">Plusieurs ajouts manuels sont regroupés sur cette ligne. Choisis précisément celui à modifier, sans toucher aux quantités des recettes.</p>';
+ out+=entries.map(entry=>'<div class="manual-extra-choice"><span class="grow">'+html(entry.name)+' <strong>· '+html(quantity(entry.qty,entry.unit))+'</strong></span>'+
+ '<button class="btn tiny secondary" data-action="edit-manual-extra" data-id="'+html(entry.id)+'">Modifier</button></div>').join('');
+ showModal('Modifier les ajouts · '+item.name,out)
+}
+function editManualExtraModal(extraId){
+ const entry=getWeek().extras.find(x=>x.id===extraId);if(!entry)return;
+ const linked=Boolean(entry.productId||entry.ingredientId);
+ let out='<p class="helper">Tu modifies uniquement cet achat ajouté manuellement à la semaine, pas les ingrédients calculés des recettes.</p>'+
+ (linked?'<div class="manual-linked-name"><strong>'+html(entry.name)+'</strong><p class="helper">Nom lié au catalogue Produits</p></div>':
+ '<div class="field"><label for="manualExtraName">Nom de l’article</label><input id="manualExtraName" maxlength="80" value="'+html(entry.name)+'" required></div>')+
+ '<div class="manual-edit-fields"><div class="field"><label for="manualExtraQty">Quantité</label><input id="manualExtraQty" type="number" min=".01" step="any" inputmode="decimal" value="'+html(entry.qty)+'"></div>'+
+ '<div class="field"><label for="manualExtraUnit">Unité</label><select id="manualExtraUnit">'+selectOptions(units,entry.unit)+'</select></div></div>'+
+ '<button class="btn wide" data-action="save-manual-extra" data-id="'+html(entry.id)+'">✓ Enregistrer les modifications</button>'+
+ '<button class="btn danger wide manual-delete-extra" data-action="remove-manual-extra" data-id="'+html(entry.id)+'">🗑️ Supprimer cet ajout de la semaine</button>';
+ showModal('Modifier l’achat · '+entry.name,out)
+}
 function shoppingRow(x){
  const p=productById(x.productId);
  const stock=x.stockAmount>0;
@@ -720,7 +748,7 @@ function shoppingRow(x){
  '<option value="carrefour" '+(x.store==='carrefour'?'selected':'')+'>Carrefour</option>'+
  '<option value="grandfrais" '+(x.store==='grandfrais'?'selected':'')+'>Grand Frais</option></select>'+
  '<button class="home-stock-btn" data-action="home-stock" data-id="'+html(x.id)+'">'+(stock?'🏠 Stock : '+html(quantity(x.stockAmount,x.stockUnit)):'🏠 Stock')+'</button>'+
- '<button class="home-owned" data-action="exclude" data-id="'+html(x.id)+'" title="Ne pas acheter cette semaine">Retirer</button></div></div></div>'
+ '<button class="home-owned" data-action="exclude" data-id="'+html(x.id)+'" title="Ne pas acheter cette semaine">Retirer</button>'+manualEditControl(x)+'</div></div></div>'
 }
 function renderCourses(){
  const items=shopping(),w=getWeek();
@@ -760,15 +788,11 @@ function renderCourses(){
  if(covered.length||excluded.length){
   out+='<details class="course-optional" data-section="home" '+(courseOpenSections.has('home')?'open':'')+'><summary>🏠 Déjà chez nous / retirés <span class="pill gray">'+(covered.length+excluded.length)+'</span></summary>'+
    (covered.length?'<p class="helper">Couverts par votre stock : corrige la quantité si nécessaire.</p>'+
-     covered.map(x=>'<div class="course-house-row"><span class="grow"><strong>'+html(x.name)+'</strong><small> · '+html(quantity(x.stockAmount,x.stockUnit))+' disponible</small></span><button class="btn tiny secondary" data-action="home-stock" data-id="'+html(x.id)+'">Modifier le stock</button></div>').join(''):'')+
+     covered.map(x=>'<div class="course-house-row"><span class="grow"><strong>'+html(x.name)+'</strong><small> · '+html(quantity(x.stockAmount,x.stockUnit))+' disponible</small></span><div class="course-house-actions"><button class="btn tiny secondary" data-action="home-stock" data-id="'+html(x.id)+'">Modifier le stock</button>'+manualEditControl(x,true)+'</div></div>').join(''):'')+
    (excluded.length?'<p class="helper">Retirés manuellement des achats de cette semaine.</p>'+
-     excluded.map(x=>'<div class="course-house-row"><span class="grow">'+html(x.name)+'</span><button class="btn tiny secondary" data-action="include" data-id="'+html(x.id)+'">Réintégrer</button></div>').join(''):'')+'</details>'
+     excluded.map(x=>'<div class="course-house-row"><span class="grow">'+html(x.name)+'</span><div class="course-house-actions"><button class="btn tiny secondary" data-action="include" data-id="'+html(x.id)+'">Réintégrer</button>'+manualEditControl(x,true)+'</div></div>').join(''):'')+'</details>'
  }
- if(w.extras.length){
-  out+='<details class="course-optional" data-section="manual" '+(courseOpenSections.has('manual')?'open':'')+'><summary>Gérer les ajouts manuels <span class="pill gray">'+w.extras.length+'</span></summary>'+
-   '<p class="helper">Ces articles figurent déjà dans les magasins ci-dessus. Ici, tu peux supprimer uniquement leur ajout manuel.</p>'+
-   w.extras.map(x=>'<div class="course-house-row"><span class="grow">'+html(x.name)+' · '+html(quantity(x.qty,x.unit))+'</span><button class="btn tiny secondary" data-action="delete-extra" data-id="'+html(x.id)+'" aria-label="Supprimer l’ajout manuel">Supprimer</button></div>').join('')+'</details>'
- }
+
  return out
 }
 function grandFraisText(){
@@ -1451,6 +1475,23 @@ document.addEventListener('click',e=>{
   else if(mode==='repeat-week'){const prev=state.weeks[offsetDate(currentWeek,-7)];if(!prev?.meals?.some(Boolean)){toast('Aucun menu trouvé la semaine précédente.');return}if(w.meals.some(Boolean)&&!confirm('Remplacer les repas de cette semaine ?'))return;w.meals=JSON.parse(JSON.stringify(prev.meals));persist();render();toast('Menus de la semaine précédente repris !')}
   else if(mode==='add-extra')extraModal();
   else if(mode==='quick-staple'){const s=state.staples.find(x=>x.id===id);if(s){w.extras.push({id:uid(),name:s.name,qty:s.qty,unit:s.unit});persist();render();toast(s.name+' ajouté !')}}
+  else if(mode==='edit-manual-row')editManualRowModal(id);
+  else if(mode==='edit-manual-extra')editManualExtraModal(id);
+  else if(mode==='save-manual-extra'){
+   const entry=w.extras.find(x=>x.id===id),qtyValue=$('#manualExtraQty')?.value,qty=qtyValue===''?NaN:Number(qtyValue),unit=$('#manualExtraUnit')?.value;
+   const freeName=$('#manualExtraName')?.value?.trim();
+   if(!entry||!Number.isFinite(qty)||qty<=0||!units.includes(unit)||(!entry.productId&&!entry.ingredientId&&!freeName)){
+    toast('Indique une quantité positive et une unité valide.');return
+   }
+   entry.qty=qty;entry.unit=unit;
+   if(!entry.productId&&!entry.ingredientId)entry.name=freeName;
+   persist();closeModal();render(true);toast('Ajout manuel mis à jour !')
+  }
+  else if(mode==='remove-manual-extra'){
+   const entry=w.extras.find(x=>x.id===id);if(!entry)return;
+   if(!confirm('Supprimer « '+entry.name+' » des achats manuels de cette semaine ?'))return;
+   w.extras=w.extras.filter(x=>x.id!==id);persist();closeModal();render(true);toast('Ajout manuel retiré de cette semaine.')
+  }
   else if(mode==='delete-extra'){w.extras=w.extras.filter(x=>x.id!==id);persist();render()}
   else if(mode==='exclude'){if(!w.excluded.includes(id))w.excluded.push(id);persist();render(true)}
   else if(mode==='include'){w.excluded=w.excluded.filter(x=>x!==id);persist();render(true)}

@@ -309,3 +309,29 @@ Le **générateur de semaine** ne place plus non plus de restes automatiquement 
 
 Tests simulés : cuisson lundi/consommation jeudi, 4 portions → 2 restes, deux plats au même repas dont un reste, aucun doublon d'ingrédients, réduction/suppression de la cuisson, 6 portions réparties entre deux repas de restes, génération sans restes automatiques, compatibilité d'anciens restes, conservation de la logique de transfert Carrefour et de Grand Frais. Contrôle visuel du focus/zoom et du scroll sur les deux iPhones encore nécessaire.
 
+
+
+## Base de données unique d'ingrédients — Carrefour / Grand Frais (v16, 28 octobre 2026)
+
+### Intention et structure des données
+
+- **Base partagée** `state.ingredientCatalog` : un objet par ingrédient normalisé (`id`, `name`, `store`, `productId` facultatif). Comparaison de nom insensible à la casse et aux accents pour empêcher le double enregistrement de « Chorizo », « chorizo » et « CHORIZO ». Les recettes conservent chaque ligne et sa quantité propre, avec `ingredientId` pour pointer vers la même fiche de référence.
+- L'onglet de navigation **Base** (anciennement **Produits**) propose deux rubriques : **Carrefour** et **Grand Frais**, ainsi qu'un formulaire d'ajout/édition de la fiche d'ingrédient. Modifier le magasin dans la base change son affectation dans toutes les recettes, sans duplication. On peut toujours changer le magasin depuis Mes courses.
+- **Carrefour** : on associe à l'ingrédient une fiche produit déjà présente dans le catalogue, ou on clique **« Créer une fiche produit Carrefour pour cet ingrédient »**. La fiche conserve le nom commercial, marque, URL, EAN-13, quantité achetée et le contenu d'un emballage (`packAmount`, `packUnit`). Les produits existants (y compris les achats hors recettes, comme les produits habituels) restent présents et leurs boutons d'import et d'ajout aux courses sont conservés.
+- **Grand Frais** : aucun lien, compte ou produit Carrefour n'est nécessaire. L'ingrédient et sa quantité totale sont envoyés uniquement dans la liste texte à copier dans Notes.
+- **Saisie des recettes** : les ingrédients peuvent être recherchés dans les suggestions de la base par nom ; un nouveau nom est créé une seule fois lors de l'enregistrement de la recette, dans le magasin choisi sur sa ligne. Les ingrédients déjà connus sont réutilisés automatiquement. Chaque recette garde sa quantité et son unité propres, sans dupliquer l'enregistrement de l'ingrédient. Les champs de saisie continuent de rester adaptés à l'iPhone, avec le bouton « Ajouter un ingrédient » sous la liste.
+
+### Exemple de calcul
+
+- Pâtes au chorizo : **100 g** ; pizza au chorizo : **150 g**.
+- Base unique **Chorizo** affectée à **Carrefour**, liée au produit **Chorizo [marque] 200 g** dont le code EAN et le conditionnement sont correctement renseignés.
+- Courses calculées : **250 g de chorizo nécessaires**. L'application arrondit au paquet entier supérieur : **2 paquets de 200 g**. Elle transmet **une seule ligne EAN quantité 2** à Userscripts pour le panier Carrefour.
+- Si cette même fiche est affectée à **Grand Frais** : la liste à copier dans Notes contient **« Chorizo — 250 g »**, et cet article n'est plus transféré à Carrefour, même s'il dispose d'un EAN.
+- Si le produit Carrefour n'a pas de **contenu d'emballage** renseigné, ou si les unités ne sont pas compatibles, la quantité n'est pas transformée arbitrairement en paquets : il faut compléter la fiche ; le transfert EAN reste bloqué pour cette ligne. La disponibilité réelle est toujours vérifiée par Userscripts.
+
+### Compatibilité et sécurité
+
+La base utilise le **schéma JSON 1 existant**, avec un nouveau champ facultatif `ingredientCatalog`. Au premier chargement, `normalizeIngredientCatalog()` parcourt les recettes préexistantes, rassemble les ingrédients ayant le même nom normalisé, conserve les références produits déjà liées lorsque possible, et assigne des IDs d'ingrédients aux recettes. Les anciens choix de magasin sont respectés autant que possible. La migration n'efface ni recettes, ni photos, ni produits, ni semaines, ni sauvegardes. Les sauvegardes JSON exportées incluent la base ; les anciens JSON sans le champ sont toujours importables. L'historique local de versions reste conservé. Les données des deux iPhone demeurent indépendantes.
+
+Le script Userscripts **v0.9**, la sélection du Drive École-Valentin, les protections du panier et l'absence de paiement automatisé restent inchangés. Tester l'interface sur les deux iPhone, notamment la recherche d'ingrédients dans la saisie d'une recette (datalist iOS), puis exporter un JSON vers iCloud Drive.
+

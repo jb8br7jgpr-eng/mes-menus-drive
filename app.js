@@ -192,7 +192,7 @@ function openImportedCarrefourProduct(data){
       '<button class="btn wide" data-action="edit-product" data-id="'+html(already.id)+'">Modifier la fiche existante</button>'+
       (linked?'<button class="btn secondary wide" style="margin-top:8px" data-action="link-imported-existing" data-id="'+html(already.id)+'" data-ingredient="'+html(linked.id)+'">✓ Associer à '+html(linked.name)+'</button>':''));
   }else{
-    productEditor(null,{name,brand,packaging,category:'Autres',qty:1,unit:'paquet',url,ean,packAmount:null,packUnit:null},linked?.id||null);
+    productEditor(null,{name,brand,packaging,category:'Autres',store:'carrefour',qty:1,unit:'paquet',url,ean,packAmount:null,packUnit:null},linked?.id||null);
   }
 }
 function importCarrefourProductFromHash(){
@@ -331,7 +331,7 @@ function saveUnifiedCatalogue(e){
   if(productId&&!productById(productId)){toast('Référence Carrefour introuvable.');return}
   const ing=old||makeIngredient(name,store,productId);if(!ing)return;
   const previous=ing.name;
-  Object.assign(ing,{name,store,category,qty,unit,frequent,productId});
+  Object.assign(ing,{name,store,category,qty,unit,frequent:frequent||(!old&&Boolean(productById(productId)?.frequent)),productId});
   if(state.storePreferences)delete state.storePreferences['ingredient:'+ing.id];
   state.recipes.forEach(r=>(r.ingredients||[]).forEach(x=>{
    if(x.ingredientId===ing.id||norm(x.name)===norm(previous)){
@@ -355,7 +355,7 @@ function saveUnifiedCatalogue(e){
   if(old)state.products=state.products.map(p=>p.id===old.id?product:p);else state.products.push(product);
   const ing=ingredientById(e.target.dataset.ingredientId);
   if(ing){
-   ing.productId=product.id;ing.store='carrefour';ingredientStoreTab='carrefour';
+   ing.productId=product.id;ing.store='carrefour';ing.frequent=Boolean(ing.frequent||product.frequent);ingredientStoreTab='carrefour';
    state.recipes.forEach(r=>(r.ingredients||[]).forEach(x=>{if(x.ingredientId===ing.id)x.productId=product.id}))
   }
  }
@@ -551,7 +551,8 @@ function migrateFrequentProducts(){
   if(!String(fav?.name||'').trim())continue;
   const ing=ingredientByName(fav.name);
   const product=state.products.find(p=>norm(p.name)===norm(fav.name));
-  const target=ing||product;
+  const linked=product?(state.ingredientCatalog||[]).find(i=>i.productId===product.id):null;
+  const target=ing||linked||product;
   if(target){target.frequent=true;continue}
   state.products.push({id:uid(),name:String(fav.name).trim().slice(0,100),brand:'',packaging:'',
    store:'carrefour',category:'Autres',qty:Number(fav.qty)>0?Number(fav.qty):1,
@@ -1605,7 +1606,7 @@ document.addEventListener('click',e=>{
   else if(mode==='import-linked-product')carrefourClipboardModal(id);
   else if(mode==='link-imported-existing'){
    const ing=ingredientById(a.dataset.ingredient),p=productById(id);if(!ing||!p)return;
-   ing.productId=p.id;ing.store='carrefour';
+   ing.productId=p.id;ing.store='carrefour';ing.frequent=Boolean(ing.frequent||p.frequent);
    state.recipes.forEach(r=>(r.ingredients||[]).forEach(x=>{if(x.ingredientId===ing.id)x.productId=p.id}));
    persist();closeModal();render();toast('Référence Carrefour associée à '+ing.name+' !')
   }
@@ -1732,7 +1733,7 @@ document.addEventListener('change',e=>{
   const p=productById(match.productId);
   linked.textContent=ingredientStore(match)==='grandfrais'?'Grand Frais : aucune fiche produit nécessaire.':p?'Produit Carrefour lié : '+p.name:'Pas encore de produit Carrefour lié (à associer dans la base).'
  }
- }else if(e.target.matches('[data-store-item]')){setShoppingStore(e.target.dataset.storeItem,e.target.value)}else if(e.target.matches('[data-check]')){const w=getWeek(),id=e.target.dataset.check;w.checked=e.target.checked?[...new Set([...w.checked,id])]:w.checked.filter(x=>x!==id);persist();render(true)}else if(e.target.id==='importFile')importData(e.target.files?.[0])});
+ }else if(e.target.matches('[data-store-item]')){const item=e.target.dataset.storeItem,store=e.target.value;closeModal();setShoppingStore(item,store)}else if(e.target.matches('[data-check]')){const w=getWeek(),id=e.target.dataset.check;w.checked=e.target.checked?[...new Set([...w.checked,id])]:w.checked.filter(x=>x!==id);persist();render(true)}else if(e.target.id==='importFile')importData(e.target.files?.[0])});
 document.addEventListener('input',e=>{
  if(e.target.id==='courseAddSearch'){const results=$('#courseAddSearchResults');if(results)results.innerHTML=extraSearchResults(e.target.value);return}
  if(e.target.id==='mealRecipeSearch'){refreshMealRecipePicker();return}

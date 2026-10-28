@@ -124,7 +124,7 @@
     let previewRows=[];
     const notice = document.createElement('div');
     notice.className = 'light';
-    notice.innerHTML = '<strong>✅ Lecture seule</strong><div class="muted">Aucun produit ajouté, panier inchangé, aucune donnée envoyée.</div>';
+    notice.innerHTML = '<strong>🔒 Lecture seule</strong><div class="muted">Aucune modification de panier. En cliquant sur « Vérifier mes références », des requêtes de consultation sont envoyées uniquement à Carrefour.fr.</div>';
     const shop = document.createElement('p');
     shop.className = 'muted';
     shop.textContent = 'Vérifie toi-même dans l’interface Carrefour que le Drive actif est bien École-Valentin : le diagnostic ne peut pas le certifier.';

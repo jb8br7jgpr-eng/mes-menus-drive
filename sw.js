@@ -1,5 +1,5 @@
-const CACHE='menus-drive-v22-weekly-shopping-on-demand-20261028';
-const ASSETS=['./','./index.html','./styles.css?v=20261028-22','./app.js?v=20261028-22','./manifest.webmanifest','./icon.svg'];
+const CACHE='menus-drive-v23-one-menu-generator-20261028';
+const ASSETS=['./','./index.html','./styles.css?v=20261028-23','./app.js?v=20261028-23','./manifest.webmanifest','./icon.svg'];
 self.addEventListener('install',event=>{
   event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(ASSETS)).then(()=>self.skipWaiting()));
 });

@@ -254,13 +254,22 @@ function driveTransferLines(){
 function driveTransferText(){
  return driveTransferLines().map(x=>x.ean+' '+x.qty).join('\n');
 }
+// Un lien extérieur transmet seulement les EAN et quantités via le fragment d'URL.
+function driveDirectUrl(){
+ const lines=driveTransferLines(),text=driveTransferText();
+ if(!lines.length||lines.length>120)return '';
+ const encoded=encodeURIComponent(text);
+ if(encoded.length>2900)return ''; // Garde une URL courte pour Safari iPhone.
+ return 'https://www.carrefour.fr/#md-drive-v1='+encoded;
+}
 function driveListModal(){
  const rows=driveTransferRows(),ready=rows.filter(x=>x.ready),missing=rows.filter(x=>!x.ready),lines=driveTransferLines();
  let body='<div class="card soft"><strong>Transfert simplifié</strong><p class="subtext">Une ligne = un code-barres Carrefour et le nombre de produits à acheter. Aucun nom ni donnée personnelle n’est copié.</p></div>';
  body+='<div class="row between" style="margin:12px 0"><span class="pill">'+lines.length+' code'+(lines.length>1?'s':'')+' à copier</span><span class="pill">'+missing.length+' produit'+(missing.length>1?'s':'')+' à préciser</span></div>';
- body+='<button class="btn wide" data-action="copy-drive-transfer" '+(!lines.length?'disabled':'')+'>📋 Copier les codes-barres et quantités</button>';
+ body+=driveDirectUrl()?'<a class="btn wide" href="'+html(driveDirectUrl())+'" target="_blank" rel="noopener noreferrer">🚀 Ouvrir Carrefour avec ma liste</a>':'<div class="note">La liste est trop longue pour un lien direct ou aucun produit n’est prêt. Utilise la copie de secours.</div>';
+ body+='<button class="btn secondary wide" style="margin-top:10px" data-action="copy-drive-transfer" '+(!lines.length?'disabled':'')+'>📋 Copier les codes-barres (secours)</button>';
  body+='<div class="field" style="margin-top:12px"><label for="driveTransferFallback">Aperçu du texte à copier</label><textarea class="text-input" id="driveTransferFallback" rows="5" readonly>'+html(driveTransferText())+'</textarea><div class="helper">Si la copie automatique est bloquée : appui long → Tout sélectionner → Copier.</div></div>';
- body+='<div class="note"><strong>Ensuite :</strong> ouvre Carrefour.fr dans Safari, touche le bouton vert Menus & Drive puis « Coller ma liste ». Le script affiche les codes et les quantités, sans modifier ton panier.</div>';
+ body+='<div class="note"><strong>Le bouton ouvre directement Carrefour.fr</strong> et affiche ta liste dans Userscripts sans copier-coller, si Safari lance bien l’extension. Sinon, utilise la copie de secours et « Coller mes codes-barres ».</div>';
  if(!lines.length)body+='<p class="helper">Aucune référence exploitable : associe des produits Carrefour aux ingrédients et indique leur conditionnement avant de transférer.</p>';
  if(missing.length)body+='<div class="section-head"><h3>Non transférés — à compléter</h3></div>'+missing.slice(0,25).map(x=>'<div class="shopping-row"><div class="grow"><strong>'+html(x.name)+'</strong><div class="shopping-meta">'+html(x.reason)+'</div></div><span class="pill gray">'+html(quantity(x.qty,x.unit))+'</span></div>').join('')+(missing.length>25?'<p class="helper">Et '+(missing.length-25)+' autres lignes.</p>':'');
  showModal('Préparer mon panier Carrefour',body)
@@ -272,14 +281,15 @@ async function copyDriveTransfer(){
  try{await navigator.clipboard.writeText(text);toast('Codes et quantités copiés ! Ouvre Carrefour dans Safari.')}
  catch(e){toast('Utilise le champ de copie manuelle.');$('#driveTransferFallback')?.focus()}
 }
-function renderDrive(){const items=shopping().filter(x=>!x.checked&&!x.excluded),transfers=driveTransferRows(),ready=transfers.filter(x=>x.ready);
+function renderDrive(){const items=shopping().filter(x=>!x.checked&&!x.excluded),transfers=driveTransferRows(),ready=transfers.filter(x=>x.ready),directUrl=driveDirectUrl();
  let out=pageHeading('Carrefour École-Valentin','Mon Drive','Prépare les références et les quantités pour ton Carrefour Drive.');
  out+='<div class="card"><div class="drive-illustration">🛍️</div><div class="row between"><h2>'+items.length+' produit'+(items.length!==1?'s':'')+' à acheter</h2><span class="pill">Drive favori</span></div><p class="subtext">Carrefour Besançon-Valentin · École-Valentin (à vérifier sur Carrefour.fr)</p><div class="divider"></div>';
  out+='<p class="subtext">Notre extension peut maintenant afficher ta liste complète : '+ready.length+' référence'+(ready.length!==1?'s':'')+' avec une quantité exploitable, '+(transfers.length-ready.length)+' à compléter.</p>';
- out+='<button class="btn wide" data-action="prepare-drive-transfer" '+(!items.length?'disabled':'')+'>🛒 Préparer mon panier Carrefour</button>';
+ out+=directUrl?'<a class="btn wide" href="'+html(directUrl)+'" target="_blank" rel="noopener noreferrer">🚀 Ouvrir Carrefour avec ma liste</a>':'<button class="btn wide" disabled>🚀 Ouvrir Carrefour avec ma liste</button>';
+ out+='<button class="btn secondary wide" style="margin-top:9px" data-action="prepare-drive-transfer" '+(!items.length?'disabled':'')+'>📋 Détails et copie de secours</button>';
  out+='<button class="btn secondary wide" style="margin-top:9px" data-action="copy-list" '+(!items.length?'disabled':'')+'>⧉ Copier ma liste classique</button>';
  out+='<a class="btn secondary wide" style="margin-top:9px" href="https://www.carrefour.fr/" target="_blank" rel="noopener noreferrer">Ouvrir Carrefour ↗</a></div>';
- out+='<div class="note" style="margin-top:16px"><strong>Étape test — lecture seule.</strong> Les codes-barres ne sont pas encore recherchés en direct, aucun stock ni prix n’est confirmé, et aucun article n’est ajouté à ton panier. Vérifie toujours ton Drive sélectionné sur Carrefour.fr.</div>';
+ out+='<div class="note" style="margin-top:16px"><strong>Transfert direct en test.</strong> L’extension Safari doit être à jour pour recevoir la liste sans collage. Aucun article n’est ajouté au panier ; les disponibilités sont à vérifier sur Carrefour.fr, avec le bon Drive.</div>';
  out+='<div class="section-head"><h2>Ta liste à préparer</h2></div>';
  out+=items.length?'<div class="card">'+items.map(x=>'<div class="row between" style="padding:8px 0;border-bottom:1px solid #eef1ea"><span class="grow" style="font-size:13px">'+html(x.name)+(x.needed?' <small class="muted">(besoin : '+html(x.needed)+')</small>':'')+(productById(x.productId)?.url?'<br><a href="'+html(productById(x.productId).url)+'" target="_blank" rel="noopener noreferrer" style="font-size:11px">Voir sur Carrefour ↗</a>':'')+'</span><strong style="font-size:12px">'+html(quantity(x.qty,x.unit))+'</strong></div>').join('')+'</div>':emptyView('🥬','Rien à commander','Remplis ton planning et ta liste de courses.','<button class="btn" data-action="go-menus">Créer mes menus</button>');
  return out

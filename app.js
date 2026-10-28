@@ -7,7 +7,7 @@ const categories=['Autres','Épicerie','Fruits et légumes','Viandes et poissons
 const icons={'Pâtes':'🍝','Viande':'🥩','Poisson':'🐟','Légumes':'🥦','Salade':'🥗','Dessert':'🍰','Autre':'🍽️'};
 const units=['g','kg','ml','cl','l','pièce','paquet','boîte','rouleau','bouteille','pot','sachet'];
 const contentUnits=['g','kg','ml','cl','l','pièce','rouleau'];
-const baseState=()=>({schema:1,recipes:[],products:[],weeks:{},staples:[],storePreferences:{},ingredientCatalog:[],settings:{people:2}});
+const baseState=()=>({schema:1,recipes:[],products:[],weeks:{},staples:[],storePreferences:{},ingredientCatalog:[],coursesExplicitGenerationV1:false,settings:{people:2}});
 let state=baseState(), currentTab='menus', currentWeek='', search='', productSearch='', productCategory='Toutes', ingredientStoreTab='carrefour', db=null, usingFallback=false;
 let pendingRecipeDraftImage='',pendingIngredientLinkId=null;
 let independentProductsOpen=false;const courseOpenSections=new Set();
@@ -62,7 +62,7 @@ async function restoreSnapshot(id){
   if(!confirm('Remplacer tes données actuelles par cette sauvegarde locale ?'))return;
   await checkpoint('Avant restauration');
   state={...baseState(),...selected.data,products:Array.isArray(selected.data.products)?selected.data.products:[]};
-  normalizeIngredientCatalog();persist();await saveQueue;closeModal();render();toast('Version précédente restaurée !')
+  normalizeIngredientCatalog();migrateLegacyGeneratedCourses();persist();await saveQueue;closeModal();render();toast('Version précédente restaurée !')
  }catch(e){toast('Restauration impossible. Exporte ton JSON si nécessaire.')}
 }
 let toastTimer;
@@ -100,15 +100,12 @@ function mealCard(meal,i){
  return '<button class="meal-tile'+classes+'" data-action="pick-meal" data-index="'+i+'" aria-label="'+html(days[Math.floor(i/2)])+' '+(i%2?'soir':'midi')+', '+html(names.join(' et ')||'ajouter un plat')+'"><span class="meal-type">'+(i%2?'Soir':'Midi')+(note?' · '+html(note):'')+'</span>'+
  (names.length?names.map(n=>'<strong>'+html(n)+'</strong>').join(''):'<span class="add">＋ Ajouter un plat</span>')+'</button>';
 }
-function renderMenus(){const w=getWeek(),count=w.meals.filter(Boolean).length, last=offsetDate(currentWeek,6),isThis=currentWeek===monday(new Date()),planned=shopping().filter(x=>x.source.includes('Recettes'));
+function renderMenus(){const w=getWeek(),count=w.meals.filter(Boolean).length, last=offsetDate(currentWeek,6),isThis=currentWeek===monday(new Date());
   let out='<div class="hero"><div class="eyebrow">Planificateur hebdomadaire</div><h1>Qu’est-ce qu’on mange cette semaine ?</h1><p>Pour vous deux : cuisine 4 portions, puis choisis librement quand manger les restes. Tu peux aussi faire deux plats différents au même repas !</p><button class="btn cream" data-action="complete-week">✦ Compléter ma semaine</button></div>';
   out+='<div class="section-head"><h2>Votre semaine</h2><span class="pill">'+count+' / 14 repas</span></div>';
   out+='<div class="week-control"><button class="icon-btn" aria-label="Semaine précédente" data-action="week-prev">‹</button><div class="week-label">Du '+niceDate(currentWeek)+' au '+niceDate(last)+(isThis?'<small>Cette semaine</small>':'<small>Planning personnalisé</small>')+'</div><button class="icon-btn" aria-label="Semaine suivante" data-action="week-next">›</button></div>';
   out+='<div class="status-bar"><span style="width:'+(count/14*100)+'%"></span></div>';
-  out+='<div class="menus-courses-link"><div class="grow"><strong>🛒 Courses synchronisées avec vos menus</strong><p>'+(
-    planned.length?planned.length+' référence'+(planned.length>1?'s':'')+' calculée'+(planned.length>1?'s':'')+' depuis vos recettes. Les quantités sont additionnées automatiquement.':
-    'Dès qu’un plat est ajouté au calendrier, ses ingrédients alimentent automatiquement les courses.'
-   )+'</p></div><button class="btn secondary" data-action="go-courses">Voir les courses</button></div>';
+  out+=courseGenerationBanner(w,'menus');
   out+='<div class="meal-list">';
   for(let day=0;day<7;day++){
    const d=offsetDate(currentWeek,day),hasMeals=Boolean(w.meals[day*2]||w.meals[day*2+1]);
@@ -466,6 +463,79 @@ function setShoppingStore(itemId,store){
 }
 function groupFor(name,unit){const s=norm(name);if(/pq|papier toilette|lessive|savon|shampo|dentifrice|baume|douche|mouchoir|deodorant/.test(s))return 'Hygiène et maison';if(/poulet|boeuf|bœuf|jambon|poisson|saumon|crevette|porc|steak|dinde/.test(s))return 'Viandes et poissons';if(/tomate|oignon|carotte|salade|pomme|banane|courgette|ail|citron|poivron|brocoli|champignon/.test(s))return 'Fruits et légumes';if(/lait|crème|creme|yaourt|fromage|beurre|mozzarella|oeuf|œuf/.test(s))return 'Produits frais';return 'Épicerie et divers'}
 function productGroup(p){if(['Hygiène','Maison'].includes(p?.category))return 'Hygiène et maison';if(p?.category==='Viandes et poissons')return 'Viandes et poissons';if(p?.category==='Fruits et légumes')return 'Fruits et légumes';if(p?.category==='Produits frais')return 'Produits frais';return 'Épicerie et divers'}
+// Les menus sont un brouillon. Seul le bouton « Générer les courses » capture
+// une photographie des ingrédients de cette semaine. Les ajouts manuels restent
+// indépendants et n'ont pas à attendre cette génération.
+function collectRecipeIngredients(w){
+ const lines=[];
+ (w.meals||[]).forEach(meal=>mealDishes(meal).forEach(d=>{
+  const r=recipeById(d.recipeId);if(!r)return;
+  const factor=(Number(d.people)||2)/Math.max(1,Number(r.people)||2);
+  (r.ingredients||[]).forEach(x=>{
+   const qty=Number(x.qty)*factor;
+   if(qty>0&&Number.isFinite(qty))lines.push({name:x.name,qty,unit:x.unit,productId:x.productId||null,ingredientId:x.ingredientId||null});
+  })
+ }));
+ return lines
+}
+function menuGenerationSignature(w){
+ return JSON.stringify((w.meals||[]).map(meal=>mealDishes(meal).map(d=>{
+  const r=recipeById(d.recipeId);
+  return [d.recipeId,d.people,r?.people||null,
+   (r?.ingredients||[]).map(i=>[i.ingredientId,i.name,i.qty,i.unit,i.productId])]
+ })))
+}
+function hasCookedMeals(w){return (w.meals||[]).some(m=>mealDishes(m).length>0)}
+function coursesStatus(w=getWeek()){
+ if(!Array.isArray(w.generatedIngredients))return 'not-generated';
+ if(w.generatedSignature!==menuGenerationSignature(w))return 'outdated';
+ return 'ready'
+}
+function generateWeekCourses(w=getWeek()){
+ w.generatedIngredients=collectRecipeIngredients(w);
+ w.generatedSignature=menuGenerationSignature(w);
+ w.generatedAt=new Date().toISOString()
+}
+// Une migration unique conserve la liste des semaines déjà préparées avant V22.
+// Le drapeau racine empêche de régénérer des semaines laissées volontairement
+// en brouillon lors des prochains chargements de l'application.
+function migrateLegacyGeneratedCourses(){
+ if(state.coursesExplicitGenerationV1===true)return false;
+ for(const key of Object.keys(state.weeks||{})){
+  const w=getWeek(key);
+  if(!Array.isArray(w.generatedIngredients)&&hasCookedMeals(w))generateWeekCourses(w)
+ }
+ state.coursesExplicitGenerationV1=true;
+ return true
+}
+function weekSwitcher(){
+ const end=offsetDate(currentWeek,6);
+ return '<div class="week-control"><button class="icon-btn" aria-label="Semaine précédente" data-action="week-prev">‹</button>'+
+ '<div class="week-label">Du '+niceDate(currentWeek)+' au '+niceDate(end)+'</div>'+
+ '<button class="icon-btn" aria-label="Semaine suivante" data-action="week-next">›</button></div>'
+}
+function courseGenerationBanner(w=getWeek(),where='courses'){
+ const status=coursesStatus(w),hasMenus=hasCookedMeals(w);
+ let title='',description='',button='';
+ if(status==='not-generated'){
+  title='Courses non générées pour cette semaine';
+  description=hasMenus?'Tes recettes restent dans Menus : leurs ingrédients ne sont pas encore dans cette liste.':'Compose tes menus ou ajoute des achats ponctuels. Les recettes ne seront ajoutées qu’après génération.';
+  button=hasMenus?'<button class="btn wide" data-action="generate-week-courses">🛒 Générer les courses de cette semaine</button>':
+   '<button class="btn secondary wide" data-action="go-menus">🍽️ Préparer mes menus</button>'
+ }else if(status==='outdated'){
+  title='Les menus ont été modifiés';
+  description='La liste déjà générée est conservée telle quelle. Actualise-la seulement quand tu le souhaites ; ton stock et tes ajouts manuels resteront enregistrés.';
+  button='<button class="btn secondary wide" data-action="generate-week-courses">↻ Actualiser les courses de cette semaine</button>'
+ }else{
+  title='Liste de courses générée pour cette semaine';
+  description='Les quantités des recettes sont enregistrées. Tu peux modifier tes menus sans changer cette liste tant que tu ne la régénères pas.';
+  if(where==='menus')button='<button class="btn secondary" data-action="go-courses">Voir la liste</button>'+
+    '<button class="btn ghost" data-action="generate-week-courses">↻ Régénérer</button>';
+  else button='<button class="btn secondary" data-action="go-menus">Voir les menus</button>'
+ }
+ return '<div class="course-generation '+status+'"><strong>'+title+'</strong><p>'+description+'</p>'+
+ '<div class="course-generation-actions">'+button+'</div></div>'
+}
 function shopping(){
  const w=getWeek(),map=new Map(),packs=new Map();
  function plain(name,qty,unit,source,productId,ingredientId,store){
@@ -492,11 +562,9 @@ function shopping(){
   }
   plain(ing?.name||name,qty,unit,source,(store==='grandfrais')?null:p?.id,ing?.id||null,store)
  }
- w.meals.forEach(m=>mealDishes(m).forEach(d=>{
-  const recipe=recipeById(d.recipeId);if(!recipe)return;
-  const factor=(Number(d.people)||2)/Math.max(1,Number(recipe.people)||2);
-  recipe.ingredients.forEach(x=>add(x.name,Number(x.qty)*factor,x.unit,'Recettes',x.productId,false,x.ingredientId))
- }));
+ (Array.isArray(w.generatedIngredients)?w.generatedIngredients:[]).forEach(x=>
+  add(x.name,Number(x.qty),x.unit,'Recettes',x.productId,false,x.ingredientId)
+ );
  w.extras.forEach(x=>add(x.name,x.qty,x.unit,'Ajout manuel',x.productId,Boolean(x.fromCatalogue),x.ingredientId));
  for(const [productId,item] of packs){
   const p=item.p,stockUnit=item.needed>0?item.needUnit:(p.unit||'paquet');
@@ -625,7 +693,8 @@ function renderCourses(){
   carrefour=active.filter(x=>x.store==='carrefour'),
   grand=active.filter(x=>x.store==='grandfrais');
  const order=['Fruits et légumes','Viandes et poissons','Produits frais','Épicerie et divers','Hygiène et maison'];
- let out=pageHeading('Achats de la semaine','Mes courses','Les quantités sont calculées depuis vos repas. Ici, prépare uniquement ce qu’il reste à acheter.');
+ let out=pageHeading('Achats de la semaine','Mes courses','Les ingrédients arrivent ici quand tu génères les courses depuis les menus de la semaine choisie.');
+ out+=weekSwitcher()+courseGenerationBanner(w,'courses');
  out+='<div class="course-summary"><div class="course-shop-count carrefour"><strong>'+carrefour.length+'</strong><span>🛒 Carrefour Drive</span></div>'+
  '<div class="course-shop-count grand"><strong>'+grand.length+'</strong><span>🥬 Grand Frais</span></div></div>';
  out+='<button class="btn wide course-add-btn" data-action="add-extra">＋ Ajouter un article à cette semaine</button>';
@@ -758,6 +827,7 @@ async function copyDriveTransfer(){
 }
 function renderDrive(){const items=shopping().filter(x=>!x.checked&&!x.excluded&&!x.covered&&x.store==='carrefour'),grandFraisCount=shopping().filter(x=>!x.checked&&!x.excluded&&!x.covered&&x.store==='grandfrais').length,transfers=driveTransferRows(),ready=transfers.filter(x=>x.ready),directUrl=driveDirectUrl();
  let out=pageHeading('Carrefour École-Valentin','Mon Drive','Prépare les références et les quantités pour ton Carrefour Drive.');
+ out+=weekSwitcher()+courseGenerationBanner(getWeek(),'drive');
  out+='<div class="card"><div class="drive-illustration">🛍️</div><div class="row between"><h2>'+items.length+' produit'+(items.length!==1?'s':'')+' à acheter</h2><span class="pill">Drive favori</span></div><p class="subtext">Carrefour Besançon-Valentin · École-Valentin (à vérifier sur Carrefour.fr)</p><div class="divider"></div>';
  out+='<p class="subtext">Contrôle avant Drive : '+ready.length+' référence'+(ready.length!==1?'s':'')+' prête'+(ready.length!==1?'s':'')+' · '+(transfers.length-ready.length)+' à compléter.</p>';
  if(transfers.some(x=>!x.ready)){
@@ -1114,7 +1184,7 @@ async function copyList(){const value=listText();if(!value){toast('Aucun produit
 function exportData(){const blob=new Blob([JSON.stringify({...state,exportedAt:new Date().toISOString()},null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='mes-menus-drive-sauvegarde-'+localDate(new Date())+'.json';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);toast('Sauvegarde créée. Conserve le fichier !')}
 async function importData(file){if(!file)return;try{if(file.size>25*1024*1024)throw Error('Fichier trop volumineux.');const raw=JSON.parse(await file.text());if(raw.schema!==1||!Array.isArray(raw.recipes)||!raw.weeks||typeof raw.weeks!=='object'||!Array.isArray(raw.staples))throw Error('Format de sauvegarde non reconnu.');
   if(!confirm('Remplacer les données actuelles par celles de ce fichier ?'))return;
-  checkpoint('Avant import JSON');state={schema:1,recipes:raw.recipes,products:Array.isArray(raw.products)?raw.products:[],weeks:raw.weeks,staples:raw.staples,storePreferences:raw.storePreferences&&typeof raw.storePreferences==='object'&&!Array.isArray(raw.storePreferences)?raw.storePreferences:{},ingredientCatalog:Array.isArray(raw.ingredientCatalog)?raw.ingredientCatalog:[],settings:{people:2,...raw.settings}};normalizeIngredientCatalog();persist();closeModal();render();toast('Sauvegarde restaurée !')
+  checkpoint('Avant import JSON');state={schema:1,recipes:raw.recipes,products:Array.isArray(raw.products)?raw.products:[],weeks:raw.weeks,staples:raw.staples,storePreferences:raw.storePreferences&&typeof raw.storePreferences==='object'&&!Array.isArray(raw.storePreferences)?raw.storePreferences:{},ingredientCatalog:Array.isArray(raw.ingredientCatalog)?raw.ingredientCatalog:[],coursesExplicitGenerationV1:raw.coursesExplicitGenerationV1===true,settings:{people:2,...raw.settings}};normalizeIngredientCatalog();migrateLegacyGeneratedCourses();persist();closeModal();render();toast('Sauvegarde restaurée !')
 }catch(err){toast(err.message||'Importation impossible.')}}
 document.addEventListener('click',e=>{
  const summary=e.target.closest('summary');
@@ -1158,6 +1228,14 @@ document.addEventListener('click',e=>{
    persist();closeModal();render(true);toast('Stock maison déduit des achats !')
   }
   else if(mode==='week-prev'||mode==='week-next'){currentWeek=offsetDate(currentWeek,mode==='week-prev'?-7:7);render()}
+  else if(mode==='generate-week-courses'){
+   const w=getWeek(),status=coursesStatus(w);
+   if(!hasCookedMeals(w)){toast('Ajoute d’abord un plat aux menus de cette semaine.');return}
+   if(status!=='not-generated'&&!confirm('Régénérer les ingrédients des recettes pour cette semaine ? Les nouveaux menus remplaceront les anciens besoins de recettes dans Courses. Les ajouts manuels, le stock maison, les articles cochés et les exclusions seront conservés.'))return;
+   checkpoint('Avant génération des courses de la semaine');
+   generateWeekCourses(w);persist();currentTab='courses';render();
+   toast('Courses de la semaine générées : Carrefour et Grand Frais sont prêts !')
+  }
   else if(mode==='clear-day'){
    const day=Number(a.dataset.day);
    if(!Number.isInteger(day)||day<0||day>6||!w.meals[day*2]&&!w.meals[day*2+1])return;
@@ -1327,6 +1405,7 @@ window.addEventListener('hashchange',()=>importCarrefourProductFromHash());
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal()});
 $('#settingsBtn').addEventListener('click',settingsModal);
 (async function boot(){currentWeek=monday(new Date());try{db=await openDatabase();const stored=await readRecord();if(stored?.schema===1)state={...baseState(),...stored,products:Array.isArray(stored.products)?stored.products:[]}}catch(err){usingFallback=true;try{const raw=localStorage.getItem('menus-drive-backup');if(raw){const saved=JSON.parse(raw);state={...baseState(),...saved,products:Array.isArray(saved.products)?saved.products:[]}}}catch(e){}toast('Mode de sauvegarde local de secours activé.')}
-  if(normalizeIngredientCatalog())persist();
+  const ingredientMigration=normalizeIngredientCatalog(),courseMigration=migrateLegacyGeneratedCourses();
+  if(ingredientMigration||courseMigration)persist();
   render();importCarrefourProductFromHash();if('serviceWorker' in navigator&&location.protocol==='https:')navigator.serviceWorker.register('./sw.js').catch(()=>{});
 })();

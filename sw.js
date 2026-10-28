@@ -1,5 +1,5 @@
-const CACHE='menus-drive-v17-meal-day-week-ingredients-20261028';
-const ASSETS=['./','./index.html','./styles.css?v=20261028-17','./app.js?v=20261028-17','./manifest.webmanifest','./icon.svg'];
+const CACHE='menus-drive-v18-six-ux-improvements-20261028';
+const ASSETS=['./','./index.html','./styles.css?v=20261028-18','./app.js?v=20261028-18','./manifest.webmanifest','./icon.svg'];
 self.addEventListener('install',event=>{
   event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(ASSETS)).then(()=>self.skipWaiting()));
 });

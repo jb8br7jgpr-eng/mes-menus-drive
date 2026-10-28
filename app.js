@@ -209,10 +209,10 @@ function ingredientRowsCatalogue(){
    (isDrive&&p?'<button class="btn tiny ghost" data-action="edit-product" data-id="'+html(p.id)+'">Produit Carrefour</button>':'')+'</div></article>'
  }).join('')
 }
-function ingredientEditor(id){
+function ingredientEditor(id,draftName=''){
  const ing=ingredientById(id),store=ing?ingredientStore(ing):ingredientStoreTab;
  let out='<form id="ingredientCatalogForm" data-id="'+html(ing?.id||'')+'">'+
- '<div class="field"><label for="catalogIngredientName">Nom unique de l’ingrédient</label><input id="catalogIngredientName" maxlength="100" required placeholder="Ex. Chorizo" value="'+html(ing?.name||'')+'"></div>'+
+ '<div class="field"><label for="catalogIngredientName">Nom unique de l’ingrédient</label><input id="catalogIngredientName" maxlength="100" required placeholder="Ex. Chorizo" value="'+html(ing?.name||draftName)+'"></div>'+
  '<div class="field"><label for="catalogIngredientStore">Magasin habituel</label><select id="catalogIngredientStore">'+
  '<option value="carrefour" '+(store==='carrefour'?'selected':'')+'>🛒 Carrefour Drive</option>'+
  '<option value="grandfrais" '+(store==='grandfrais'?'selected':'')+'>🥬 Grand Frais</option></select></div>'+
@@ -553,7 +553,7 @@ function driveTransferRows(){
   let reason='';
   if(!matchedEan)reason='Référence Carrefour à associer';
   else if(!isCountable)reason='Unité à acheter incompatible ou conditionnement à préciser';
-  return {name:x.name.slice(0,120),qty,unit,ean:matchedEan,url:p?.url||'',brand:p?.brand||'',
+  return {id:x.id,ingredientId:x.ingredientId||null,productId:x.productId||null,name:x.name.slice(0,120),qty,unit,ean:matchedEan,url:p?.url||'',brand:p?.brand||'',
    packaging:p?.packaging||'',needed:x.needed||'',ready:Boolean(!reason),reason};
  });
 }
@@ -626,7 +626,17 @@ async function copyDriveTransfer(){
 function renderDrive(){const items=shopping().filter(x=>!x.checked&&!x.excluded&&x.store==='carrefour'),grandFraisCount=shopping().filter(x=>!x.checked&&!x.excluded&&x.store==='grandfrais').length,transfers=driveTransferRows(),ready=transfers.filter(x=>x.ready),directUrl=driveDirectUrl();
  let out=pageHeading('Carrefour École-Valentin','Mon Drive','Prépare les références et les quantités pour ton Carrefour Drive.');
  out+='<div class="card"><div class="drive-illustration">🛍️</div><div class="row between"><h2>'+items.length+' produit'+(items.length!==1?'s':'')+' à acheter</h2><span class="pill">Drive favori</span></div><p class="subtext">Carrefour Besançon-Valentin · École-Valentin (à vérifier sur Carrefour.fr)</p><div class="divider"></div>';
- out+='<p class="subtext">Notre extension peut maintenant afficher ta liste complète : '+ready.length+' référence'+(ready.length!==1?'s':'')+' avec une quantité exploitable, '+(transfers.length-ready.length)+' à compléter.</p>';
+ out+='<p class="subtext">Contrôle avant Drive : '+ready.length+' référence'+(ready.length!==1?'s':'')+' prête'+(ready.length!==1?'s':'')+' · '+(transfers.length-ready.length)+' à compléter.</p>';
+ if(transfers.some(x=>!x.ready)){
+  out+='<div class="drive-preflight"><strong>⚠️ Références à compléter avant Carrefour</strong><p class="helper">Ces produits ne seront pas envoyés automatiquement tant que leur fiche n’est pas prête.</p>';
+  for(const item of transfers.filter(x=>!x.ready)){
+   out+='<div class="drive-preflight-item"><div class="grow"><strong>'+html(item.name)+'</strong><p>'+html(item.reason)+'</p></div>'+
+    '<button class="btn tiny secondary" data-action="fix-drive-item" data-id="'+html(item.id)+'">Compléter</button></div>'
+  }
+  out+='</div>'
+ }else if(transfers.length){
+  out+='<div class="drive-ready">✅ Toutes les références sélectionnées sont prêtes pour la vérification de disponibilité Carrefour.</div>'
+ }
  out+=directUrl?'<button class="btn wide" data-action="open-drive-in-safari">🛒 Constituer mon panier Carrefour</button>':'<button class="btn wide" disabled>🛒 Constituer mon panier Carrefour</button>';
  out+='<button class="btn secondary wide" style="margin-top:9px" data-action="prepare-drive-transfer" '+(!items.length?'disabled':'')+'>📋 Détails et copie de secours</button>';
  out+='<button class="btn secondary wide" style="margin-top:9px" data-action="copy-grand-frais" '+(!grandFraisCount?'disabled':'')+'>🥬 Copier Grand Frais pour Notes ('+grandFraisCount+')</button>';
@@ -971,6 +981,13 @@ document.addEventListener('click',e=>{const tab=e.target.closest('[data-tab]');i
   else if(mode==='go-drive'){currentTab='drive';render()}
   else if(mode==='go-menus'){currentTab='menus';render()}
   else if(mode==='go-products'){currentTab='produits';render()}
+  else if(mode==='fix-drive-item'){
+   const x=shopping().find(i=>i.id===id);
+   if(!x)return;
+   if(x.productId){productEditor(x.productId);return}
+   if(x.ingredientId){ingredientEditor(x.ingredientId);return}
+   ingredientEditor(null,x.name)
+  }
   else if(mode==='home-stock')homeStockModal(id);
   else if(mode==='save-home-stock'){
    const x=shopping().find(i=>i.id===id),value=Number($('#homeStockAmount')?.value);

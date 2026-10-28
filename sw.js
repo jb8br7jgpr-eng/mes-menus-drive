@@ -1,5 +1,5 @@
-const CACHE='menus-drive-v25-recipes-type-sort-scroll-20261028';
-const ASSETS=['./','./index.html','./styles.css?v=20261028-25','./app.js?v=20261028-25','./manifest.webmanifest','./icon.svg'];
+const CACHE='menus-drive-v26-menu-picker-search-filter-20261028';
+const ASSETS=['./','./index.html','./styles.css?v=20261028-26','./app.js?v=20261028-26','./manifest.webmanifest','./icon.svg'];
 self.addEventListener('install',event=>{
   event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(ASSETS)).then(()=>self.skipWaiting()));
 });

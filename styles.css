@@ -75,3 +75,21 @@
  .text-input{font-size:16px!important}
  .ingredient-edit-row input,.ingredient-edit-row select,.ingredient-product{font-size:16px!important}
 }
+
+/* Base commune d'ingrédients : deux rayons, une fiche réutilisable par nom. */
+.ingredient-tabs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:16px 0 12px}
+.ingredient-tab{min-width:0;border:1px solid #d8e3d7;border-radius:13px;background:#f4f6ef;padding:12px 8px;color:#4b6654;font-size:13px;font-weight:800}
+.ingredient-tab.active{color:#fff;background:var(--green);border-color:var(--green);box-shadow:0 5px 14px #24594324}
+.ingredient-catalog-card{background:#fff;border:1px solid #e4ebe1;border-radius:15px;display:flex;align-items:center;gap:12px;padding:12px;margin:8px 0}
+.ingredient-catalog-card>.grow{min-width:0}
+.ingredient-catalog-card strong{font-size:14px;color:var(--ink);overflow-wrap:anywhere}
+.ingredient-catalog-details{font-size:11px;color:#6b8071;line-height:1.55;margin-top:6px;overflow-wrap:anywhere}
+.ingredient-catalog-details strong{font-size:11px;color:#35583f}
+.ingredient-warning{color:#9b6a24;font-weight:700}
+.ingredient-catalog-actions{display:flex;flex-direction:column;gap:5px;flex-shrink:0;max-width:122px}
+.ingredient-catalog-actions .btn{min-width:0;font-size:10px;line-height:1.25;white-space:normal;text-align:center}
+.ingredient-store-row{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:9px}
+.ingredient-store-row label{font-size:11px;color:#586d5d;flex:0 0 auto}
+.ingredient-store-row .ingredient-store{min-width:0;max-width:62%;height:38px;padding:6px 8px;border:1px solid #d6e3d6;border-radius:10px;background:#f7faf5;color:#2d5440;font-size:12px;font-weight:700}
+.ingredient-link-note{font-size:10px;color:#728377;line-height:1.45;margin:7px 1px 2px;overflow-wrap:anywhere}
+@supports (-webkit-touch-callout:none){.ingredient-store-row .ingredient-store{font-size:16px!important}}

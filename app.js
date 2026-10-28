@@ -336,7 +336,10 @@ function normalizeIngredientCatalog(){
    let ing=ingredientById(line.ingredientId);
    if(!ing)ing=ingredientByName(line.name);
    if(!ing){
-    ing=makeIngredient(line.name,ingredientDefaultStore(line.name,line.productId),line.productId||null);
+    const oldUnit=converted(line.qty,line.unit)[1];
+    const oldKey=norm(line.name)+'|'+oldUnit;
+    const oldStore=state.storePreferences?.[oldKey];
+    ing=makeIngredient(line.name,oldStore==='grandfrais'||oldStore==='carrefour'?oldStore:ingredientDefaultStore(line.name,line.productId),line.productId||null);
     if(ing)changed=true
    }
    if(!ing)continue;

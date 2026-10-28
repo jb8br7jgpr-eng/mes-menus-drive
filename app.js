@@ -9,7 +9,7 @@ const icons={'Pâtes':'🍝','Viande':'🥩','Poisson':'🐟','Légumes':'🥦',
 const units=['g','kg','ml','cl','l','pièce','paquet','boîte','rouleau','bouteille','pot','sachet'];
 const contentUnits=['g','kg','ml','cl','l','pièce','rouleau'];
 const baseState=()=>({schema:1,recipes:[],products:[],weeks:{},staples:[],storePreferences:{},ingredientCatalog:[],coursesExplicitGenerationV1:false,settings:{people:2}});
-let state=baseState(), currentTab='menus', currentWeek='', search='', recipeSort='az', recipeTypeFilter='all', productSearch='', productCategory='Toutes', ingredientStoreTab='carrefour', db=null, usingFallback=false;
+let state=baseState(), currentTab='menus', currentWeek='', search='', recipeSort='az', recipeTypeFilter='all', productSearch='', productCategory='Toutes', ingredientStoreTab='carrefour', catalogueTypeFilter='all', catalogueStoreFilter='all', db=null, usingFallback=false;
 let pendingRecipeDraftImage='',pendingIngredientLinkId=null;
 let independentProductsOpen=false;const courseOpenSections=new Set();
 const app=$('#app'), modalRoot=$('#modalRoot');
@@ -325,35 +325,48 @@ function productRows(){
  '<div class="product-actions"><button class="btn tiny secondary" data-action="edit-product" data-id="'+html(p.id)+'" aria-label="Modifier '+html(p.name)+'">Modifier</button>'+
  '<button class="btn tiny" data-action="add-catalog-product" data-id="'+html(p.id)+'" aria-label="Ajouter '+html(p.name)+' aux courses">＋ Courses</button></div></article>').join('')
 }
+
+function unifiedCatalogueItems(){
+ const linked=new Set((state.ingredientCatalog||[]).map(i=>i.productId).filter(Boolean));
+ const items=[
+  ...(state.ingredientCatalog||[]).map(i=>({type:'ingredient',id:i.id,name:i.name,store:ingredientStore(i),item:i})),
+  ...(state.products||[]).filter(p=>!linked.has(p.id)).map(p=>({type:'daily',id:p.id,name:p.name,store:state.storePreferences?.['product:'+p.id]||p.store||'carrefour',item:p}))
+ ];
+ const needle=norm(productSearch);
+ return items.filter(x=>(catalogueTypeFilter==='all'||catalogueTypeFilter===x.type)&&
+  (catalogueStoreFilter==='all'||catalogueStoreFilter===x.store)&&
+  (!needle||[x.name,x.item.brand,x.item.packaging,x.item.category].some(v=>norm(v).includes(needle))))
+  .sort((a,b)=>a.name.localeCompare(b.name,'fr',{sensitivity:'base'})||a.type.localeCompare(b.type));
+}
+function unifiedCatalogueRows(){
+ const items=unifiedCatalogueItems();
+ if(!items.length)return '<div class="note">Aucun produit trouvé pour ces filtres.</div>';
+ return items.map(x=>{
+  const ing=x.type==='ingredient',p=ing?productById(x.item.productId):x.item;
+  const description=ing?(x.store==='grandfrais'?'Liste Grand Frais':p?'Référence Carrefour : '+p.name+(p.packAmount>0?' · '+quantity(p.packAmount,p.packUnit):' · contenu à préciser'):'Référence Carrefour à associer'):
+    ([x.item.brand,x.item.packaging].filter(Boolean).join(' · ')||quantity(x.item.qty||1,x.item.unit||'paquet'));
+  return '<article class="catalogue-unified-card"><div class="catalogue-unified-icon">'+(ing?'🥕':productBadge(x.item))+'</div>'+
+    '<div class="grow"><strong>'+html(x.name)+'</strong><div class="catalogue-unified-meta"><span class="catalogue-type-badge">'+(ing?'Ingrédient':'Quotidien')+'</span> · '+(x.store==='grandfrais'?'Grand Frais':'Carrefour Drive')+'</div>'+
+    '<div class="catalogue-unified-desc">'+html(description)+'</div></div>'+
+    '<div class="catalogue-unified-actions"><button class="btn tiny" data-action="add-unified-courses" data-kind="'+x.type+'" data-id="'+html(x.id)+'">＋ Courses</button>'+
+    '<button class="btn tiny secondary" data-action="edit-unified-product" data-kind="'+x.type+'" data-id="'+html(x.id)+'">Gérer</button></div></article>';
+ }).join('');
+}
 function renderProduits(){
- const isCarrefour=ingredientStoreTab==='carrefour',
-  total=state.ingredientCatalog.filter(i=>ingredientStore(i)===ingredientStoreTab).length,
-  independent=independentProducts().length;
- let out=pageHeading('Bibliothèque permanente','Mes produits','Enregistre chaque ingrédient une seule fois. Les quantités à acheter se gèrent dans Courses.');
- out+='<div class="ingredient-tabs" role="group" aria-label="Choisir un magasin">'+
- '<button class="ingredient-tab '+(isCarrefour?'active':'')+'" data-action="ingredient-store-tab" data-store="carrefour">🛒 Carrefour</button>'+
- '<button class="ingredient-tab '+(!isCarrefour?'active':'')+'" data-action="ingredient-store-tab" data-store="grandfrais">🥬 Grand Frais</button></div>';
- out+='<div class="catalog-primary-actions">'+
- '<button class="btn" data-action="add-catalog-ingredient">＋ Ingrédient</button>'+
- (isCarrefour?'<button class="btn secondary" data-action="open-carrefour-import">📋 Importer Carrefour</button>':'')+'</div>';
- out+='<div class="field catalog-search"><input class="text-input" id="productSearch" value="'+html(productSearch)+'" placeholder="⌕ Chercher dans ce magasin…" aria-label="Rechercher un ingrédient ou un article"></div>';
- out+='<div class="section-head"><h2>Ingrédients</h2><span class="pill">'+total+'</span></div>'+
- '<p class="helper catalog-help">'+(isCarrefour?'Associe une référence Carrefour une seule fois à chaque ingrédient.':'Aucun lien ni code-barres nécessaire pour Grand Frais.')+'</p>'+
- '<div id="ingredientCatalogResults">'+ingredientRowsCatalogue()+'</div>';
- out+='<section class="daily-products"><div class="daily-products-heading"><div class="daily-icon">🧻</div><div class="grow"><h2>Achats du quotidien</h2><p>Papier toilette, sopalin, chewing-gum, mascara, produits ménagers…</p></div><span class="pill gray">'+independent+'</span></div>'+
- '<p class="helper">Ce sont les articles qui ne sont pas des ingrédients de recettes. Garde-les ici pour les ajouter aux courses quand tu en as besoin.</p>'+
- '<button class="btn wide" data-action="add-product">＋ Ajouter un achat du quotidien</button>'+
- '<div class="daily-suggestions"><span class="helper">Exemples :</span>'+
- '<button class="daily-suggestion" data-action="daily-example" data-name="Papier toilette" data-category="Hygiène" data-unit="paquet">＋ PQ</button>'+
- '<button class="daily-suggestion" data-action="daily-example" data-name="Sopalin" data-category="Maison" data-unit="rouleau">＋ Sopalin</button>'+
- '<button class="daily-suggestion" data-action="daily-example" data-name="Chewing-gum" data-category="Épicerie" data-unit="paquet">＋ Chewing-gum</button>'+
- '<button class="daily-suggestion" data-action="daily-example" data-name="Mascara" data-category="Hygiène" data-unit="pièce">＋ Mascara</button></div>'+
- '<details class="catalog-independent" '+(independentProductsOpen||productSearch?'open':'')+'><summary>Mes articles enregistrés <span class="pill gray">'+independent+'</span></summary>'+
- '<div id="productResults">'+productRows()+'</div></details></section>';
- if(isCarrefour){
-  out+='<p class="helper catalog-footer">Import Carrefour inchangé : copie une référence depuis Carrefour.fr, puis utilise « Importer Carrefour » ci-dessus. Tu peux aussi importer depuis la fiche de chaque ingrédient.</p>';
- }
- return out
+ const n=unifiedCatalogueItems().length;
+ let out=pageHeading('Bibliothèque permanente','Mes produits','Un seul catalogue pour les ingrédients et les achats du quotidien.');
+ out+='<div class="catalogue-unified-controls"><div class="field"><label>Type de produit</label><div class="catalogue-filter-bar" role="group" aria-label="Type de produit">'+
+ [['all','Tous'],['ingredient','Ingrédients'],['daily','Quotidien']].map(([k,label])=>'<button class="catalogue-filter '+(catalogueTypeFilter===k?'active':'')+'" data-action="catalogue-type-filter" data-value="'+k+'" aria-pressed="'+(catalogueTypeFilter===k)+'">'+label+'</button>').join('')+
+ '</div></div><div class="field"><label>Magasin</label><div class="catalogue-filter-bar" role="group" aria-label="Magasin">'+
+ [['all','Tous'],['carrefour','Carrefour'],['grandfrais','Grand Frais']].map(([k,label])=>'<button class="catalogue-filter '+(catalogueStoreFilter===k?'active':'')+'" data-action="catalogue-store-filter" data-value="'+k+'" aria-pressed="'+(catalogueStoreFilter===k)+'">'+label+'</button>').join('')+
+ '</div></div></div>';
+ out+='<div class="catalog-primary-actions"><button class="btn" data-action="add-unified-product">＋ Ajouter un produit</button>'+
+ '<button class="btn secondary" data-action="open-carrefour-import">📋 Importer Carrefour</button></div>';
+ out+='<div class="field catalog-search"><input class="text-input" id="productSearch" value="'+html(productSearch)+'" placeholder="⌕ Rechercher un produit…" aria-label="Rechercher un produit"></div>';
+ out+='<div class="section-head"><h2>Votre catalogue</h2><span class="pill" id="catalogueCount">'+n+' produit'+(n>1?'s':'')+'</span></div>'+
+ '<div id="catalogueResults">'+unifiedCatalogueRows()+'</div>'+
+ '<p class="helper catalog-footer">Ingrédients : recettes et courses. Quotidien : courses uniquement. Le magasin et le stock maison fonctionnent pour les deux dans Courses.</p>';
+ return out;
 }
 function productEditor(id,draft=null,linkedIngredientId=null){
  const p=productById(id)||draft,title=id?'Modifier le produit':draft?.url?'Importer depuis Carrefour':draft?'Nouvel achat du quotidien':'Ajouter un achat du quotidien';

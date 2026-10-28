@@ -1,12 +1,14 @@
 // ==UserScript==
 // @name         Menus & Drive — Diagnostic Carrefour (lecture seule)
 // @namespace    https://github.com/jb8br7jgpr-eng/mes-menus-drive
-// @version      0.1.0
-// @description  Vérifie uniquement que Userscripts fonctionne sur Carrefour.fr. Aucune opération de panier.
+// @version      0.2.0
+// @description  Importe les fiches produits Carrefour dans Mes produits, sans toucher au panier.
 // @match        https://www.carrefour.fr/*
 // @match        https://carrefour.fr/*
 // @run-at       document-idle
 // @grant        none
+// @downloadURL  https://raw.githubusercontent.com/jb8br7jgpr-eng/mes-menus-drive/developpement-v1/scripts/carrefour-diagnostic.user.js
+// @updateURL    https://raw.githubusercontent.com/jb8br7jgpr-eng/mes-menus-drive/developpement-v1/scripts/carrefour-diagnostic.user.js
 // ==/UserScript==
 
 (() => {
@@ -17,6 +19,30 @@
   if (!/^(www\.)?carrefour\.fr$/i.test(location.hostname)) return;
   if (document.getElementById('md-carrefour-diagnostic-root')) return;
 
+  const APP_URL = 'https://jb8br7jgpr-eng.github.io/mes-menus-drive/';
+  const productPage = () => location.pathname.startsWith('/p/');
+  function extractProductInfo() {
+    if (!productPage()) return null;
+    const og = document.querySelector('meta[property="og:title"]')?.getAttribute('content') || '';
+    const title = (document.querySelector('h1')?.textContent?.trim() || og).replace(/\\s+(?:à|au)\\s+prix\\s+Carrefour.*$/i,'').slice(0,100).trim();
+    let brand='', packaging='';
+    for(const el of [...document.querySelectorAll('script[type="application/ld+json"]')].slice(0,16)) {
+      try {
+        const val=JSON.parse(el.textContent);
+        function find(x,depth=0){
+          if(!x||typeof x!=='object'||depth>5)return null;
+          if(Array.isArray(x)){for(const y of x){const result=find(y,depth+1);if(result)return result}return null}
+          const types=Array.isArray(x['@type'])?x['@type']:[x['@type']];
+          if(types.some(t=>typeof t==='string'&&t.endsWith('Product')))return x;
+          for(const key of ['@graph','mainEntity','itemListElement']){const result=find(x[key],depth+1);if(result)return result}
+          return null;
+        }
+        const p=find(val);
+        if(p){brand=typeof p.brand==='string'?p.brand:String(p.brand?.name||'');packaging=typeof p.size==='string'?p.size:'';break;}
+      }catch(e){/* Données structurées facultatives */}
+    }
+    return {v:1,name:title,brand:brand.slice(0,80),packaging:packaging.slice(0,80),ean:extractProductEan()||'',url:location.origin+location.pathname};
+  }
   function extractProductEan() {
     const match = location.pathname.match(/(?:^|[-/])(\d{13})(?=\/|$)/);
     return match ? match[1] : null;
@@ -46,6 +72,7 @@
       .close{background:#f0f4ef;border:1px solid #dce8df;border-radius:10px;padding:9px 12px;width:100%;font-weight:650;color:#245943;margin-top:10px}
       .muted{color:#66766c;font-size:12px}
       .data{overflow-wrap:anywhere}
+      .import{background:#245943;color:white;border:0;border-radius:12px;width:100%;padding:12px;font-size:13px;font-weight:750;margin:9px 0}
     `;
 
     const panel = document.createElement('section');
@@ -57,6 +84,11 @@
     const status = document.createElement('p');
     const domain = document.createElement('p');
     const ean = document.createElement('p');
+    const preview = document.createElement('p');
+    preview.style.cssText='font-weight:700;overflow-wrap:anywhere';
+    const importBtn = document.createElement('button');
+    importBtn.type='button';importBtn.className='import';importBtn.textContent='Ouvrir la fiche dans Menus & Drive';
+    let importDraft=null;
     const notice = document.createElement('div');
     notice.className = 'light';
     notice.innerHTML = '<strong>✅ Lecture seule</strong><div class="muted">Aucun produit ajouté, panier inchangé, aucune donnée envoyée.</div>';
@@ -67,15 +99,20 @@
     close.type = 'button';
     close.className = 'close';
     close.textContent = 'Fermer le diagnostic';
-    panel.append(heading, status, domain, ean, notice, shop, close);
+    panel.append(heading, status, domain, ean, preview, importBtn, notice, shop, close);
 
     const trigger = document.createElement('button');
     trigger.type = 'button';
     trigger.className = 'trigger';
-    trigger.textContent = '🧪 Test Menus & Drive';
+    trigger.textContent = productPage() ? '➕ Mes produits' : '🧪 Test Menus & Drive';
     trigger.setAttribute('aria-label', 'Afficher le diagnostic Carrefour');
 
     function refresh() {
+      importDraft=extractProductInfo();
+      heading.textContent=importDraft?'🛍️ Ajouter à Mes produits':'🧪 Diagnostic Menus & Drive';
+      trigger.textContent=importDraft?'➕ Mes produits':'🧪 Test Menus & Drive';
+      preview.textContent=importDraft?(importDraft.name||'Nom du produit introuvable'):'Sur une fiche produit Carrefour, tu pourras importer son nom et son lien.';
+      importBtn.hidden=!importDraft;importBtn.disabled=!importDraft?.name;
       status.textContent = '✅ Extension active sur Carrefour.fr';
       status.className = 'green';
       domain.textContent = 'Site détecté : ' + location.hostname;
@@ -92,11 +129,23 @@
       panel.classList.toggle('open');
       if (panel.classList.contains('open')) close.focus();
     });
+    importBtn.addEventListener('click',()=>{
+      if(!importDraft||!importDraft.name||!productPage())return;
+      const data=encodeURIComponent(JSON.stringify(importDraft));
+      if(data.length>5000)return;
+      location.assign(APP_URL+'#carrefour-product='+data);
+    });
     close.addEventListener('click', () => {
       panel.classList.remove('open');
       trigger.focus();
     });
     root.append(style, panel, trigger);
+    // Carrefour peut changer de fiche sans recharger la page.
+    let prevPath=location.pathname;
+    const observer=new MutationObserver(()=>{
+      if(prevPath!==location.pathname){prevPath=location.pathname;refresh();}
+    });
+    observer.observe(document.body,{childList:true,subtree:true});
     document.body.appendChild(host);
   }
 

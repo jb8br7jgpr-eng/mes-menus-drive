@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Menus & Drive — Diagnostic Carrefour (lecture seule)
 // @namespace    https://github.com/jb8br7jgpr-eng/mes-menus-drive
-// @version      0.8.0
-// @description  Constitue le panier Drive avec les références disponibles, sans commande ni paiement.
+// @version      0.9.0
+// @description  Constitue le panier Drive et présente un bilan clair des articles ajoutés, présents ou manquants. Aucun paiement.
 // @match        https://www.carrefour.fr/*
 // @match        https://carrefour.fr/*
 // @run-at       document-idle
@@ -81,7 +81,29 @@
       .line small{display:block;color:#66766c;margin-top:2px}
       .greenTxt{color:#217947}.orangeTxt{color:#945900}
       .danger{color:#af443d}
-      .summary{background:#f0f7f0;border-radius:12px;padding:11px;margin:9px 0;font-size:12px;line-height:1.5}
+      .summary{background:#f8faf8;border:1px solid #dce7dc;border-radius:16px;padding:12px;margin:9px 0 14px;font-size:12px;line-height:1.5}
+      .summary-title{font-size:15px;font-weight:800;color:#233d31;margin-bottom:2px}
+      .summary-sub{font-size:11px;color:#596c60;margin-bottom:10px}
+      .summary-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;margin:9px 0 10px}
+      .summary-tile{border-radius:12px;padding:9px 10px;min-width:0;border:1px solid transparent}
+      .summary-tile strong{display:block;font-size:21px;line-height:1.15;font-weight:800}
+      .summary-tile span{display:block;font-size:11px;font-weight:650;margin-top:3px}
+      .summary-added{background:#e2f3e8;border-color:#c9e9d3;color:#205e41}
+      .summary-existing{background:#e9f0fa;border-color:#d4e2f4;color:#26577f}
+      .summary-missing{background:#fff0e8;border-color:#f7d8c8;color:#994c34}
+      .summary-partial{background:#fff5d9;border-color:#f0e2ad;color:#88641e}
+      .summary-progress{height:5px;background:#dce8e0;overflow:hidden;border-radius:10px;margin:9px 0 3px}
+      .summary-progress > span{display:block;background:#347757;height:100%;border-radius:10px}
+      .summary-section{border-top:1px solid #dbe6de;padding-top:10px;margin-top:10px}
+      .summary-section summary{font-weight:750;font-size:12px;cursor:pointer;list-style:auto;line-height:1.6}
+      .summary-section[open] summary{margin-bottom:8px}
+      .summary-product{border-radius:10px;background:#fff;padding:9px 10px;margin:6px 0;border-left:3px solid #bfd5c8;overflow-wrap:anywhere}
+      .summary-product.problem{border-left-color:#d18462}
+      .summary-product.partial{border-left-color:#dfb94c}
+      .summary-product .product-name{font-weight:720;color:#26372b;line-height:1.35}
+      .summary-product .product-meta{color:#68786d;font-size:11px;margin-top:3px}
+      .summary-product .product-reason{color:#954d36;font-size:11px;margin-top:4px}
+      .summary-foot{background:#edf4ed;border-radius:10px;padding:9px;color:#4b6252;font-size:11px;margin-top:9px}
     `;
 
     const panel = document.createElement('section');
@@ -143,7 +165,7 @@
     close.type = 'button';
     close.className = 'close';
     close.textContent = 'Fermer le diagnostic';
-    panel.append(heading, status, domain, ean, preview, importBtn, manualCopy, listBtn, pasteField, pasteConfirm, listStatus, fillCartBtn, confirmStoreBtn, cartSummary, verifyBtn, lookupStatus, listPreview, verifiedProducts, notice, shop, close);
+    panel.append(heading, cartSummary, status, domain, ean, preview, importBtn, manualCopy, listBtn, pasteField, pasteConfirm, listStatus, fillCartBtn, confirmStoreBtn, verifyBtn, lookupStatus, listPreview, verifiedProducts, notice, shop, close);
 
     const trigger = document.createElement('button');
     trigger.type = 'button';
@@ -398,6 +420,8 @@
       const body=await response.json();
       return body?.cart||body
     }
+    // Présentation uniquement : ces lignes n'ajoutent, ne retirent et ne modifient
+    // aucun article du panier. Elles lisent uniquement cartOutcomes et previewRows.
     function showCartSummary(note=''){
       cartSummary.hidden=false;
       const added=cartOutcomes.filter(x=>x.kind==='added');
@@ -405,16 +429,62 @@
       const missing=cartOutcomes.filter(x=>x.kind==='missing');
       const partial=cartOutcomes.filter(x=>x.kind==='partial');
       const pending=Math.max(0,previewRows.length-cartOutcomes.length);
-      const title=document.createElement('strong');
-      title.textContent='🛒 '+added.length+' ajouté(s) · '+existing.length+' déjà présent(s) · '+(missing.length+partial.length)+' à vérifier'+(pending?' · '+pending+' restant(s)':'');
-      const details=document.createElement('div');
-      details.textContent=note||'Seules les références confirmées disponibles sont ajoutées. Vérifie ton panier avant paiement.';
-      cartSummary.replaceChildren(title,details);
-      for(const r of [...partial,...missing]){
-        const p=document.createElement('p');p.className='danger';
-        p.textContent='⚠️ '+r.ean+(r.name?' · '+r.name:'')+' : '+r.reason;
-        cartSummary.append(p)
+      const create=(tag,className,text)=>{
+        const n=document.createElement(tag);
+        if(className)n.className=className;
+        if(text!==undefined)n.textContent=String(text);
+        return n
+      };
+      const title=create('div','summary-title','🛒 Bilan de ton panier');
+      const subtitle=create('div','summary-sub',pending?'Analyse en cours · '+cartOutcomes.length+'/'+previewRows.length+' références traitées'
+        :'Liste traitée · '+previewRows.length+' référence'+(previewRows.length===1?'':'s'));
+      const grid=create('div','summary-grid');
+      for(const [count,label,style] of [
+        [added.length,'Ajoutés','summary-added'],
+        [existing.length,'Déjà présents','summary-existing'],
+        [missing.length,'Indisponibles / erreurs','summary-missing'],
+        [partial.length,'Quantités partielles','summary-partial']
+      ]){
+        const tile=create('div','summary-tile '+style);
+        tile.append(create('strong','',count),create('span','',label));
+        grid.append(tile)
       }
+      const nodes=[title,subtitle,grid];
+      if(pending){
+        const track=create('div','summary-progress');
+        const bar=create('span');
+        bar.style.width=(Math.round(cartOutcomes.length/Math.max(1,previewRows.length)*100))+'%';
+        track.append(bar);
+        nodes.push(track,create('div','summary-sub',pending+' référence'+(pending===1?'':'s')+' encore à traiter'))
+      }
+      const groups=[
+        {name:'⚠️ Indisponibles ou à vérifier',rows:missing,klass:'problem',open:true},
+        {name:'⚠️ Quantités partielles',rows:partial,klass:'partial',open:true},
+        {name:'✅ Produits ajoutés',rows:added,klass:'added',open:added.length<=4},
+        {name:'✓ Déjà dans le panier',rows:existing,klass:'existing',open:existing.length<=4}
+      ];
+      for(const group of groups){
+        if(!group.rows.length)continue;
+        const section=create('details','summary-section');
+        section.open=group.open;
+        section.append(create('summary','',group.name+' ('+group.rows.length+')'));
+        for(const item of group.rows){
+          const expected=previewRows.find(x=>x.ean===item.ean);
+          const row=create('div','summary-product '+group.klass);
+          row.append(create('div','product-name',item.name||'Référence '+item.ean));
+          const quantities='Demandé : '+(expected?.qty??'?')+
+            (Number.isInteger(item.finalQty)?' · Dans le panier : '+item.finalQty:'');
+          row.append(create('div','product-meta','EAN '+item.ean+' · '+quantities));
+          if(group.klass==='problem'||group.klass==='partial')
+            row.append(create('div','product-reason',item.reason||'À vérifier dans Carrefour'));
+          section.append(row)
+        }
+        nodes.push(section)
+      }
+      if(!pending&&!missing.length&&!partial.length)
+        nodes.push(create('div','summary-foot','✅ Aucune référence manquante ou partielle signalée.'));
+      nodes.push(create('div','summary-foot',note||'Vérifie les quantités dans le vrai panier Carrefour. Le paiement reste entièrement manuel.'));
+      cartSummary.replaceChildren(...nodes)
     }
     const shopWarning='Le magasin actif n’a pas pu être identifié. Contrôle École-Valentin sur Carrefour.fr.';
     async function runCartFill(userConfirmedStore=false){
@@ -452,7 +522,7 @@
               throw Error('STOP : le Drive actif a changé');
             const current=currentQuantity(existingCart,row.ean);
             if(current>=row.qty){
-              cartOutcomes.push({ean:row.ean,kind:'existing',reason:'Déjà en quantité suffisante'});
+              cartOutcomes.push({ean:row.ean,name:String(cartLine(existingCart,row.ean)?.product?.attributes?.title||'').slice(0,100),finalQty:current,kind:'existing',reason:'Déjà en quantité suffisante'});
               showCartSummary();continue
             }
             const result=await carrefourRead('/autocomplete?q='+encodeURIComponent(row.ean)+'&maxResults=12&productCard=true');
@@ -489,17 +559,17 @@
             const already=currentQuantity(freshCart,row.ean);
             const target=Math.max(already,row.qty);
             if(target===already){
-              cartOutcomes.push({ean:row.ean,name,kind:'existing',reason:'Déjà présent'});
+              cartOutcomes.push({ean:row.ean,name,finalQty:already,kind:'existing',reason:'Déjà présent'});
               showCartSummary();continue
             }
             const updated=await patchCartQuantity(row.ean,target,sid);
             const line=cartLine(updated,row.ean);
             const granted=currentQuantity(updated,row.ean);
             if(granted<target||line?.isStockOff||line?.available===false){
-              cartOutcomes.push({ean:row.ean,name,kind:'partial',reason:granted>0?
+              cartOutcomes.push({ean:row.ean,name,finalQty:granted,kind:'partial',reason:granted>0?
                 'Quantité réelle '+granted+'/'+target+' ; à vérifier dans le panier':'Ajout refusé ou indisponible'});
             }else{
-              cartOutcomes.push({ean:row.ean,name,kind:'added',reason:'Quantité finale '+granted});
+              cartOutcomes.push({ean:row.ean,name,finalQty:granted,kind:'added',reason:'Quantité finale '+granted});
             }
             showCartSummary()
           }catch(e){
@@ -518,6 +588,7 @@
           lookupStatus.textContent='✓ Opération terminée. Vérifie le panier Carrefour avant de choisir ton créneau et de payer.';
         }
         showCartSummary();
+        panel.scrollTop=0;
       }catch(e){
         lookupStatus.textContent='⛔ Impossible de constituer le panier : '+String(e.message||'Erreur Carrefour');
       }finally{

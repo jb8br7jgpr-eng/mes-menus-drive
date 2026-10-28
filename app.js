@@ -262,14 +262,41 @@ function driveDirectUrl(){
  if(encoded.length>2900)return ''; // Garde une URL courte pour Safari iPhone.
  return 'https://www.carrefour.fr/#md-drive-v1='+encoded;
 }
+// Sur l'iPhone, les liens HTTPS externes d'une PWA peuvent s'ouvrir dans un
+// navigateur intégré sans extension Safari. On utilise alors l'URL scheme Safari.
+function isIosHomeScreenApp(){
+ const ios=/iPad|iPhone|iPod/i.test(navigator.userAgent||'')||
+   (navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+ const standalone=navigator.standalone===true||
+   Boolean(window.matchMedia?.('(display-mode: standalone)')?.matches);
+ return ios&&standalone
+}
+function openDriveInSafari(){
+ const url=driveDirectUrl();
+ if(!url){toast('Aucune référence prête pour Carrefour.');return}
+ if(isIosHomeScreenApp()){
+   // Le schéma x-safari-https est reconnu par Safari sur les iOS récents.
+   // Il contourne le navigateur intégré de la PWA. Test réel requis selon iOS.
+   window.location.href='x-safari-'+url;
+ }else{
+   window.open(url,'_blank','noopener,noreferrer')
+ }
+}
+async function copyDriveUrl(){
+ const url=driveDirectUrl();
+ if(!url){toast('Aucune référence prête à transférer.');return}
+ try{await navigator.clipboard.writeText(url);toast('Lien Carrefour copié ! Colle-le dans la barre d’adresse Safari.')}
+ catch(e){showModal('Lien Carrefour pour Safari','<p class="helper">Copie ce lien dans la barre d’adresse Safari :</p><textarea class="text-input" rows="4" readonly>'+html(url)+'</textarea>')}
+}
 function driveListModal(){
  const rows=driveTransferRows(),ready=rows.filter(x=>x.ready),missing=rows.filter(x=>!x.ready),lines=driveTransferLines();
  let body='<div class="card soft"><strong>Références et quantités</strong><p class="subtext">Une ligne = un code-barres et un nombre d’articles. Le bouton principal tente maintenant de constituer ton vrai panier Carrefour avec les seuls produits disponibles.</p></div>';
  body+='<div class="row between" style="margin:12px 0"><span class="pill">'+lines.length+' code'+(lines.length>1?'s':'')+' à copier</span><span class="pill">'+missing.length+' produit'+(missing.length>1?'s':'')+' à préciser</span></div>';
- body+=driveDirectUrl()?'<a class="btn wide" href="'+html(driveDirectUrl())+'" target="_blank" rel="noopener noreferrer">🛒 Constituer mon panier Carrefour</a>':'<div class="note">La liste est trop longue pour un lien direct ou aucun produit n’est prêt. Utilise la copie de secours.</div>';
- body+='<button class="btn secondary wide" style="margin-top:10px" data-action="copy-drive-transfer" '+(!lines.length?'disabled':'')+'>📋 Copier les codes-barres (secours)</button>';
+ body+=driveDirectUrl()?'<button class="btn wide" data-action="open-drive-in-safari">🛒 Constituer mon panier Carrefour</button>':'<div class="note">La liste est trop longue pour un lien direct ou aucun produit n’est prêt. Utilise la copie de secours.</div>';
+ body+='<button class="btn secondary wide" style="margin-top:10px" data-action="copy-drive-url" '+(!driveDirectUrl()?'disabled':'')+'>🔗 Copier le lien pour Safari (secours)</button>';
+ body+='<button class="btn secondary wide" style="margin-top:9px" data-action="copy-drive-transfer" '+(!lines.length?'disabled':'')+'>📋 Copier les codes-barres (autre secours)</button>';
  body+='<div class="field" style="margin-top:12px"><label for="driveTransferFallback">Aperçu du texte à copier</label><textarea class="text-input" id="driveTransferFallback" rows="5" readonly>'+html(driveTransferText())+'</textarea><div class="helper">Si la copie automatique est bloquée : appui long → Tout sélectionner → Copier.</div></div>';
- body+='<div class="note"><strong>En appuyant sur « Constituer mon panier Carrefour »</strong>, l’extension vérifie le Drive, recherche les produits puis ajoute ceux dont la disponibilité a été confirmée. Les absents seront listés. Pas de paiement automatique. Si Safari ne lance pas Userscripts, utilise la copie de secours.</div>';
+ body+='<div class="note"><strong>Sur iPhone</strong>, le bouton tente d’ouvrir directement Safari (pas la fenêtre intégrée). Si Safari ne s’ouvre pas, copie le lien de secours et colle-le dans sa barre d’adresse. Aucun paiement automatique.</div>';
  if(!lines.length)body+='<p class="helper">Aucune référence exploitable : associe des produits Carrefour aux ingrédients et indique leur conditionnement avant de transférer.</p>';
  if(missing.length)body+='<div class="section-head"><h3>Non transférés — à compléter</h3></div>'+missing.slice(0,25).map(x=>'<div class="shopping-row"><div class="grow"><strong>'+html(x.name)+'</strong><div class="shopping-meta">'+html(x.reason)+'</div></div><span class="pill gray">'+html(quantity(x.qty,x.unit))+'</span></div>').join('')+(missing.length>25?'<p class="helper">Et '+(missing.length-25)+' autres lignes.</p>':'');
  showModal('Préparer mon panier Carrefour',body)
@@ -285,7 +312,7 @@ function renderDrive(){const items=shopping().filter(x=>!x.checked&&!x.excluded)
  let out=pageHeading('Carrefour École-Valentin','Mon Drive','Prépare les références et les quantités pour ton Carrefour Drive.');
  out+='<div class="card"><div class="drive-illustration">🛍️</div><div class="row between"><h2>'+items.length+' produit'+(items.length!==1?'s':'')+' à acheter</h2><span class="pill">Drive favori</span></div><p class="subtext">Carrefour Besançon-Valentin · École-Valentin (à vérifier sur Carrefour.fr)</p><div class="divider"></div>';
  out+='<p class="subtext">Notre extension peut maintenant afficher ta liste complète : '+ready.length+' référence'+(ready.length!==1?'s':'')+' avec une quantité exploitable, '+(transfers.length-ready.length)+' à compléter.</p>';
- out+=directUrl?'<a class="btn wide" href="'+html(directUrl)+'" target="_blank" rel="noopener noreferrer">🛒 Constituer mon panier Carrefour</a>':'<button class="btn wide" disabled>🛒 Constituer mon panier Carrefour</button>';
+ out+=directUrl?'<button class="btn wide" data-action="open-drive-in-safari">🛒 Constituer mon panier Carrefour</button>':'<button class="btn wide" disabled>🛒 Constituer mon panier Carrefour</button>';
  out+='<button class="btn secondary wide" style="margin-top:9px" data-action="prepare-drive-transfer" '+(!items.length?'disabled':'')+'>📋 Détails et copie de secours</button>';
  out+='<button class="btn secondary wide" style="margin-top:9px" data-action="copy-list" '+(!items.length?'disabled':'')+'>⧉ Copier ma liste classique</button>';
  out+='<a class="btn secondary wide" style="margin-top:9px" href="https://www.carrefour.fr/" target="_blank" rel="noopener noreferrer">Ouvrir Carrefour ↗</a></div>';
@@ -416,6 +443,8 @@ document.addEventListener('click',e=>{const tab=e.target.closest('[data-tab]');i
   else if(mode==='include'){w.excluded=w.excluded.filter(x=>x!==id);persist();render(true)}
   else if(mode==='copy-list')copyList();
   else if(mode==='prepare-drive-transfer')driveListModal();
+  else if(mode==='open-drive-in-safari')openDriveInSafari();
+  else if(mode==='copy-drive-url')copyDriveUrl();
   else if(mode==='copy-drive-transfer')copyDriveTransfer();
   else if(mode==='delete-recipe'){if(confirm('Supprimer ce plat ? Il disparaîtra aussi des menus qui l’utilisent.')){checkpoint('Avant suppression de plat');state.recipes=state.recipes.filter(r=>r.id!==id);Object.values(state.weeks).forEach(week=>{week.meals=week.meals.map(m=>m?.recipeId===id?null:m)});persist();closeModal();render();toast('Plat supprimé.')}}
   else if(mode==='export-data')exportData();

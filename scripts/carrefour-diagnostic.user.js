@@ -62,7 +62,7 @@
       *{box-sizing:border-box}
       button{font:inherit;cursor:pointer}
       .trigger{border:0;background:#245943;color:white;border-radius:14px;padding:12px 15px;font-size:13px;font-weight:750;box-shadow:0 8px 24px #0003}
-      .panel{display:none;width:min(325px,calc(100vw - 28px));background:#fff;color:#25382e;border:1px solid #dce8df;border-radius:18px;box-shadow:0 8px 30px #0003;padding:17px;margin-bottom:8px;font-size:13px;line-height:1.5}
+      .panel{display:none;width:min(345px,calc(100vw - 28px));max-height:calc(100dvh - 175px);overflow-y:auto;overscroll-behavior:contain;background:#fff;color:#25382e;border:1px solid #dce8df;border-radius:18px;box-shadow:0 8px 30px #0003;padding:17px;margin-bottom:8px;font-size:13px;line-height:1.5}
       .panel.open{display:block}
       h2{font-size:17px;margin:0 0 12px;line-height:1.25}
       p{margin:8px 0}

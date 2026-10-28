@@ -292,3 +292,20 @@ Sur chaque ligne des sections Carrefour Drive et Grand Frais apparaît une actio
 
 Le moteur Carrefour/Userscripts est inchangé. Les nouveaux calculs sont validés avec des tests simulés avant vérification sur iPhone.
 
+
+
+## Correction ergonomique — restes placés librement et saisie des ingrédients sur iPhone (28/10/2026, v15)
+
+Cette mise à jour **remplace le précédent placement automatique des restes au créneau suivant**. Désormais, choisir une recette de 4 portions n'occupe **aucun autre créneau**. Dans le repas de son choix (un midi/soir **après le repas de cuisson**, même plusieurs jours plus tard), l'utilisateur touche **« 🍱 Placer des restes ici »** puis sélectionne le plat préparé ainsi que la quantité de portions. L'application indique la date du repas où le plat a été cuisiné et les portions encore disponibles. Les restes peuvent être placés dans une case vide **ou à côté d'un autre plat** prévu au même repas.
+
+La quantité disponible correspond aux portions préparées moins celles consommées pendant le repas de cuisson (2 dans le cas d'un plat unique pour deux personnes, 1 de chaque plat lorsque plusieurs plats sont servis) et moins les restes déjà attribués. Exemple : 4 portions de poulet au curry préparées lundi midi → 2 mangées lundi → 2 disponibles pour jeudi soir. On ne peut pas attribuer plus de portions que le disponible. Un plat de 6 portions peut voir ses restes répartis sur plusieurs jours, sans double comptage d'ingrédients. Si l'on réduit les portions préparées ou supprime le plat source, les allocations de restes devenues impossibles sont supprimées ou réduites, sans toucher aux autres plats des mêmes cases.
+
+Le **générateur de semaine** ne place plus non plus de restes automatiquement : il remplit les cases vides avec une recette pour deux portions, laissant toute liberté de créer ses propres repas de restes. Les anciennes données et les restes déjà placés continuent d'être lisibles sans migration destructive.
+
+**Ajout de recettes sur iPhone :**
+- le bouton **« ＋ Ajouter un ingrédient »** est désormais **sous toutes les lignes d'ingrédients**, juste au-dessus de l'enregistrement. À chaque ajout, la fenêtre défile légèrement pour maintenir le bouton à portée ;
+- les champs texte / numériques et les menus déroulants du formulaire sont affichés à **16px au minimum** sur Safari iOS, afin d'éviter le zoom automatique au focus. Le zoom manuel reste autorisé ;
+- le moteur Carrefour Drive (Userscripts v0.9), les préférences Grand Frais, les recettes, les sauvegardes JSON et les autres projets restent inchangés.
+
+Tests simulés : cuisson lundi/consommation jeudi, 4 portions → 2 restes, deux plats au même repas dont un reste, aucun doublon d'ingrédients, réduction/suppression de la cuisson, 6 portions réparties entre deux repas de restes, génération sans restes automatiques, compatibilité d'anciens restes, conservation de la logique de transfert Carrefour et de Grand Frais. Contrôle visuel du focus/zoom et du scroll sur les deux iPhones encore nécessaire.
+

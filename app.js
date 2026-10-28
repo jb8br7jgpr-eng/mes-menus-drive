@@ -9,6 +9,7 @@ const units=['g','kg','ml','cl','l','pièce','paquet','boîte','rouleau','boutei
 const contentUnits=['g','kg','ml','cl','l','pièce','rouleau'];
 const baseState=()=>({schema:1,recipes:[],products:[],weeks:{},staples:[],storePreferences:{},ingredientCatalog:[],settings:{people:2}});
 let state=baseState(), currentTab='menus', currentWeek='', search='', productSearch='', productCategory='Toutes', ingredientStoreTab='carrefour', db=null, usingFallback=false;
+let pendingRecipeDraftImage='';
 const app=$('#app'), modalRoot=$('#modalRoot');
 const uid=()=>Math.random().toString(36).slice(2,10)+Date.now().toString(36);
 function localDate(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}
@@ -111,7 +112,7 @@ function renderMenus(){const w=getWeek(),count=w.meals.filter(Boolean).length, l
   return out
 }
 function recipeImg(r){return '<div class="recipe-img">'+(r.image?'<img src="'+html(r.image)+'" alt="">':html(icons[r.category]||'🍽️'))+'</div>'}
-function recipeRows(){let list=state.recipes.filter(r=>r.name.toLocaleLowerCase('fr').includes(search.toLocaleLowerCase('fr'))).sort((a,b)=>a.name.localeCompare(b.name,'fr'));return list.map(r=>'<div class="recipe-card">'+recipeImg(r)+'<div class="grow"><h3>'+html(r.name)+'</h3><p>'+r.ingredients.length+' ingrédient'+(r.ingredients.length>1?'s':'')+' · recette pour '+r.people+' portions</p><span class="pill gray">'+html(r.category||'Autre')+'</span></div><div class="recipe-actions"><button class="icon-btn" data-action="edit-recipe" data-id="'+r.id+'" aria-label="Modifier '+html(r.name)+'">✎</button></div></div>').join('')||emptyView('🍲','Aucun plat trouvé',search?'Essaie un autre nom.':'Commence par ajouter votre premier plat.','<button class="btn" data-action="add-recipe">＋ Ajouter un plat</button>')}
+function recipeRows(){let list=state.recipes.filter(r=>r.name.toLocaleLowerCase('fr').includes(search.toLocaleLowerCase('fr'))).sort((a,b)=>a.name.localeCompare(b.name,'fr'));return list.map(r=>'<div class="recipe-card">'+recipeImg(r)+'<div class="grow"><h3>'+html(r.name)+'</h3><p>'+r.ingredients.length+' ingrédient'+(r.ingredients.length>1?'s':'')+' · recette pour '+r.people+' portions</p><span class="pill gray">'+html(r.category||'Autre')+'</span></div><div class="recipe-actions"><button class="icon-btn" data-action="edit-recipe" data-id="'+r.id+'" aria-label="Modifier '+html(r.name)+'">✎</button><button class="btn tiny secondary" data-action="duplicate-recipe" data-id="'+r.id+'">Dupliquer</button></div></div>').join('')||emptyView('🍲','Aucun plat trouvé',search?'Essaie un autre nom.':'Commence par ajouter votre premier plat.','<button class="btn" data-action="add-recipe">＋ Ajouter un plat</button>')}
 function renderPlats(){let out=pageHeading('Votre bibliothèque','Mes plats','Enregistre une seule fois les ingrédients de vos plats habituels.');
   out+='<div class="toolbar"><button class="btn wide" data-action="add-recipe">＋ Ajouter un plat</button></div>';
   out+='<div class="field"><input class="text-input" id="recipeSearch" value="'+html(search)+'" placeholder="⌕ Rechercher un plat…" aria-label="Rechercher un plat"></div>';
@@ -629,9 +630,10 @@ function ingredientRow(item={name:'',qty:'',unit:'g'}){
   linked?'Produit Carrefour : '+html(linked.name)+(linked.packAmount?' · '+html(quantity(linked.packAmount,linked.packUnit))+'/paquet':' · contenu du paquet à préciser'):
   'Aucun produit Carrefour lié : tu pourras l’associer dans la base.')+'</p></div>'
 }
-function recipeEditor(id){
- const r=recipeById(id),title=r?'Modifier le plat':'Ajouter un plat',ingredients=r?.ingredients?.length?r.ingredients:[{name:'',qty:'',unit:'g'}];
- let body='<form id="recipeForm" data-id="'+(r?.id||'')+'">'+
+function recipeEditor(id,draft=null){
+ const old=recipeById(id),r=old||draft,title=old?'Modifier le plat':draft?'Dupliquer un plat':'Ajouter un plat',ingredients=r?.ingredients?.length?r.ingredients:[{name:'',qty:'',unit:'g'}];
+ pendingRecipeDraftImage=!old&&draft?draft.image||'':'';
+ let body='<form id="recipeForm" data-id="'+(old?.id||'')+'">'+
  '<div class="field"><label for="recipeName">Nom du plat</label><input required maxlength="90" id="recipeName" placeholder="Ex. Poulet au curry" value="'+html(r?.name||'')+'"></div>'+
  '<div class="row" style="align-items:start;gap:11px"><div class="field grow"><label for="recipeCategory">Type de plat</label><select id="recipeCategory">'+selectOptions(Object.keys(icons),r?.category||'Autre')+'</select></div>'+
  '<div class="field" style="width:115px"><label for="recipePeople">Portions de base</label><input id="recipePeople" type="number" min="1" max="30" required value="'+(r?.people||4)+'"></div></div>'+
@@ -639,10 +641,12 @@ function recipeEditor(id){
  '<div class="row between" style="margin:15px 0 8px"><h3>Ingrédients</h3></div>'+
  '<div class="note ingredient-auto-note">✓ Chaque ingrédient sera automatiquement enregistré dans <strong>Produits → Carrefour ou Grand Frais</strong> lorsque tu enregistreras le plat. Si son nom existe déjà, sa fiche sera réutilisée, sans doublon.</div>'+
  '<datalist id="ingredientNames">'+(state.ingredientCatalog||[]).slice().sort((a,b)=>a.name.localeCompare(b.name,'fr')).map(x=>'<option value="'+html(x.name)+'"></option>').join('')+'</datalist>'+
+ '<div class="ingredient-favorites"><span class="helper">Ingrédients fréquents :</span>'+
+ frequentIngredients().map(i=>'<button type="button" class="ingredient-favorite" data-action="favorite-ingredient" data-id="'+html(i.id)+'">＋ '+html(i.name)+'</button>').join('')+'</div>'+
  '<div id="ingredientRows">'+ingredients.map(ingredientRow).join('')+'</div>'+
  '<button id="addIngredientBottom" type="button" class="btn secondary wide ingredient-add-bottom" data-action="add-ingredient">＋ Ajouter un ingrédient</button>'+
  '<div class="divider"></div><button class="btn wide" type="submit">✓ Enregistrer le plat</button></form>';
- if(r)body+='<button class="btn danger wide" style="margin-top:10px" data-action="delete-recipe" data-id="'+r.id+'">Supprimer ce plat</button>';
+ if(old)body+='<button class="btn danger wide" style="margin-top:10px" data-action="delete-recipe" data-id="'+old.id+'">Supprimer ce plat</button>';
  showModal(title,body)
 }
 function pickMeal(index){
@@ -852,7 +856,7 @@ async function saveRecipe(e){
  if(!rows.length||rows.some(x=>!x.name||!Number.isFinite(x.qty)||x.qty<=0||!units.includes(x.unit)||!['carrefour','grandfrais'].includes(x.store))){
   toast('Chaque ingrédient doit avoir un nom, une quantité et un magasin.');return
  }
- const old=recipeById(form.dataset.id);let image=old?.image||'';
+ const old=recipeById(form.dataset.id);let image=old?.image||pendingRecipeDraftImage||'';
  try{if($('#recipePhoto').files[0])image=await compressImage($('#recipePhoto').files[0])}catch(err){toast(err.message);return}
  // Ne modifier la base que lorsque toute la recette est validée.
  const ingredients=[],unique=new Map();
@@ -877,7 +881,7 @@ async function saveRecipe(e){
  }
  const recipe={id:old?.id||uid(),name,people,category,ingredients,image};
  if(old)state.recipes=state.recipes.map(x=>x.id===old.id?recipe:x);else state.recipes.push(recipe);
- persist();closeModal();render();toast(old?'Plat modifié !':'Plat ajouté et ingrédients enregistrés !')
+ persist();closeModal();pendingRecipeDraftImage='';render();toast(old?'Plat modifié !':'Plat ajouté et ingrédients enregistrés !')
 }
 function addExtra(e){e.preventDefault();const name=$('#extraName').value.trim(),qty=Number($('#extraQty').value),unit=$('#extraUnit').value;
   if(!name||!Number.isFinite(qty)||qty<=0){toast('Renseigne un produit et sa quantité.');return}
@@ -916,6 +920,19 @@ document.addEventListener('click',e=>{const tab=e.target.closest('[data-tab]');i
   else if(mode==='pick-meal')pickMeal(index);
   else if(mode==='add-recipe')recipeEditor(null);
   else if(mode==='edit-recipe')recipeEditor(id);
+  else if(mode==='duplicate-recipe'){const r=recipeById(id);if(r)recipeEditor(null,{...r,id:null,name:r.name+' (variante)',ingredients:r.ingredients.map(x=>({...x}))})}
+  else if(mode==='favorite-ingredient'){
+   const ing=ingredientById(id);if(!ing)return;
+   const rows=$('#ingredientRows'),all=[...(rows?.children||[])];
+   if(all.some(x=>norm(x.querySelector('.ingredient-name')?.value)===norm(ing.name))){toast('Ingrédient déjà présent.');return}
+   let row=all.find(x=>!x.querySelector('.ingredient-name')?.value.trim());
+   if(!row){rows?.insertAdjacentHTML('beforeend',ingredientRow());row=rows?.lastElementChild}
+   if(!row)return;
+   row.querySelector('.ingredient-name').value=ing.name;
+   row.querySelector('.ingredient-unit').value=preferredIngredientUnit(ing);
+   refreshIngredientEntry(row);row.querySelector('.ingredient-qty')?.focus();
+   $('#addIngredientBottom')?.scrollIntoView?.({behavior:'smooth',block:'nearest'})
+  }
   else if(mode==='add-product')productEditor(null);
   else if(mode==='ingredient-store-tab'){ingredientStoreTab=a.dataset.store==='grandfrais'?'grandfrais':'carrefour';render(true)}
   else if(mode==='add-catalog-ingredient')ingredientEditor(null);

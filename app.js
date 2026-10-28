@@ -368,6 +368,24 @@ function renderProduits(){
  '<p class="helper catalog-footer">Ingrédients : recettes et courses. Quotidien : courses uniquement. Le magasin et le stock maison fonctionnent pour les deux dans Courses.</p>';
  return out;
 }
+
+function chooseUnifiedProductType(){
+ const suggested=catalogueTypeFilter==='daily'?'daily':'ingredient';
+ showModal('Ajouter un produit',
+  '<p class="helper">Choisis si ce produit pourra apparaître dans tes recettes. Les deux types utilisent les mêmes magasins et la même liste de courses.</p>'+
+  '<div class="catalogue-create-types"><button class="btn wide '+(suggested==='ingredient'?'':'secondary')+'" data-action="new-unified-kind" data-kind="ingredient">🥕 Ingrédient <small>Recettes et courses</small></button>'+
+  '<button class="btn wide '+(suggested==='daily'?'':'secondary')+'" data-action="new-unified-kind" data-kind="daily">🧻 Achat du quotidien <small>Courses uniquement</small></button></div>');
+}
+function unifiedToCourses(type,id){
+ const item=type==='ingredient'?ingredientById(id):productById(id);if(!item)return;
+ const unit=item.unit||(type==='ingredient'?preferredIngredientUnit(item):'paquet');
+ const amount=item.qty||1;
+ const body='<p class="helper">Ajout manuel : les ingrédients des recettes ne sont pas générés automatiquement. Le stock maison pourra être renseigné dans Courses.</p>'+
+ '<div class="row stock-editor-row"><div class="field grow"><label for="unifiedExtraQty">Quantité</label><input id="unifiedExtraQty" type="number" min=".01" step="any" value="'+html(amount)+'"></div>'+
+ '<div class="field grow"><label for="unifiedExtraUnit">Unité</label><select id="unifiedExtraUnit">'+selectOptions(units,unit)+'</select></div></div>'+
+ '<button class="btn wide" data-action="save-unified-courses" data-kind="'+type+'" data-id="'+html(id)+'">＋ Ajouter aux courses</button>';
+ showModal('Ajouter aux courses · '+html(item.name),body);
+}
 function productEditor(id,draft=null,linkedIngredientId=null){
  const p=productById(id)||draft,title=id?'Modifier le produit':draft?.url?'Importer depuis Carrefour':draft?'Nouvel achat du quotidien':'Ajouter un achat du quotidien';
  const body='<form id="productForm" data-id="'+html(p?.id||'')+'" data-ingredient-id="'+html(linkedIngredientId||'')+'"><div class="field"><label for="productName">Nom du produit</label><input id="productName" maxlength="100" required placeholder="Ex. Papier toilette" value="'+html(p?.name||'')+'"></div><details class="daily-optional" '+(id||p?.brand||p?.packaging?'open':'')+'><summary>Marque et description (facultatif)</summary><div class="field"><label for="productBrand">Marque (facultatif)</label><input id="productBrand" maxlength="80" placeholder="Ex. Lotus" value="'+html(p?.brand||'')+'"></div><div class="field"><label for="productPackaging">Conditionnement (facultatif)</label><input id="productPackaging" maxlength="80" placeholder="Ex. Lot de 12 rouleaux" value="'+html(p?.packaging||'')+'"></div></details><div class="field"><label for="productCategory">Catégorie</label><select id="productCategory">'+selectOptions(productCategories,p?.category||'Autres')+'</select></div><div class="field"><label for="productStore">Magasin habituel</label><select id="productStore"><option value="carrefour" '+((state.storePreferences?.['product:'+p?.id]||p?.store||'carrefour')==='carrefour'?'selected':'')+'>Carrefour Drive</option><option value="grandfrais" '+((state.storePreferences?.['product:'+p?.id]||p?.store)==='grandfrais'?'selected':'')+'>Grand Frais</option></select></div><div class="row" style="align-items:start"><div class="field grow"><label for="productQty">Quantité habituelle à acheter</label><input id="productQty" type="number" min=".01" step="any" required value="'+(p?.qty||1)+'"></div><div class="field grow"><label for="productUnit">Unité</label><select id="productUnit">'+selectOptions(units,p?.unit||'paquet')+'</select></div></div><details class="daily-optional" '+(id||p?.url||p?.ean||p?.packAmount?'open':'')+'><summary>Référence Carrefour et contenu du paquet (facultatif)</summary><div class="card soft" style="margin:12px 0"><strong>Contenu d’un emballage</strong><p class="helper">Exemple : un paquet contenant 1 kg de riz, pour calculer le nombre de paquets à acheter.</p><div class="row" style="align-items:start"><div class="field grow"><label for="packAmount">Contenu</label><input id="packAmount" type="number" min=".01" step="any" placeholder="Ex. 1" value="'+html(p?.packAmount??'')+'"></div><div class="field grow"><label for="packUnit">Unité de contenu</label><select id="packUnit">'+selectOptions(contentUnits,p?.packUnit||'g')+'</select></div></div></div><div class="field"><label for="productEan">Code-barres EAN-13 (facultatif)</label><input id="productEan" maxlength="13" inputmode="numeric" pattern="[0-9]{13}" placeholder="13 chiffres" value="'+html(p?.ean||'')+'"><div class="helper">Code de la fiche Carrefour, à vérifier sur l’emballage si nécessaire.</div></div><div class="field"><label for="productUrl">Lien du produit Carrefour (facultatif)</label><input id="productUrl" type="url" maxlength="2000" autocomplete="off" placeholder="https://www.carrefour.fr/p/..." value="'+html(p?.url||'')+'"><div class="helper">Colle le lien exact depuis Carrefour.fr. Aucune connexion à ton compte n’est demandée.</div></div></details><button class="btn wide" type="submit">✓ Enregistrer le produit</button></form>';
@@ -1409,6 +1427,29 @@ document.addEventListener('click',e=>{
    refreshIngredientEntry(row);row.querySelector('.ingredient-qty')?.focus();
    $('#addIngredientBottom')?.scrollIntoView?.({behavior:'smooth',block:'nearest'})
   }
+  else if(mode==='add-unified-product')chooseUnifiedProductType();
+  else if(mode==='new-unified-kind'){
+   if(a.dataset.kind==='ingredient')ingredientEditor(null);
+   else productEditor(null,{name:'',category:'Autres',store:catalogueStoreFilter==='grandfrais'?'grandfrais':'carrefour',qty:1,unit:'paquet'});
+  }
+  else if(mode==='catalogue-type-filter'){catalogueTypeFilter=['all','ingredient','daily'].includes(a.dataset.value)?a.dataset.value:'all';render(true)}
+  else if(mode==='catalogue-store-filter'){
+   catalogueStoreFilter=['all','carrefour','grandfrais'].includes(a.dataset.value)?a.dataset.value:'all';
+   if(catalogueStoreFilter!=='all')ingredientStoreTab=catalogueStoreFilter;
+   render(true)
+  }
+  else if(mode==='edit-unified-product'){
+   if(a.dataset.kind==='ingredient')ingredientEditor(id);else productEditor(id)
+  }
+  else if(mode==='add-unified-courses')unifiedToCourses(a.dataset.kind,id);
+  else if(mode==='save-unified-courses'){
+   const isIngredient=a.dataset.kind==='ingredient';
+   const item=isIngredient?ingredientById(id):productById(id),qty=Number($('#unifiedExtraQty')?.value),unit=$('#unifiedExtraUnit')?.value;
+   if(!item||!Number.isFinite(qty)||qty<=0||!units.includes(unit)){toast('Vérifie la quantité et l’unité.');return}
+   w.extras.push({id:uid(),name:item.name,qty,unit,productId:isIngredient?(item.productId||null):item.id,
+    ingredientId:isIngredient?item.id:null,fromCatalogue:!isIngredient});
+   persist();closeModal();render(true);toast(item.name+' ajouté aux courses !')
+  }
   else if(mode==='add-product')productEditor(null);
   else if(mode==='daily-example'){
    productEditor(null,{name:a.dataset.name||'',category:a.dataset.category||'Autres',
@@ -1560,7 +1601,7 @@ document.addEventListener('change',e=>{
  }else if(e.target.matches('[data-store-item]')){setShoppingStore(e.target.dataset.storeItem,e.target.value)}else if(e.target.matches('[data-check]')){const w=getWeek(),id=e.target.dataset.check;w.checked=e.target.checked?[...new Set([...w.checked,id])]:w.checked.filter(x=>x!==id);persist();render(true)}else if(e.target.id==='importFile')importData(e.target.files?.[0])});
 document.addEventListener('input',e=>{
  if(e.target.id==='mealRecipeSearch'){refreshMealRecipePicker();return}
- if(e.target.id==='homeStockAmount')refreshStockPreview();if(e.target.matches?.('.ingredient-name'))refreshIngredientEntry(e.target.closest('.ingredient-line'));if(e.target.matches?.('.ingredient-unit'))e.target.closest('.ingredient-line').dataset.unitSelected='true';if(e.target.id==='recipeSearch'){search=e.target.value;const result=$('#recipeResults'),count=$('#recipeCount');if(result)result.innerHTML=recipeRows();if(count)count.textContent=visibleRecipes().length+' / '+state.recipes.length+' plats'}else if(e.target.id==='productSearch'){productSearch=e.target.value;if(productSearch.trim()){independentProductsOpen=true;const section=document.querySelector('.catalog-independent');if(section)section.open=true}const result=$('#productResults');if(result)result.innerHTML=productRows();const ings=$('#ingredientCatalogResults');if(ings)ings.innerHTML=ingredientRowsCatalogue()}});
+ if(e.target.id==='homeStockAmount')refreshStockPreview();if(e.target.matches?.('.ingredient-name'))refreshIngredientEntry(e.target.closest('.ingredient-line'));if(e.target.matches?.('.ingredient-unit'))e.target.closest('.ingredient-line').dataset.unitSelected='true';if(e.target.id==='recipeSearch'){search=e.target.value;const result=$('#recipeResults'),count=$('#recipeCount');if(result)result.innerHTML=recipeRows();if(count)count.textContent=visibleRecipes().length+' / '+state.recipes.length+' plats'}else if(e.target.id==='productSearch'){productSearch=e.target.value;const result=$('#catalogueResults'),count=$('#catalogueCount');if(result)result.innerHTML=unifiedCatalogueRows();if(count){const n=unifiedCatalogueItems().length;count.textContent=n+' produit'+(n>1?'s':'')}}});
 document.addEventListener('submit',e=>{if(e.target.id==='recipeForm')saveRecipe(e);if(e.target.id==='ingredientCatalogForm')saveCatalogIngredient(e);if(e.target.id==='extraForm')addExtra(e);if(e.target.id==='productForm')saveProduct(e)});
 window.addEventListener('hashchange',()=>importCarrefourProductFromHash());
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal()});

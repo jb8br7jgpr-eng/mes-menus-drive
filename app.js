@@ -1147,7 +1147,40 @@ function pickMeal(index){
  '<button class="btn secondary wide" style="margin-top:12px" data-action="remove-meal" data-index="'+index+'">Vider ce repas</button>';
  showModal(days[Math.floor(index/2)]+' '+(index%2?'soir':'midi'),out)
 }
-function extraModal(){let out='<form id="extraForm"><div class="field"><label for="extraName">Produit</label><input id="extraName" maxlength="80" placeholder="Ex. papier toilette, baume à lèvres…" required></div><div class="row" style="align-items:start"><div class="field grow"><label for="extraQty">Quantité</label><input id="extraQty" type="number" min=".01" step="any" value="1" required></div><div class="field grow"><label for="extraUnit">Unité</label><select id="extraUnit">'+selectOptions(units,'paquet')+'</select></div></div><label class="row" style="font-size:13px;margin:5px 0 19px"><input type="checkbox" id="extraFavorite" checked> Mémoriser dans mes favoris</label><button class="btn wide" type="submit">＋ Ajouter aux courses</button></form>';showModal('Ajouter un produit',out)}
+function extraSearchItems(term=''){
+ const needle=norm(term);
+ const linked=new Set((state.ingredientCatalog||[]).map(i=>i.productId).filter(Boolean));
+ return [
+  ...(state.ingredientCatalog||[]).map(i=>({kind:'ingredient',id:i.id,name:i.name,store:ingredientStore(i),frequent:!!i.frequent})),
+  ...(state.products||[]).filter(p=>!linked.has(p.id)).map(p=>({kind:'daily',id:p.id,name:p.name,store:p.store||'carrefour',frequent:!!p.frequent}))
+ ].filter(x=>!needle||norm(x.name).includes(needle))
+  .sort((a,b)=>Number(b.frequent)-Number(a.frequent)||a.name.localeCompare(b.name,'fr',{sensitivity:'base'}))
+  .slice(0,25);
+}
+function extraSearchResults(term=''){
+ const items=extraSearchItems(term);
+ if(!items.length)return '<p class="note">Aucun produit trouvé. Tu peux l’ajouter ponctuellement sans créer de fiche.</p>';
+ return items.map(x=>'<button class="course-search-result" data-action="select-extra-catalogue" data-kind="'+x.kind+'" data-id="'+html(x.id)+'">'+
+  '<span class="grow"><strong>'+html(x.name)+'</strong><small>'+(x.kind==='ingredient'?'Ingrédient':'Quotidien')+
+  ' · '+(x.store==='grandfrais'?'Grand Frais':'Carrefour')+(x.frequent?' · ☆ fréquent':'')+'</small></span><span aria-hidden="true">＋</span></button>').join('');
+}
+function extraModal(){
+ let out='<p class="helper">Choisis un produit enregistré : sa quantité habituelle et son magasin seront repris automatiquement. Les achats restent ponctuels à cette semaine.</p>'+
+ '<div class="field"><label for="courseAddSearch">Rechercher dans mes produits</label>'+
+ '<input id="courseAddSearch" class="text-input" placeholder="Ex. dentifrice, lait, pommes…" autocomplete="off"></div>'+
+ '<div id="courseAddSearchResults" class="course-search-results">'+extraSearchResults()+'</div>'+
+ '<button class="btn secondary wide course-one-off" data-action="extra-one-off">＋ Article ponctuel, hors catalogue</button>';
+ showModal('Ajouter aux courses',out);
+}
+function extraOneOffModal(){
+ const out='<p class="helper">Pour un achat exceptionnel, sans nouvelle fiche dans Produits. Pour un article habituel, utilise la recherche du catalogue.</p>'+
+ '<form id="extraForm"><div class="field"><label for="extraName">Nom de l’article</label><input id="extraName" maxlength="80" required placeholder="Ex. cadeau, fournitures…"></div>'+
+ '<div class="row stock-editor-row"><div class="field grow"><label for="extraQty">Quantité</label><input id="extraQty" type="number" min=".01" step="any" value="1" required></div>'+
+ '<div class="field grow"><label for="extraUnit">Unité</label><select id="extraUnit">'+selectOptions(units,'pièce')+'</select></div></div>'+
+ '<button class="btn wide" type="submit">＋ Ajouter aux courses</button></form>'+
+ '<button class="btn secondary wide" data-action="add-extra" style="margin-top:9px">← Rechercher un produit</button>';
+ showModal('Article ponctuel',out);
+}
 function settingsModal(){
  let out='<div class="card soft"><strong>Sauvegarde automatique activée</strong><p class="subtext">Chaque modification est enregistrée immédiatement sur cet iPhone. Jusqu’à 10 points de restauration locaux sont conservés automatiquement (espacés d’environ 10 min).</p></div>';
  out+='<div class="section-head"><h3>Versions locales précédentes</h3><button class="btn tiny secondary" data-action="refresh-backups">Actualiser</button></div><div id="snapshotList" class="subtext">Chargement…</div>';
@@ -1396,10 +1429,12 @@ async function saveRecipe(e){
  persist();closeModal();pendingRecipeDraftImage='';render();toast(old?'Plat modifié !':'Plat ajouté et ingrédients enregistrés !')
 }
 function addExtra(e){e.preventDefault();const name=$('#extraName').value.trim(),qty=Number($('#extraQty').value),unit=$('#extraUnit').value;
-  if(!name||!Number.isFinite(qty)||qty<=0){toast('Renseigne un produit et sa quantité.');return}
-  const item={id:uid(),name,qty,unit};getWeek().extras.push(item);
-  if($('#extraFavorite').checked){const old=state.staples.find(x=>norm(x.name)===norm(name));if(old)Object.assign(old,{name,qty,unit});else state.staples.push({...item})}
-  persist();closeModal();render();toast('Produit ajouté aux courses !')
+  if(!name||!Number.isFinite(qty)||qty<=0||!units.includes(unit)){toast('Renseigne un produit et sa quantité.');return}
+  const linked=ingredientByName(name);
+  const product=state.products.find(p=>norm(p.name)===norm(name));
+  if(linked||product){toast('Ce produit existe déjà dans le catalogue : utilise sa fiche.');unifiedToCourses(linked?'ingredient':'daily',(linked||product).id);return}
+  getWeek().extras.push({id:uid(),name,qty,unit});
+  persist();closeModal();render();toast('Article ponctuel ajouté aux courses !')
 }
 async function copyList(){const value=listText();if(!value){toast('Aucun produit à copier.');return}try{await navigator.clipboard.writeText(value);toast('Liste copiée !')}catch(err){showModal('Liste à copier','<p class="helper">Sélectionne le texte ci-dessous pour le copier :</p><textarea class="text-input" style="height:180px" readonly>'+html(value)+'</textarea>')}}
 function exportData(){const blob=new Blob([JSON.stringify({...state,exportedAt:new Date().toISOString()},null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='mes-menus-drive-sauvegarde-'+localDate(new Date())+'.json';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);toast('Sauvegarde créée. Conserve le fichier !')}
@@ -1609,6 +1644,8 @@ document.addEventListener('click',e=>{
   else if(mode==='complete-week')populate();
   else if(mode==='repeat-week'){const prev=state.weeks[offsetDate(currentWeek,-7)];if(!prev?.meals?.some(Boolean)){toast('Aucun menu trouvé la semaine précédente.');return}if(w.meals.some(Boolean)&&!confirm('Remplacer les repas de cette semaine ?'))return;w.meals=JSON.parse(JSON.stringify(prev.meals));persist();render();toast('Menus de la semaine précédente repris !')}
   else if(mode==='add-extra')extraModal();
+  else if(mode==='extra-one-off')extraOneOffModal();
+  else if(mode==='select-extra-catalogue')unifiedToCourses(a.dataset.kind,id);
   else if(mode==='frequent-to-courses')unifiedToCourses(a.dataset.kind,id);
   else if(mode==='edit-manual-row')editManualRowModal(id);
   else if(mode==='edit-manual-extra')editManualExtraModal(id);
@@ -1682,6 +1719,7 @@ document.addEventListener('change',e=>{
  }
  }else if(e.target.matches('[data-store-item]')){setShoppingStore(e.target.dataset.storeItem,e.target.value)}else if(e.target.matches('[data-check]')){const w=getWeek(),id=e.target.dataset.check;w.checked=e.target.checked?[...new Set([...w.checked,id])]:w.checked.filter(x=>x!==id);persist();render(true)}else if(e.target.id==='importFile')importData(e.target.files?.[0])});
 document.addEventListener('input',e=>{
+ if(e.target.id==='courseAddSearch'){const results=$('#courseAddSearchResults');if(results)results.innerHTML=extraSearchResults(e.target.value);return}
  if(e.target.id==='mealRecipeSearch'){refreshMealRecipePicker();return}
  if(e.target.id==='homeStockAmount')refreshStockPreview();if(e.target.matches?.('.ingredient-name'))refreshIngredientEntry(e.target.closest('.ingredient-line'));if(e.target.matches?.('.ingredient-unit'))e.target.closest('.ingredient-line').dataset.unitSelected='true';if(e.target.id==='recipeSearch'){search=e.target.value;const result=$('#recipeResults'),count=$('#recipeCount');if(result)result.innerHTML=recipeRows();if(count)count.textContent=visibleRecipes().length+' / '+state.recipes.length+' plats'}else if(e.target.id==='productSearch'){productSearch=e.target.value;const result=$('#catalogueResults'),count=$('#catalogueCount');if(result)result.innerHTML=unifiedCatalogueRows();if(count){const n=unifiedCatalogueItems().length;count.textContent=n+' produit'+(n>1?'s':'')}}});
 document.addEventListener('submit',e=>{if(e.target.id==='recipeForm')saveRecipe(e);if(e.target.id==='ingredientCatalogForm')saveCatalogIngredient(e);if(e.target.id==='extraForm')addExtra(e);if(e.target.id==='productForm')saveProduct(e);if(e.target.id==='catalogueEditorForm')saveUnifiedCatalogue(e)});

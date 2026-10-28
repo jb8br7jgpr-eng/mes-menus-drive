@@ -70,7 +70,7 @@ function pageHeading(kicker,title,sub){return '<div class="eyebrow">'+kicker+'</
 function recipeById(id){return state.recipes.find(r=>r.id===id)}
 function emptyView(emoji,title,description,button){return '<div class="empty"><div class="illustration">'+emoji+'</div><strong>'+title+'</strong><p>'+description+'</p>'+button+'</div>'}
 function mealCard(meal,i){let label='',classes='',note='';
-  if(meal?.type==='leftovers'){const linked=meal.recipeId?recipeById(meal.recipeId):null;label=linked?'Restes : '+linked.name:'Restes';classes=' filled';note='2 portions · sans courses supplémentaires'}
+  if(meal?.type==='leftovers'){const linked=meal.recipeId?recipeById(meal.recipeId):null;label=linked?'Restes : '+linked.name:'Restes';classes=' filled';note=(meal.leftoverPortions||2)+' portions · sans courses supplémentaires'}
   else if(meal?.type==='recipe'){const r=recipeById(meal.recipeId);label=r?r.name:'Plat supprimé';classes=' filled';note=(meal.people||2)+' portions à cuisiner'}
   return '<button class="meal-tile'+classes+'" data-action="pick-meal" data-index="'+i+'" aria-label="'+html(days[Math.floor(i/2)])+' '+(i%2?'soir':'midi')+', '+html(label||'ajouter un plat')+'"><span class="meal-type">'+(i%2?'Soir':'Midi')+(note?' · '+html(note):'')+'</span>'+(label?'<strong>'+html(label)+'</strong>':'<span class="add">＋ Ajouter un plat</span>')+'</button>';
 }
@@ -430,7 +430,7 @@ function selectRecipeForMeal(w,index,recipeId,portions){
  clearMealWithPair(w,index);
  w.meals[index]={type:'recipe',recipeId,people:portions};
  if(portions>=4&&index+1<w.meals.length&&!w.meals[index+1])
-   w.meals[index+1]={type:'leftovers',recipeId,fromIndex:index};
+   w.meals[index+1]={type:'leftovers',recipeId,fromIndex:index,leftoverPortions:Math.max(2,portions-2)};
 }
 
 function populate(mode){
@@ -444,7 +444,7 @@ function populate(mode){
   for(let i=0;i<w.meals.length-1;i++){
    const meal=w.meals[i];
    if(meal?.type==='recipe'&&Number(meal.people)>=4&&!w.meals[i+1])
-    w.meals[i+1]={type:'leftovers',recipeId:meal.recipeId,fromIndex:i};
+    w.meals[i+1]={type:'leftovers',recipeId:meal.recipeId,fromIndex:i,leftoverPortions:Math.max(2,Number(meal.people)-2)};
   }
  }
  const counts={},types={},history={};

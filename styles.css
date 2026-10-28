@@ -338,3 +338,70 @@
  .catalogue-unified-actions{flex-basis:76px}
  .catalogue-unified-actions .btn{font-size:10px}
 }
+
+
+/* V29 — Finition soignée, sans modifier la largeur des écrans ni les flux métier. */
+.catalogue-type-locked{font-size:12px;font-weight:850;padding:11px 12px;border-radius:12px;border:1px solid #dae7d9;background:#f2f8ee;color:#315f42;margin-bottom:13px}
+.catalogue-frequent-check{display:flex;align-items:center;gap:10px;font-size:12px;font-weight:750;color:#345b3d;background:#f9faf3;border:1px solid #e4e9d8;border-radius:11px;padding:13px 11px;margin:10px 0 15px;min-height:45px}
+.catalogue-frequent-check input{width:18px;height:18px;accent-color:var(--green);flex:0 0 auto}
+.catalogue-reference-panel[hidden]{display:none!important}
+.catalogue-linked-actions{display:grid;gap:8px;margin-top:13px}
+.catalogue-linked-actions .btn{white-space:normal;text-align:center}
+.course-search-results{display:grid;gap:7px;max-height:47dvh;overflow-y:auto;overscroll-behavior:contain;margin:9px 0 13px}
+.course-search-result{display:flex;align-items:center;gap:10px;width:100%;text-align:left;padding:12px;border:1px solid #deeadc;background:#fff;border-radius:12px;color:var(--ink);cursor:pointer;min-height:55px;font:inherit}
+.course-search-result>.grow{min-width:0;flex:1}
+.course-search-result strong{display:block;font-size:13px;overflow-wrap:anywhere}
+.course-search-result small{display:block;font-size:11px;color:#6e8174;margin-top:5px}
+.course-search-result>span:last-child{color:#42794e;font-weight:800;font-size:22px}
+.course-search-result:active{background:#eff7ed}
+.course-one-off{margin-top:8px}
+.v29-shopping-row{align-items:center;gap:9px;padding:11px 10px}
+.v29-shopping-row .shopping-meta{line-height:1.4}
+.v29-shopping-row .shopping-qty{font-size:12px;font-weight:850}
+.shopping-store-chip{font-size:10px;color:#537760;font-weight:750;margin-top:6px}
+.shopping-modify{flex-shrink:0;min-height:38px;min-width:68px;background:#eff6ed;border-color:#d5e6d2;color:#356342}
+.shopping-detail-header{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:10px;padding:11px;background:#f2f7ed;border-radius:13px}
+.shopping-detail-header strong{font-size:14px;overflow-wrap:anywhere}
+.v29-shopping-row.checked{opacity:.72;background:#f7f9f6}
+.v29-shopping-row.checked .shopping-name{text-decoration:line-through;text-decoration-color:#88aa90}
+.drive-v29-summary{background:linear-gradient(145deg,#f9fcf6 0%,#edf7ea 100%);border:1px solid #d8e8d6;border-radius:20px;padding:17px 15px;margin:15px 0;box-shadow:0 8px 20px #24594310}
+.drive-v29-head{display:flex;justify-content:space-between;align-items:center;gap:12px}
+.drive-v29-head h2{font-size:18px;color:#2d583c;margin:4px 0 0}
+.drive-v29-head small{font-size:10px;color:#6c876f;font-weight:800;letter-spacing:.04em;text-transform:uppercase}
+.drive-v29-stats{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin:16px 0 10px}
+.drive-v29-stats>div{display:flex;flex-direction:column;gap:4px;padding:12px;border:1px solid #d8e6d9;background:#fff;border-radius:13px}
+.drive-v29-stats strong{font-size:25px;color:#366a43;font-variant-numeric:tabular-nums}
+.drive-v29-stats span{font-size:11px;font-weight:800;color:#5d7965}
+.drive-v29-stats .drive-stat-missing{border-color:#ecd6bc;background:#fff9f0}
+.drive-v29-stats .drive-stat-missing strong,.drive-v29-stats .drive-stat-missing span{color:#9a652b}
+.drive-v29-primary{margin-top:14px;min-height:48px;font-weight:850}
+.drive-v29-details{border:1px solid #dfe9dd;border-radius:14px;background:#fff;margin:11px 0;overflow:hidden}
+.drive-v29-details summary{list-style:none;display:flex;align-items:center;gap:10px;justify-content:space-between;cursor:pointer;min-height:47px;padding:12px 14px;color:#365b41;font-weight:850;font-size:13px}
+.drive-v29-details summary::-webkit-details-marker{display:none}
+.drive-v29-details summary:after{content:"⌄";color:#708673;font-size:18px}
+.drive-v29-details[open] summary:after{transform:rotate(180deg)}
+.drive-v29-details-body{border-top:1px solid #edf2eb;padding:12px 13px}
+.drive-v29-warnings{border-color:#eddcc7}
+.drive-v29-warnings summary{background:#fff9f0;color:#92602c}
+.drive-v29-item{display:flex;justify-content:space-between;gap:13px;font-size:12px;padding:11px 0;border-bottom:1px solid #eef2ec}
+.drive-v29-item:last-child{border:0}
+.drive-v29-item strong{flex-shrink:0;font-variant-numeric:tabular-nums}
+.drive-v29-complete{padding:11px 13px;border-radius:12px;color:#346844;background:#eff7ed;font-size:12px;font-weight:800}
+.drive-v29-footer{margin:14px 4px 0;line-height:1.55}
+.catalogue-unified-card,.v29-shopping-row,.course-search-result,.drive-v29-summary{transition:background-color .16s ease,border-color .16s ease,box-shadow .16s ease,transform .16s ease}
+@media(hover:hover){
+ .catalogue-unified-card:hover,.v29-shopping-row:hover{border-color:#c8ddc8;box-shadow:0 5px 18px #2e68450d}
+ .course-search-result:hover{background:#f2f9f0}
+}
+@media(prefers-reduced-motion:reduce){
+ .catalogue-unified-card,.v29-shopping-row,.course-search-result,.drive-v29-summary{transition:none!important;animation:none!important}
+}
+@media(max-width:370px){
+ .drive-v29-summary{padding:13px 10px}
+ .drive-v29-head h2{font-size:16px}
+ .shopping-modify{min-width:60px;font-size:10px;padding:7px 5px}
+ .v29-shopping-row{gap:7px}
+}
+@supports (-webkit-touch-callout:none){
+ #catalogueName,#catalogueStore,#catalogueCategory,#catalogueQty,#catalogueUnit,#catalogueBrand,#cataloguePackaging,#cataloguePackAmount,#cataloguePackUnit,#catalogueEan,#catalogueUrl,#courseAddSearch,#shoppingDetailStore{font-size:16px!important}
+}

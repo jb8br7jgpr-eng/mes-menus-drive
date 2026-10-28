@@ -1,8 +1,8 @@
 // ==UserScript==
-// @name         Menus & Drive — Diagnostic Carrefour (lecture seule)
+// @name         Menus & Drive — Carrefour
 // @namespace    https://github.com/jb8br7jgpr-eng/mes-menus-drive
-// @version      0.7.0
-// @description  Ouvre automatiquement la liste de courses transmise par l’app iPhone, sans modifier le panier.
+// @version      0.8.0
+// @description  Constitue le panier Drive avec les références disponibles, sans commande ni paiement.
 // @match        https://www.carrefour.fr/*
 // @match        https://carrefour.fr/*
 // @run-at       document-idle
@@ -14,9 +14,9 @@
 (() => {
   'use strict';
 
-  // Sécurité : requêtes GET Carrefour.fr uniquement sur clic pour rechercher les EAN.
-  // Aucune requête d'écriture, aucun cookie/token/profil lu ou conservé,
-  // aucun produit ajouté/supprimé du panier.
+  // Le clic dans l'application Menus & Drive déclenche la préparation du panier.
+  // Aucun paiement, suppression, retrait ni commande. Les quantités existantes
+  // ne sont jamais réduites et les échecs sont affichés à l'écran.
   if (!/^(www\.)?carrefour\.fr$/i.test(location.hostname)) return;
   if (document.getElementById('md-carrefour-diagnostic-root')) return;
 
@@ -80,6 +80,8 @@
       .line strong{display:block;overflow-wrap:anywhere}
       .line small{display:block;color:#66766c;margin-top:2px}
       .greenTxt{color:#217947}.orangeTxt{color:#945900}
+      .danger{color:#af443d}
+      .summary{background:#f0f7f0;border-radius:12px;padding:11px;margin:9px 0;font-size:12px;line-height:1.5}
     `;
 
     const panel = document.createElement('section');
@@ -115,6 +117,15 @@
     const verifyBtn = document.createElement('button');
     verifyBtn.type='button';verifyBtn.className='minor';verifyBtn.hidden=true;
     verifyBtn.textContent='🔎 Vérifier mes références sur Carrefour';
+    const fillCartBtn = document.createElement('button');
+    fillCartBtn.type='button';fillCartBtn.className='import';fillCartBtn.hidden=true;
+    fillCartBtn.textContent='🛒 Ajouter les produits disponibles au panier';
+    const confirmStoreBtn = document.createElement('button');
+    confirmStoreBtn.type='button';confirmStoreBtn.className='minor';confirmStoreBtn.hidden=true;
+    confirmStoreBtn.textContent='✓ Je confirme que mon Drive affiché est École-Valentin';
+    const cartSummary = document.createElement('div');
+    cartSummary.className='summary';cartSummary.hidden=true;
+    cartSummary.setAttribute('aria-live','polite');
     const lookupStatus = document.createElement('p');
     lookupStatus.className='muted';lookupStatus.setAttribute('aria-live','polite');
     const verifiedProducts = document.createElement('div');
@@ -124,7 +135,7 @@
     let previewRows=[];
     const notice = document.createElement('div');
     notice.className = 'light';
-    notice.innerHTML = '<strong>🔒 Lecture seule</strong><div class="muted">Aucune modification de panier. En cliquant sur « Vérifier mes références », des requêtes de consultation sont envoyées uniquement à Carrefour.fr.</div>';
+    notice.innerHTML = '<strong>🛒 Panier Carrefour</strong><div class="muted">Seuls les produits vérifiés comme disponibles seront ajoutés. Aucun paiement, aucune commande, aucun retrait des autres articles. Le bouton « Vérifier mes références » reste sans modification.</div>';
     const shop = document.createElement('p');
     shop.className = 'muted';
     shop.textContent = 'Vérifie toi-même dans l’interface Carrefour que le Drive actif est bien École-Valentin : le diagnostic ne peut pas le certifier.';
@@ -132,7 +143,7 @@
     close.type = 'button';
     close.className = 'close';
     close.textContent = 'Fermer le diagnostic';
-    panel.append(heading, status, domain, ean, preview, importBtn, manualCopy, listBtn, pasteField, pasteConfirm, listStatus, verifyBtn, lookupStatus, listPreview, verifiedProducts, notice, shop, close);
+    panel.append(heading, status, domain, ean, preview, importBtn, manualCopy, listBtn, pasteField, pasteConfirm, listStatus, fillCartBtn, confirmStoreBtn, cartSummary, verifyBtn, lookupStatus, listPreview, verifiedProducts, notice, shop, close);
 
     const trigger = document.createElement('button');
     trigger.type = 'button';
@@ -207,6 +218,10 @@
       lookupStatus.textContent='';
       verifyBtn.hidden=!data.rows.length;
       verifyBtn.disabled=false;
+      fillCartBtn.hidden=!data.rows.length;
+      fillCartBtn.disabled=false;
+      confirmStoreBtn.hidden=true;
+      cartSummary.hidden=true;cartSummary.replaceChildren();
       listStatus.textContent=data.rows.length+' référence'+(data.rows.length!==1?'s':'')+' transférée'+(data.rows.length!==1?'s':'')+' (code-barres + quantité).';
       const note=document.createElement('p');
       note.className='muted';
@@ -229,7 +244,7 @@
     }
     function parseAndShow(raw){
       try{renderPreview(validateTransfer(raw));return true}
-      catch(e){listStatus.textContent='⚠️ '+String(e.message||'Liste non reconnue');listPreview.replaceChildren();verifiedProducts.replaceChildren();verifyBtn.hidden=true;return false}
+      catch(e){listStatus.textContent='⚠️ '+String(e.message||'Liste non reconnue');listPreview.replaceChildren();verifiedProducts.replaceChildren();verifyBtn.hidden=true;fillCartBtn.hidden=true;return false}
     }
     // Protocole de test : lecture seule. Les API Carrefour ci-dessous sont non officielles,
     // sujettes à changement et l'utilisateur doit sélectionner son magasin sur Carrefour.fr.
@@ -315,6 +330,203 @@
       if(previewRows.length>limit)lookupStatus.textContent+=' · '+limit+' premières références vérifiées sur '+previewRows.length+'.';
       verifyBtn.disabled=false;
     });
+    let activeCartRun=false;
+    const cartOutcomes=[];
+    const expectedDriveName=/\b(?:ecole|école)[-\s]?valentin\b|\bbesan[cç]on[-\s]?valentin\b/i;
+    function cartItems(cart){
+      return (Array.isArray(cart?.items)?cart.items:[])
+        .flatMap(group=>Array.isArray(group?.products)?group.products:[]);
+    }
+    function cartLine(cart,ean){
+      return cartItems(cart).find(row=>String(row?.product?.attributes?.ean||'')===ean)||null
+    }
+    function currentQuantity(cart,ean){
+      const count=Number(cartLine(cart,ean)?.counter||0);
+      return Number.isFinite(count)&&count>0?count:0
+    }
+    // Lecture stricte de l'offre exacte dans le HTML de la fiche produit.
+    // Une réponse imprévue => disponibilité INCONNUE => aucune écriture.
+    function pageAvailability(html,sid,ean){
+      if(typeof html!=='string'||!sid||!/^\d{13}$/.test(ean))return 'unknown';
+      const key='"'+sid+'-'+ean+'"';
+      const at=html.indexOf(key);
+      if(at<0)return 'unknown';
+      let pos=at+key.length;
+      while(/\s/.test(html[pos]||'')&&pos<at+key.length+20)pos++;
+      if(html[pos++]!==':')return 'unknown';
+      while(/\s/.test(html[pos]||'')&&pos<at+key.length+30)pos++;
+      if(html[pos]!=='{')return 'unknown';
+      let depth=0,inside=false,escaped=false,last=-1;
+      for(let i=pos;i<html.length&&i<pos+15000;i++){
+        const char=html[i];
+        if(inside){if(escaped)escaped=false;else if(char==='\\')escaped=true;else if(char==='"')inside=false;continue}
+        if(char==='"'){inside=true;continue}
+        if(char==='{')depth++;
+        if(char==='}'){depth--;if(depth===0){last=i+1;break}}
+      }
+      if(last<0)return 'unknown';
+      try{
+        const offer=JSON.parse(html.slice(pos,last));
+        const a=offer?.attributes?.availability;
+        if(a?.purchasable===false||a?.stopped===true||a?.suspended===true)return 'unavailable';
+        return a?.purchasable===true?'available':'unknown';
+      }catch(e){return 'unknown'}
+    }
+    async function availabilityFromProductPage(attrs,ean,sid){
+      const slug=String(attrs?.slug||'');
+      if(!/^[a-z0-9-]+$/i.test(slug)||!sid)return 'unknown';
+      const url='/p/'+slug+'-'+ean;
+      const response=await fetch(url,{method:'GET',credentials:'same-origin',
+        cache:'no-store',headers:{Accept:'text/html'}});
+      if(!response.ok)throw Error('Fiche produit HTTP '+response.status);
+      const type=response.headers.get('content-type')||'';
+      if(!type.includes('html'))throw Error('Fiche Carrefour non reconnue');
+      return pageAvailability(await response.text(),sid,ean)
+    }
+    async function patchCartQuantity(ean,target,sid){
+      if(!/^\d{13}$/.test(ean)||!Number.isInteger(target)||target<1||target>999||!sid)throw Error('Quantité invalide');
+      const response=await fetch('/api/cart',{
+        method:'PATCH',credentials:'same-origin',cache:'no-store',
+        headers:{'X-Requested-With':'XMLHttpRequest','Content-Type':'application/json'},
+        body:JSON.stringify({items:[{basketServiceId:sid,counter:target,ean,subBasketType:'drive_clcv'}]})
+      });
+      if(!response.ok){
+        const e=new Error('Modification du panier refusée (HTTP '+response.status+')');
+        e.status=response.status;throw e
+      }
+      if(!(response.headers.get('content-type')||'').includes('json'))throw Error('Réponse panier invalide');
+      const body=await response.json();
+      return body?.cart||body
+    }
+    function showCartSummary(note=''){
+      cartSummary.hidden=false;
+      const added=cartOutcomes.filter(x=>x.kind==='added');
+      const existing=cartOutcomes.filter(x=>x.kind==='existing');
+      const missing=cartOutcomes.filter(x=>x.kind==='missing');
+      const partial=cartOutcomes.filter(x=>x.kind==='partial');
+      const title=document.createElement('strong');
+      title.textContent='🛒 '+added.length+' ajouté(s) · '+existing.length+' déjà présent(s) · '+(missing.length+partial.length)+' à vérifier';
+      const details=document.createElement('div');
+      details.textContent=note||'Seules les références confirmées disponibles sont ajoutées. Vérifie ton panier avant paiement.';
+      cartSummary.replaceChildren(title,details);
+      for(const r of [...partial,...missing]){
+        const p=document.createElement('p');p.className='danger';
+        p.textContent='⚠️ '+r.ean+(r.name?' · '+r.name:'')+' : '+r.reason;
+        cartSummary.append(p)
+      }
+    }
+    const shopWarning='Le magasin actif n’a pas pu être identifié. Contrôle École-Valentin sur Carrefour.fr.';
+    async function runCartFill(userConfirmedStore=false){
+      if(activeCartRun||!previewRows.length)return;
+      activeCartRun=true;fillCartBtn.disabled=true;verifyBtn.disabled=true;
+      cartOutcomes.length=0;verifiedProducts.replaceChildren();
+      confirmStoreBtn.hidden=true;
+      let sid='',storeName='';
+      try{
+        const data=await carrefourRead('/api/cart');
+        const cart=data?.cart;
+        if(!cart?.facilityServiceId||String(cart.storeRef)==='6'||String(cart.facilityServiceId).endsWith('-6')){
+          lookupStatus.textContent='⚠️ Sélectionne le Drive École-Valentin sur Carrefour puis relance le transfert.';
+          return
+        }
+        sid=String(cart.facilityServiceId);
+        storeName=getSelectedStoreName(sid);
+        if(storeName&&!expectedDriveName.test(storeName)){
+          lookupStatus.textContent='⛔ Drive différent détecté : '+storeName+'. Sélectionne École-Valentin avant tout ajout.';
+          return
+        }
+        if(!storeName&&!userConfirmedStore){
+          lookupStatus.textContent='⚠️ '+shopWarning+' Appuie sur le bouton de confirmation uniquement si tu vois bien École-Valentin sur le site.';
+          confirmStoreBtn.hidden=false;
+          return
+        }
+        lookupStatus.textContent='Drive : '+(storeName||'École-Valentin (confirmé manuellement)')+' · Constitution du panier en cours…';
+        // Objectif en quantités absolues : un nouvel essai ne rajoute pas des doublons.
+        for(const [index,row] of previewRows.entries()){
+          lookupStatus.textContent='Drive : '+(storeName||'École-Valentin confirmé')+' · Produit '+(index+1)+'/'+previewRows.length;
+          let name='';
+          try{
+            const existingCart=(await carrefourRead('/api/cart'))?.cart;
+            if(!existingCart||String(existingCart.facilityServiceId)!==sid)
+              throw Error('STOP : le Drive actif a changé');
+            const current=currentQuantity(existingCart,row.ean);
+            if(current>=row.qty){
+              cartOutcomes.push({ean:row.ean,kind:'existing',reason:'Déjà en quantité suffisante'});
+              showCartSummary();continue
+            }
+            const result=await carrefourRead('/autocomplete?q='+encodeURIComponent(row.ean)+'&maxResults=12&productCard=true');
+            const product=(Array.isArray(result?.data?.products)?result.data.products:[])
+              .find(p=>String(p?.attributes?.ean||'')===row.ean);
+            if(!product){
+              cartOutcomes.push({ean:row.ean,kind:'missing',reason:'Référence introuvable sur Carrefour'});
+              showCartSummary();continue
+            }
+            const attrs=product.attributes||{};
+            name=String(attrs.title||attrs.shortTitle||'').slice(0,100);
+            const local=attrs.offers?.[row.ean]?.[sid]?.attributes;
+            if(!local){
+              cartOutcomes.push({ean:row.ean,name,kind:'missing',reason:'Offre non trouvée pour ce Drive'});
+              showCartSummary();continue
+            }
+            if(local.availability?.purchasable===false||
+               local.availability?.stopped===true||local.availability?.suspended===true){
+              cartOutcomes.push({ean:row.ean,name,kind:'missing',reason:'Indiqué indisponible dans ce Drive'});
+              showCartSummary();continue
+            }
+            // Carrefour peut déclarer disponible dans la recherche un produit indisponible
+            // sur sa fiche : seule la disponibilité explicite sur la fiche autorise l'ajout.
+            const availability=await availabilityFromProductPage(attrs,row.ean,sid);
+            if(availability!=='available'){
+              cartOutcomes.push({ean:row.ean,name,kind:'missing',reason:availability==='unavailable'?
+                'Indisponible sur la fiche Carrefour':'Disponibilité impossible à confirmer'});
+              showCartSummary();continue
+            }
+            // Le Drive peut changer pendant la recherche : revérifier avant toute écriture.
+            const freshCart=(await carrefourRead('/api/cart'))?.cart;
+            if(!freshCart||String(freshCart.facilityServiceId)!==sid)
+              throw Error('STOP : le Drive actif a changé');
+            const already=currentQuantity(freshCart,row.ean);
+            const target=Math.max(already,row.qty);
+            if(target===already){
+              cartOutcomes.push({ean:row.ean,name,kind:'existing',reason:'Déjà présent'});
+              showCartSummary();continue
+            }
+            const updated=await patchCartQuantity(row.ean,target,sid);
+            const line=cartLine(updated,row.ean);
+            const granted=currentQuantity(updated,row.ean);
+            if(granted<target||line?.isStockOff||line?.available===false){
+              cartOutcomes.push({ean:row.ean,name,kind:'partial',reason:granted>0?
+                'Quantité réelle '+granted+'/'+target+' ; à vérifier dans le panier':'Ajout refusé ou indisponible'});
+            }else{
+              cartOutcomes.push({ean:row.ean,name,kind:'added',reason:'Quantité finale '+granted});
+            }
+            showCartSummary()
+          }catch(e){
+            const msg=String(e.message||'Erreur inconnue');
+            cartOutcomes.push({ean:row.ean,name,kind:'missing',reason:'Échec technique : '+msg});
+            showCartSummary();
+            if(/STOP : le Drive actif a changé/.test(msg)||[401,403,429].includes(e.status)){
+              lookupStatus.textContent='⛔ Arrêt du transfert : '+msg;
+              break
+            }
+          }
+          // Requêtes espacées ; pas de traitement simultané des commandes.
+          if(index<previewRows.length-1)await new Promise(resolve=>setTimeout(resolve,400));
+        }
+        if(!lookupStatus.textContent.startsWith('⛔')){
+          lookupStatus.textContent='✓ Opération terminée. Vérifie le panier Carrefour avant de choisir ton créneau et de payer.';
+        }
+        showCartSummary();
+      }catch(e){
+        lookupStatus.textContent='⛔ Impossible de constituer le panier : '+String(e.message||'Erreur Carrefour');
+      }finally{
+        activeCartRun=false;fillCartBtn.disabled=false;verifyBtn.disabled=false;
+      }
+    }
+    fillCartBtn.addEventListener('click',()=>runCartFill(false));
+    confirmStoreBtn.addEventListener('click',()=>{
+      confirmStoreBtn.hidden=true;runCartFill(true)
+    });
     listBtn.addEventListener('click',async()=>{
       pasteField.hidden=false;pasteConfirm.hidden=false;
       listStatus.textContent='Autorise le collage des codes-barres depuis Menus & Drive si Safari le demande.';
@@ -345,7 +557,7 @@
         listStatus.textContent+=' · Import direct depuis ton appli ✓';
         // Le clic "Ouvrir Carrefour avec ma liste" autorise la simple lecture de
         // références, sans aucun ajout ni modification du vrai panier.
-        verifyBtn.click();
+        runCartFill(false);
       }else{
         lookupStatus.textContent='Tu peux utiliser le bouton « Coller mes codes-barres (secours) ».';
       }

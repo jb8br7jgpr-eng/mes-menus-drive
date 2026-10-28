@@ -407,16 +407,64 @@
 }
 
 
-/* V30 — Identité Speedrive, remplacement visuel uniquement de l'en-tête.
-   Conserver la navigation, les écrans, les boutons et les dimensions métier. */
-.topbar{gap:9px;padding-left:16px;padding-right:17px}
-.speedrive-brand{display:flex;align-items:center;min-width:0;flex:1;max-width:470px;min-height:0;overflow:visible}
-.speedrive-logo{display:block;width:100%;height:76px;max-width:460px;object-fit:contain;object-position:left center}
-.topbar .round-btn{flex:0 0 40px;display:grid;place-items:center}
-@media(max-width:370px){
- .topbar{gap:7px;padding-left:10px;padding-right:12px}
- .speedrive-logo{height:70px}
+/* V31 — Identité Speedrive : en-tête centré, logotype v2 plus visible.
+   Les réglages sont dans une ligne séparée au-dessus du logo, accessibles
+   dans les cinq onglets. Aucun changement sur les vues métier. */
+.topbar.speedrive-topbar{
+  width:100%;
+  height:auto;
+  max-height:none;
+  box-sizing:border-box;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:flex-start;
+  gap:0;
+  padding:calc(7px + env(safe-area-inset-top)) 13px 11px;
 }
-@media(min-width:500px){
- .speedrive-logo{height:82px}
+.speedrive-topbar-tools{
+  width:100%;
+  max-width:590px;
+  display:flex;
+  justify-content:flex-end;
+  align-items:center;
+  min-height:40px;
+  margin:0 0 3px;
+}
+.topbar .round-btn{
+  display:grid;
+  place-items:center;
+  flex:0 0 40px;
+  width:40px;
+  height:40px;
+  border-radius:12px;
+  font-size:18px;
+  color:var(--green);
+  background:#fffefb;
+  border:1px solid #e4e9de;
+}
+.speedrive-brand{
+  width:100%;
+  min-width:0;
+  max-width:570px;
+  flex:0 0 auto;
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  margin:0 auto;
+  padding:0;
+}
+.speedrive-logo{
+  display:block;
+  width:100%;
+  max-width:550px;
+  height:auto;
+  max-height:none;
+  object-fit:contain;
+  object-position:center center;
+}
+@media(max-width:370px){
+  .topbar.speedrive-topbar{padding-left:9px;padding-right:9px}
+  .speedrive-topbar-tools{min-height:38px;margin-bottom:2px}
+  .topbar .round-btn{width:38px;height:38px;flex-basis:38px}
 }

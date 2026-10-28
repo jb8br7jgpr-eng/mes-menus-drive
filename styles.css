@@ -131,3 +131,66 @@
 @supports (-webkit-touch-callout:none){
  .meal-targets button,.ingredient-favorite,.ingredient-suggestion{touch-action:manipulation}
 }
+
+/* V19 : Produits = bibliothèque durable ; Courses = achats à effectuer. */
+/* Les deux onglets conservent leurs interactions d'origine, avec une hiérarchie mobile lisible. */
+.catalog-primary-actions{display:flex;gap:8px;margin:9px 0 12px}
+.catalog-primary-actions .btn{flex:1;min-width:0;white-space:normal;padding:10px 9px;line-height:1.25;min-height:44px}
+.catalog-search{margin:3px 0 12px}
+.catalog-help{margin:0 0 11px}
+.catalog-footer{margin:16px 2px 0;line-height:1.5}
+.catalog-independent{background:#f7f9f5;border:1px solid #e0e8df;border-radius:16px;margin:18px 0 11px;padding:0 12px 13px}
+.catalog-independent summary,.course-optional summary{display:flex;align-items:center;justify-content:space-between;gap:8px;cursor:pointer;list-style:none;font-size:13px;font-weight:790;color:#31543c;min-height:47px;line-height:1.35}
+.catalog-independent summary::-webkit-details-marker,.course-optional summary::-webkit-details-marker{display:none}
+.catalog-independent summary:after,.course-optional summary:after{content:"⌄";font-size:17px;margin-left:auto;color:#6e8371}
+.catalog-independent[open] summary:after,.course-optional[open] summary:after{transform:rotate(180deg)}
+.catalog-independent summary .pill,.course-optional summary .pill{margin-left:3px}
+.catalog-independent .helper,.course-optional .helper{margin:5px 0 10px;font-size:11px}
+.catalog-independent #productResults{margin-top:10px}
+.catalog-status{display:inline;font-size:10px;font-weight:800;padding:2px 5px;border-radius:5px}
+.catalog-status.linked{color:#276144;background:#e3f2e7}
+.catalog-status.unlinked{color:#9a6b26;background:#fff1d6}
+.ingredient-catalog-actions{max-width:94px}
+.ingredient-catalog-actions .btn{min-height:35px}
+.course-summary{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;margin:12px 0}
+.course-shop-count{padding:14px 12px;border-radius:15px;display:flex;flex-direction:column;gap:3px;border:1px solid #dee8eb;min-width:0}
+.course-shop-count strong{font-size:28px;line-height:1;font-weight:850;font-variant-numeric:tabular-nums}
+.course-shop-count span{font-size:11px;font-weight:760;line-height:1.3}
+.course-shop-count.carrefour{background:#eaf1fc;border-color:#dbe5f5;color:#285277}
+.course-shop-count.grand{background:#e8f5e4;border-color:#d1e9d0;color:#2b633f}
+.course-add-btn{min-height:45px;margin:3px 0 12px}
+.course-store{background:#fff;border:1px solid #e3eae0;border-radius:17px;padding:13px 11px;margin:15px 0 12px}
+.course-store.drive{border-top:3px solid #658ab8}
+.course-store.fresh{border-top:3px solid #71a276}
+.course-store-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:12px}
+.course-store-head h2{font-size:16px;line-height:1.2;margin:2px 0 0;color:var(--ink)}
+.course-store-head .pill{white-space:nowrap;font-size:10px}
+.course-store>.btn{margin-bottom:12px;min-height:43px}
+.course-empty{background:#f7f9f4;border-radius:11px;padding:12px;color:#718174;font-size:12px;line-height:1.4}
+.shopping-row.shopping-clean{padding:11px 9px;margin:7px 0;gap:9px;align-items:flex-start;border:1px solid #e2ebe1}
+.shopping-clean>.check{margin-top:3px}
+.shopping-clean .shopping-row-top{display:flex;align-items:baseline;justify-content:space-between;gap:8px}
+.shopping-clean .shopping-row-top strong{font-size:13px;line-height:1.35;flex:1;min-width:0;overflow-wrap:anywhere}
+.shopping-clean .shopping-qty{font-weight:830;font-size:12px;white-space:nowrap;color:#284d36}
+.shopping-clean .shopping-meta{font-size:10.5px;line-height:1.5;color:#728275;margin:4px 0 7px;overflow-wrap:anywhere}
+.shopping-controls{display:flex;gap:5px;align-items:center;flex-wrap:wrap}
+.shopping-controls .store-label{margin:0;font-size:10px}
+.shopping-controls .store-select{margin:0;min-height:34px;max-width:104px;padding:4px 5px;font-size:11px;flex:1}
+.shopping-controls .home-stock-btn,.shopping-controls .home-owned{display:inline-flex;align-items:center;justify-content:center;min-height:34px;margin:0;padding:5px 7px;font-size:10px;white-space:nowrap;text-align:center}
+.shopping-controls .home-stock-btn{background:#edf6ec;color:#366849}
+.shopping-controls .home-owned{border-color:#e7dfd5;background:#faf8f4;color:#88674f}
+.course-optional{background:#f7f9f6;border:1px solid #e5eae2;border-radius:14px;padding:0 12px 12px;margin:10px 0}
+.course-optional .favorites{margin:7px 0 0}
+.course-house-row{display:flex;align-items:center;gap:10px;justify-content:space-between;background:#fff;border:1px solid #e9eee6;border-radius:11px;padding:10px;margin:6px 0;font-size:12px}
+.course-house-row .grow{min-width:0;flex:1;overflow-wrap:anywhere}
+.course-house-row small{font-size:10px;color:#718171}
+.course-house-row .btn{flex-shrink:0;font-size:10px}
+@media(max-width:380px){
+ .catalog-primary-actions .btn{font-size:12px;padding:10px 7px}
+ .shopping-clean .shopping-controls{gap:5px}
+ .shopping-controls .store-select{max-width:95px}
+ .shopping-controls .home-stock-btn,.shopping-controls .home-owned{font-size:10px}
+}
+@supports (-webkit-touch-callout:none){
+ .shopping-controls .store-select{font-size:16px!important}
+}

@@ -24,7 +24,7 @@
   function extractProductInfo() {
     if (!productPage()) return null;
     const og = document.querySelector('meta[property="og:title"]')?.getAttribute('content') || '';
-    const title = (document.querySelector('h1')?.textContent?.trim() || og).replace(/\\s+(?:à|au)\\s+prix\\s+Carrefour.*$/i,'').slice(0,100).trim();
+    const title = (document.querySelector('h1')?.textContent?.trim() || og).replace(/\s+(?:à|au)\s+prix\s+Carrefour.*$/i,'').slice(0,100).trim();
     let brand='', packaging='';
     for(const el of [...document.querySelectorAll('script[type="application/ld+json"]')].slice(0,16)) {
       try {

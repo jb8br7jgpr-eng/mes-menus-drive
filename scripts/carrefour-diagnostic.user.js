@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Menus & Drive — Diagnostic Carrefour (lecture seule)
 // @namespace    https://github.com/jb8br7jgpr-eng/mes-menus-drive
-// @version      0.6.0
-// @description  Vérifie les références et offres Carrefour en lecture seule, sans modifier le panier.
+// @version      0.7.0
+// @description  Ouvre automatiquement la liste de courses transmise par l’app iPhone, sans modifier le panier.
 // @match        https://www.carrefour.fr/*
 // @match        https://carrefour.fr/*
 // @run-at       document-idle
@@ -102,7 +102,7 @@
     manualCopy.setAttribute('aria-label','Code du produit Carrefour à copier');
     manualCopy.style.cssText='width:100%;min-height:85px;border:1px solid #bfd4c4;border-radius:8px;padding:8px;font-size:12px;margin:7px 0;resize:none';
     const listBtn = document.createElement('button');
-    listBtn.type='button';listBtn.className='minor';listBtn.textContent='📋 Coller mes codes-barres';
+    listBtn.type='button';listBtn.className='minor';listBtn.textContent='📋 Coller mes codes-barres (secours)';
     const pasteField = document.createElement('textarea');
     pasteField.className='listArea';pasteField.hidden=true;
     pasteField.placeholder='Si Safari refuse le collage automatique : appui long ici → Coller';
@@ -323,6 +323,34 @@
       catch(e){listStatus.textContent='Collage automatique indisponible : appui long dans le champ, puis « Coller ».';pasteField.focus()}
     });
     pasteConfirm.addEventListener('click',()=>parseAndShow(pasteField.value));
+    // Transfert direct depuis la PWA iPhone par fragment URL : aucune dépendance
+    // aux permissions du presse-papiers et aucune donnée personnelle envoyée.
+    function loadDirectTransfer(){
+      const prefix='#md-drive-v1=';
+      if(!location.hash.startsWith(prefix))return false;
+      const encoded=location.hash.slice(prefix.length);
+      let imported=false;
+      try{
+        if(encoded.length>4000)throw Error('Lien trop long');
+        const text=decodeURIComponent(encoded);
+        imported=parseAndShow(text);
+      }catch(e){
+        listStatus.textContent='⚠️ Lien Menus & Drive non reconnu : '+String(e.message||'erreur');
+      }
+      // Effacer le fragment après consommation pour éviter de réimporter en rechargeant.
+      try{history.replaceState(null,'',location.pathname+location.search)}catch(e){}
+      panel.classList.add('open');
+      if(imported){
+        listStatus.textContent+=' · Import direct depuis ton appli ✓';
+        // Le clic "Ouvrir Carrefour avec ma liste" autorise la simple lecture de
+        // références, sans aucun ajout ni modification du vrai panier.
+        verifyBtn.click();
+      }else{
+        lookupStatus.textContent='Tu peux utiliser le bouton « Coller mes codes-barres (secours) ».';
+      }
+      return true;
+    }
+    window.addEventListener('hashchange',loadDirectTransfer);
     close.addEventListener('click', () => {
       panel.classList.remove('open');
       trigger.focus();
@@ -335,6 +363,7 @@
     });
     observer.observe(document.body,{childList:true,subtree:true});
     document.body.appendChild(host);
+    loadDirectTransfer();
   }
 
   if (document.body) boot();

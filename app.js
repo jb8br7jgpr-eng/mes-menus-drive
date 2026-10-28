@@ -98,8 +98,14 @@ function renderMenus(){const w=getWeek(),count=w.meals.filter(Boolean).length, l
   out+='<div class="week-control"><button class="icon-btn" aria-label="Semaine précédente" data-action="week-prev">‹</button><div class="week-label">Du '+niceDate(currentWeek)+' au '+niceDate(last)+(isThis?'<small>Cette semaine</small>':'<small>Planning personnalisé</small>')+'</div><button class="icon-btn" aria-label="Semaine suivante" data-action="week-next">›</button></div>';
   out+='<div class="status-bar"><span style="width:'+(count/14*100)+'%"></span></div>';
   out+='<div class="meal-list">';
-  for(let day=0;day<7;day++){const d=offsetDate(currentWeek,day);out+='<section class="day-card"><div class="day-title">'+days[day]+' <small>'+niceDate(d)+'</small></div><div class="day-meals">'+mealCard(w.meals[day*2],day*2)+mealCard(w.meals[day*2+1],day*2+1)+'</div></section>'}
-  out+='</div><div class="toolbar"><button class="btn secondary" data-action="generate-week">✦ Générer les 14 repas</button><button class="btn secondary" data-action="repeat-week">↻ Reprendre la semaine passée</button></div>';
+  for(let day=0;day<7;day++){
+   const d=offsetDate(currentWeek,day),hasMeals=Boolean(w.meals[day*2]||w.meals[day*2+1]);
+   out+='<section class="day-card"><div class="day-card-head"><div class="day-title">'+days[day]+' <small>'+niceDate(d)+'</small></div>'+
+   '<button class="day-clear-btn" data-action="clear-day" data-day="'+day+'" aria-label="Vider les repas du '+html(days[day])+'" '+(!hasMeals?'disabled':'')+'>✕ Vider le jour</button></div>'+
+   '<div class="day-meals">'+mealCard(w.meals[day*2],day*2)+mealCard(w.meals[day*2+1],day*2+1)+'</div></section>'
+  }
+  out+='</div><div class="toolbar"><button class="btn secondary" data-action="generate-week">✦ Générer les 14 repas</button><button class="btn secondary" data-action="repeat-week">↻ Reprendre la semaine passée</button></div>'+
+  '<button class="btn danger wide clear-week-btn" data-action="clear-week" '+(!count?'disabled':'')+'>🗑️ Vider tous les repas de cette semaine</button>';
   out+='<button class="btn wide" data-action="go-courses">Voir ma liste de courses →</button>';
   out+='<p class="helper">Choisis librement quand manger les restes : touche le repas souhaité, puis « Placer des restes ici ». La sélection indique les plats cuisinés et les portions encore disponibles. Aucun repas de restes n’est rempli automatiquement.</p>';
   return out
@@ -244,7 +250,7 @@ function productRows(){
   return list.map(p=>'<article class="product-card"><div class="product-symbol" aria-hidden="true">'+productBadge(p)+'</div><div class="grow"><h3>'+html(p.name)+'</h3><p>'+html([p.brand,p.packaging].filter(Boolean).join(' · ')||quantity(p.qty,p.unit))+'</p><span class="pill gray">'+html(p.category)+'</span> <span class="pill gray">'+((state.storePreferences?.['product:'+p.id]||p.store)==='grandfrais'?'🥬 Grand Frais':'🛒 Carrefour')+'</span>'+(p.url?'<div class="product-link"><a href="'+html(p.url)+'" target="_blank" rel="noopener noreferrer" aria-label="Voir '+html(p.name)+' sur Carrefour">Voir sur Carrefour ↗</a></div>':'')+'</div><div class="product-actions"><button class="icon-btn" data-action="edit-product" data-id="'+html(p.id)+'" aria-label="Modifier '+html(p.name)+'">✎</button><button class="btn tiny" data-action="add-catalog-product" data-id="'+html(p.id)+'" aria-label="Ajouter '+html(p.name)+' aux courses">＋ Courses</button></div></article>').join('')
 }
 function renderProduits(){
- let out=pageHeading('Bibliothèque partagée','Ma base d’ingrédients','Un seul ingrédient pour toutes vos recettes, puis une référence Carrefour si nécessaire.');
+ let out=pageHeading('Bibliothèque partagée','Mes produits','Les ingrédients des recettes se créent automatiquement ici, sans doublons, dans Carrefour ou Grand Frais.');
  out+='<div class="ingredient-tabs" role="group" aria-label="Magasin des ingrédients">'+
  '<button class="ingredient-tab '+(ingredientStoreTab==='carrefour'?'active':'')+'" data-action="ingredient-store-tab" data-store="carrefour">🛒 Carrefour</button>'+
  '<button class="ingredient-tab '+(ingredientStoreTab==='grandfrais'?'active':'')+'" data-action="ingredient-store-tab" data-store="grandfrais">🥬 Grand Frais</button></div>';
@@ -589,7 +595,7 @@ function ingredientRow(item={name:'',qty:'',unit:'g'}){
  '<input class="ingredient-qty" type="number" min=".01" step="any" placeholder="Qté" aria-label="Quantité dans cette recette" value="'+html(item.qty)+'">'+
  '<select class="ingredient-unit" aria-label="Unité">'+selectOptions(units,item.unit)+'</select>'+
  '<button type="button" class="icon-btn" aria-label="Retirer cet ingrédient" data-action="remove-ingredient">×</button></div>'+
- '<div class="ingredient-store-row"><label>Magasin habituel :</label><select class="ingredient-store" aria-label="Magasin habituel de cet ingrédient">'+
+ '<div class="ingredient-store-row"><label>Ajouter dans Produits :</label><select class="ingredient-store" aria-label="Magasin habituel de cet ingrédient">'+
  '<option value="carrefour" '+(store==='carrefour'?'selected':'')+'>🛒 Carrefour</option>'+
  '<option value="grandfrais" '+(store==='grandfrais'?'selected':'')+'>🥬 Grand Frais</option></select></div>'+
  '<p class="ingredient-link-note">'+(store==='grandfrais'?'Grand Frais : aucune fiche produit nécessaire.':
@@ -604,7 +610,7 @@ function recipeEditor(id){
  '<div class="field" style="width:115px"><label for="recipePeople">Portions de base</label><input id="recipePeople" type="number" min="1" max="30" required value="'+(r?.people||4)+'"></div></div>'+
  '<div class="field"><label for="recipePhoto">Photo (facultatif)</label><div class="image-input"><input id="recipePhoto" type="file" accept="image/*"><div class="helper">Photo conservée sur ce téléphone. Format allégé automatiquement.</div></div></div>'+
  '<div class="row between" style="margin:15px 0 8px"><h3>Ingrédients</h3></div>'+
- '<p class="helper">Commence à écrire un nom déjà enregistré pour réutiliser cet ingrédient. Sinon il sera créé une seule fois dans la base, dans le magasin sélectionné.</p>'+
+ '<div class="note ingredient-auto-note">✓ Chaque ingrédient sera automatiquement enregistré dans <strong>Produits → Carrefour ou Grand Frais</strong> lorsque tu enregistreras le plat. Si son nom existe déjà, sa fiche sera réutilisée, sans doublon.</div>'+
  '<datalist id="ingredientNames">'+(state.ingredientCatalog||[]).slice().sort((a,b)=>a.name.localeCompare(b.name,'fr')).map(x=>'<option value="'+html(x.name)+'"></option>').join('')+'</datalist>'+
  '<div id="ingredientRows">'+ingredients.map(ingredientRow).join('')+'</div>'+
  '<button id="addIngredientBottom" type="button" class="btn secondary wide ingredient-add-bottom" data-action="add-ingredient">＋ Ajouter un ingrédient</button>'+
@@ -726,6 +732,21 @@ function clearMealWithPair(w,index){
  if(index<0||index>=w.meals.length)return;
  w.meals[index]=null;reconcileLeftovers(w,index)
 }
+// On efface seulement le calendrier, jamais les recettes, les produits,
+// ni les ajouts manuels de courses. Les restes liés sont réconciliés.
+function clearCalendarDay(w,day){
+ if(!Number.isInteger(day)||day<0||day>6)return false;
+ const first=day*2;
+ if(!w.meals[first]&&!w.meals[first+1])return false;
+ clearMealWithPair(w,first);
+ clearMealWithPair(w,first+1);
+ return true
+}
+function clearCalendarWeek(w){
+ if(!w.meals.some(Boolean))return false;
+ w.meals=Array(14).fill(null);
+ return true
+}
 function setMealDishes(w,index,dishes){
  if(index<0||index>=w.meals.length)return;
  const clean=dishes.filter(d=>d&&recipeById(d.recipeId)&&Number.isInteger(Number(d.people))&&Number(d.people)>=1&&Number(d.people)<=30)
@@ -846,6 +867,19 @@ document.addEventListener('click',e=>{const tab=e.target.closest('[data-tab]');i
   else if(mode==='go-menus'){currentTab='menus';render()}
   else if(mode==='go-products'){currentTab='produits';render()}
   else if(mode==='week-prev'||mode==='week-next'){currentWeek=offsetDate(currentWeek,mode==='week-prev'?-7:7);render()}
+  else if(mode==='clear-day'){
+   const day=Number(a.dataset.day);
+   if(!Number.isInteger(day)||day<0||day>6||!w.meals[day*2]&&!w.meals[day*2+1])return;
+   if(!confirm('Vider les repas du '+days[day]+' (midi et soir) ? Les éventuels restes liés à ces plats seront aussi retirés. Les recettes et les produits resteront enregistrés.'))return;
+   checkpoint('Avant suppression des repas du '+days[day]);
+   clearCalendarDay(w,day);persist();render(true);toast('Repas du '+days[day]+' retirés !')
+  }
+  else if(mode==='clear-week'){
+   if(!w.meals.some(Boolean))return;
+   if(!confirm('Vider les 14 repas de la semaine du '+niceDate(currentWeek)+' ? Tu conserveras toutes tes recettes, tes produits et tes autres ajouts de courses.'))return;
+   checkpoint('Avant suppression des repas de toute la semaine');
+   clearCalendarWeek(w);persist();render();toast('Calendrier de la semaine vidé !')
+  }
   else if(mode==='pick-meal')pickMeal(index);
   else if(mode==='add-recipe')recipeEditor(null);
   else if(mode==='edit-recipe')recipeEditor(id);

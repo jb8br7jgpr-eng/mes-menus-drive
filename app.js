@@ -190,23 +190,21 @@ async function readCarrefourClipboard(){
 }
 function ingredientRowsCatalogue(){
  const filter=norm(productSearch);
- const list=(state.ingredientCatalog||[]).filter(x=>ingredientStore(x)===ingredientStoreTab&&norm(x.name).includes(filter))
-  .sort((a,b)=>a.name.localeCompare(b.name,'fr'));
- if(!list.length)return '<div class="note">Aucun ingrédient dans cette rubrique. Ajoute-en un ou enregistre une recette : un nom n’est enregistré qu’une fois.</div>';
+ const list=(state.ingredientCatalog||[]).filter(x=>ingredientStore(x)===ingredientStoreTab&&norm(x.name).includes(filter)).sort((a,b)=>a.name.localeCompare(b.name,'fr'));
+ if(!list.length)return '<div class="note">'+(filter?'Aucun ingrédient trouvé. Essaie un autre nom.':'Aucun ingrédient pour ce magasin. Les ingrédients des recettes y seront ajoutés automatiquement.')+'</div>';
  return list.map(x=>{
   const p=productById(x.productId),isDrive=ingredientStoreTab==='carrefour';
   let details='';
   if(isDrive){
    if(p){
-    details='🛒 '+html(p.name)+' · '+html([p.brand,p.packaging].filter(Boolean).join(' · '));
-    if(p.packAmount>0)details+=' · <strong>1 emballage = '+html(quantity(p.packAmount,p.packUnit))+'</strong>';
+    details='<span class="catalog-status linked">✓ Référence liée</span> '+html(p.name);
+    if(p.packAmount>0)details+=' · '+html(quantity(p.packAmount,p.packUnit))+' / paquet';
     else details+=' · <span class="ingredient-warning">Contenu du paquet à préciser</span>';
-    if(p.ean)details+=' · EAN '+html(p.ean)
-   }else details='<span class="ingredient-warning">Produit Carrefour à associer pour le transfert automatique</span>';
-  }else details='🥬 Achat chez Grand Frais · aucun lien nécessaire';
+    if(!p.ean)details+=' · <span class="ingredient-warning">EAN à vérifier</span>';
+   }else details='<span class="catalog-status unlinked">À associer à Carrefour</span>';
+  }else details='Pour votre liste Grand Frais · aucune référence nécessaire';
   return '<article class="ingredient-catalog-card"><div class="grow"><strong>'+html(x.name)+'</strong><div class="ingredient-catalog-details">'+details+'</div></div>'+
-   '<div class="ingredient-catalog-actions"><button class="btn tiny secondary" data-action="edit-ingredient" data-id="'+html(x.id)+'">Modifier</button>'+
-   (isDrive&&p?'<button class="btn tiny ghost" data-action="edit-product" data-id="'+html(p.id)+'">Produit Carrefour</button>':'')+'</div></article>'
+   '<div class="ingredient-catalog-actions"><button class="btn tiny secondary" data-action="edit-ingredient" data-id="'+html(x.id)+'" aria-label="Gérer la fiche '+html(x.name)+'">Gérer</button></div></article>'
  }).join('')
 }
 function ingredientEditor(id,draftName=''){
@@ -255,29 +253,43 @@ function saveCatalogIngredient(e){
  ingredientStoreTab=store;persist();closeModal();render();toast('Ingrédient enregistré dans la base !')
 }
 function productBadge(p){return (p.category==='Hygiène'?'🧴':p.category==='Maison'?'🧻':p.category==='Fruits et légumes'?'🥕':p.category==='Produits frais'?'🥛':p.category==='Viandes et poissons'?'🥩':'🛍️')}
+// Les références déjà liées à un ingrédient apparaissent uniquement
+// sur sa fiche, jamais une seconde fois dans les articles indépendants.
+function independentProducts(store=ingredientStoreTab){
+ const linked=new Set((state.ingredientCatalog||[]).map(i=>i.productId).filter(Boolean));
+ return (state.products||[]).filter(p=>!linked.has(p.id)&&
+  (state.storePreferences?.['product:'+p.id]||p.store||'carrefour')===store)
+}
 function productRows(){
-  const list=(state.products||[]).filter(p=>(state.storePreferences?.['product:'+p.id]||p.store||'carrefour')==='carrefour'&&(productCategory==='Toutes'||p.category===productCategory)&&[p.name,p.brand,p.packaging].some(v=>norm(v).includes(norm(productSearch)))).sort((a,b)=>a.name.localeCompare(b.name,'fr'));
-  if(!list.length)return emptyView('🛍️',state.products.length?'Aucun produit trouvé':'Votre catalogue est vide',state.products.length?'Essaie une autre recherche.':'Ajoute vos articles préférés pour les retrouver en un clic.','<button class="btn" data-action="add-product">＋ Ajouter un produit</button>');
-  return list.map(p=>'<article class="product-card"><div class="product-symbol" aria-hidden="true">'+productBadge(p)+'</div><div class="grow"><h3>'+html(p.name)+'</h3><p>'+html([p.brand,p.packaging].filter(Boolean).join(' · ')||quantity(p.qty,p.unit))+'</p><span class="pill gray">'+html(p.category)+'</span> <span class="pill gray">'+((state.storePreferences?.['product:'+p.id]||p.store)==='grandfrais'?'🥬 Grand Frais':'🛒 Carrefour')+'</span>'+(p.url?'<div class="product-link"><a href="'+html(p.url)+'" target="_blank" rel="noopener noreferrer" aria-label="Voir '+html(p.name)+' sur Carrefour">Voir sur Carrefour ↗</a></div>':'')+'</div><div class="product-actions"><button class="icon-btn" data-action="edit-product" data-id="'+html(p.id)+'" aria-label="Modifier '+html(p.name)+'">✎</button><button class="btn tiny" data-action="add-catalog-product" data-id="'+html(p.id)+'" aria-label="Ajouter '+html(p.name)+' aux courses">＋ Courses</button></div></article>').join('')
+ const filter=norm(productSearch);
+ const list=independentProducts().filter(p=>[p.name,p.brand,p.packaging].some(v=>norm(v).includes(filter))).sort((a,b)=>a.name.localeCompare(b.name,'fr'));
+ if(!list.length)return '<div class="note">'+(filter?'Aucun article indépendant pour cette recherche.':'Aucun article indépendant pour ce magasin.')+'</div>';
+ return list.map(p=>'<article class="product-card"><div class="product-symbol" aria-hidden="true">'+productBadge(p)+'</div><div class="grow"><h3>'+html(p.name)+'</h3><p>'+html([p.brand,p.packaging].filter(Boolean).join(' · ')||quantity(p.qty,p.unit))+'</p>'+
+ (p.url&&ingredientStoreTab==='carrefour'?'<div class="product-link"><a href="'+html(p.url)+'" target="_blank" rel="noopener noreferrer">Voir sur Carrefour ↗</a></div>':'')+'</div>'+
+ '<div class="product-actions"><button class="btn tiny secondary" data-action="edit-product" data-id="'+html(p.id)+'" aria-label="Modifier '+html(p.name)+'">Modifier</button>'+
+ '<button class="btn tiny" data-action="add-catalog-product" data-id="'+html(p.id)+'" aria-label="Ajouter '+html(p.name)+' aux courses">＋ Courses</button></div></article>').join('')
 }
 function renderProduits(){
- let out=pageHeading('Bibliothèque partagée','Mes produits','Les ingrédients des recettes se créent automatiquement ici, sans doublons, dans Carrefour ou Grand Frais.');
- out+='<div class="ingredient-tabs" role="group" aria-label="Magasin des ingrédients">'+
- '<button class="ingredient-tab '+(ingredientStoreTab==='carrefour'?'active':'')+'" data-action="ingredient-store-tab" data-store="carrefour">🛒 Carrefour</button>'+
- '<button class="ingredient-tab '+(ingredientStoreTab==='grandfrais'?'active':'')+'" data-action="ingredient-store-tab" data-store="grandfrais">🥬 Grand Frais</button></div>';
- out+='<div class="toolbar"><button class="btn wide" data-action="add-catalog-ingredient">＋ Ajouter un ingrédient</button>'+
- (ingredientStoreTab==='carrefour'?'<button class="btn secondary" data-action="add-product">＋ Produit Carrefour</button>':'')+'</div>';
- out+='<div class="field"><input class="text-input" id="productSearch" value="'+html(productSearch)+'" placeholder="⌕ Rechercher un ingrédient ou un produit…" aria-label="Rechercher dans la base"></div>';
- out+='<div class="section-head"><h2>Vos ingrédients · '+(ingredientStoreTab==='carrefour'?'Carrefour':'Grand Frais')+'</h2><span class="pill">'+state.ingredientCatalog.filter(i=>ingredientStore(i)===ingredientStoreTab).length+'</span></div>';
- out+='<div id="ingredientCatalogResults">'+ingredientRowsCatalogue()+'</div>';
- if(ingredientStoreTab==='carrefour'){
-  out+='<div class="card soft" style="margin:18px 0 10px"><strong>📦 Comprendre les quantités</strong><p class="subtext">Exemple : 350 g de chorizo nécessaires dans plusieurs plats et un paquet Carrefour de 200 g → 2 paquets au Drive. Pense à renseigner le contenu de l’emballage.</p></div>';
-  out+='<div class="card soft"><strong>📲 Importer depuis Carrefour</strong><p class="subtext">Sur Carrefour.fr, touche le bouton vert « ➕ Mes produits » puis « Copier pour mon appli ». Ici, colle le produit et associe ensuite cette fiche à ton ingrédient.</p><button class="btn wide" data-action="open-carrefour-import" style="margin:8px 0">📋 Coller un produit Carrefour</button><a href="https://www.carrefour.fr/" target="_blank" rel="noopener noreferrer" class="btn secondary wide">Ouvrir Carrefour.fr ↗</a></div>';
-  out+='<div class="section-head"><h2>Références et produits habituels</h2><span class="pill">'+state.products.filter(p=>(state.storePreferences?.['product:'+p.id]||p.store||'carrefour')==='carrefour').length+'</span></div>';
-  out+='<div class="chip-row" aria-label="Filtrer les produits par catégorie">'+['Toutes',...productCategories].map(x=>'<button class="chip'+(productCategory===x?' active':'')+'" data-action="filter-products" data-category="'+html(x)+'">'+html(x)+'</button>').join('')+'</div>';
-  out+='<div id="productResults">'+productRows()+'</div>';
- }else{
-  out+='<div class="note" style="margin-top:14px">Pour Grand Frais, pas besoin de lien Internet ni de code-barres. Les quantités des recettes seront simplement additionnées sur ta liste à copier dans Notes.</div>';
+ const isCarrefour=ingredientStoreTab==='carrefour',
+  total=state.ingredientCatalog.filter(i=>ingredientStore(i)===ingredientStoreTab).length,
+  independent=independentProducts().length;
+ let out=pageHeading('Bibliothèque permanente','Mes produits','Enregistre chaque ingrédient une seule fois. Les quantités à acheter se gèrent dans Courses.');
+ out+='<div class="ingredient-tabs" role="group" aria-label="Choisir un magasin">'+
+ '<button class="ingredient-tab '+(isCarrefour?'active':'')+'" data-action="ingredient-store-tab" data-store="carrefour">🛒 Carrefour</button>'+
+ '<button class="ingredient-tab '+(!isCarrefour?'active':'')+'" data-action="ingredient-store-tab" data-store="grandfrais">🥬 Grand Frais</button></div>';
+ out+='<div class="catalog-primary-actions">'+
+ '<button class="btn" data-action="add-catalog-ingredient">＋ Ingrédient</button>'+
+ (isCarrefour?'<button class="btn secondary" data-action="open-carrefour-import">📋 Importer Carrefour</button>':'')+'</div>';
+ out+='<div class="field catalog-search"><input class="text-input" id="productSearch" value="'+html(productSearch)+'" placeholder="⌕ Chercher dans ce magasin…" aria-label="Rechercher un ingrédient ou un article"></div>';
+ out+='<div class="section-head"><h2>Ingrédients</h2><span class="pill">'+total+'</span></div>'+
+ '<p class="helper catalog-help">'+(isCarrefour?'Associe une référence Carrefour une seule fois à chaque ingrédient.':'Aucun lien ni code-barres nécessaire pour Grand Frais.')+'</p>'+
+ '<div id="ingredientCatalogResults">'+ingredientRowsCatalogue()+'</div>';
+ out+='<details class="catalog-independent" '+(productSearch?'open':'')+'><summary>Articles indépendants <span class="pill gray">'+independent+'</span></summary>'+
+ '<p class="helper">Produits sans recette associée : boissons, entretien, produits habituels… Une référence déjà liée à un ingrédient ne s’affiche pas ici.</p>'+
+ '<button class="btn secondary wide" data-action="add-product">＋ Ajouter un article indépendant</button>'+
+ '<div id="productResults">'+productRows()+'</div></details>';
+ if(isCarrefour){
+  out+='<p class="helper catalog-footer">Import Carrefour inchangé : copie une référence depuis Carrefour.fr, puis utilise « Importer Carrefour » ci-dessus. Tu peux aussi importer depuis la fiche de chaque ingrédient.</p>';
  }
  return out
 }

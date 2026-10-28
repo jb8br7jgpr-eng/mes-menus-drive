@@ -504,47 +504,74 @@ function homeStockModal(itemId){
 }
 function shoppingRow(x){
  const p=productById(x.productId);
- return '<div class="shopping-row'+(x.checked?' checked':'')+'">'+
- '<input class="check" type="checkbox" data-check="'+html(x.id)+'" '+(x.checked?'checked':'')+' aria-label="Cocher '+html(x.name)+'">'+
- '<div class="grow"><div class="shopping-name">'+html(x.name)+'</div>'+
- '<div class="shopping-meta">'+(x.grossNeeded?'Besoin total : '+html(x.grossNeeded)+' · ':'')+(x.needed?'Encore nécessaire : '+html(x.needed)+' · ':'')+html(x.source.join(' + '))+
- (p?' · '+html([p.brand,p.packaging].filter(Boolean).join(' · ')):'')+
- (p?.url&&x.store==='carrefour'?' · <a href="'+html(p.url)+'" target="_blank" rel="noopener noreferrer">Carrefour ↗</a>':'')+
- '</div><button class="home-stock-btn" data-action="home-stock" data-id="'+html(x.id)+'">🏠 Stock : '+html(quantity(x.stockAmount,x.stockUnit))+' · Modifier</button><label class="store-label" for="store-'+encodeURIComponent(x.id)+'">Magasin :</label>'+
- '<select class="store-select" id="store-'+encodeURIComponent(x.id)+'" data-store-item="'+html(x.id)+'" aria-label="Magasin pour '+html(x.name)+'">'+
- '<option value="carrefour" '+(x.store==='carrefour'?'selected':'')+'>🛒 Carrefour Drive</option>'+
- '<option value="grandfrais" '+(x.store==='grandfrais'?'selected':'')+'>🥬 Grand Frais</option></select>'+ 
- '<button class="home-owned" data-action="exclude" data-id="'+html(x.id)+'" title="Retirer des achats, sans supprimer la recette ni le produit">🏠 Déjà chez nous · Retirer</button></div>'+
- '<div class="shopping-qty">'+html(quantity(x.qty,x.unit))+'</div></div>'
+ const stock=x.stockAmount>0;
+ let detail='';
+ if(x.grossNeeded){
+  detail='Besoin : '+html(x.grossNeeded);
+  if(stock)detail+=' · Maison : '+html(quantity(x.stockAmount,x.stockUnit));
+  if(x.needed&&stock)detail+=' · Reste : '+html(x.needed);
+ }else{
+  detail=html(x.source.join(' + '));
+  if(stock)detail+=' · Stock : '+html(quantity(x.stockAmount,x.stockUnit));
+ }
+ if(p?.packaging)detail+=' · '+html(p.packaging);
+ return '<div class="shopping-row shopping-clean'+(x.checked?' checked':'')+'">'+
+ '<input class="check" type="checkbox" data-check="'+html(x.id)+'" '+(x.checked?'checked':'')+' aria-label="Marquer '+html(x.name)+' comme acheté">'+
+ '<div class="grow"><div class="shopping-row-top"><strong class="shopping-name">'+html(x.name)+'</strong><span class="shopping-qty">'+html(quantity(x.qty,x.unit))+'</span></div>'+
+ '<div class="shopping-meta">'+detail+'</div>'+
+ '<div class="shopping-controls"><label class="store-label" for="store-'+encodeURIComponent(x.id)+'">Magasin</label>'+
+ '<select class="store-select" id="store-'+encodeURIComponent(x.id)+'" data-store-item="'+html(x.id)+'" aria-label="Changer le magasin de '+html(x.name)+'">'+
+ '<option value="carrefour" '+(x.store==='carrefour'?'selected':'')+'>Carrefour</option>'+
+ '<option value="grandfrais" '+(x.store==='grandfrais'?'selected':'')+'>Grand Frais</option></select>'+
+ '<button class="home-stock-btn" data-action="home-stock" data-id="'+html(x.id)+'">'+(stock?'🏠 Stock : '+html(quantity(x.stockAmount,x.stockUnit)):'🏠 Stock')+'</button>'+
+ '<button class="home-owned" data-action="exclude" data-id="'+html(x.id)+'" title="Ne pas acheter cette semaine">Retirer</button></div></div></div>'
 }
 function renderCourses(){
- const items=shopping(),available=items.filter(x=>!x.excluded&&!x.covered),excluded=items.filter(x=>x.excluded),covered=items.filter(x=>x.covered&&!x.excluded),left=available.filter(x=>!x.checked),w=getWeek();
- const grand=available.filter(x=>x.store==='grandfrais'),drive=available.filter(x=>x.store==='carrefour');
- const todoGrand=grand.filter(x=>!x.checked).length,todoDrive=drive.filter(x=>!x.checked).length;
- let out=pageHeading('Liste intelligente','Mes courses','Deux magasins, une seule liste : choisis où acheter chaque produit.');
- out+='<div class="card soft"><div class="row between"><div><div class="eyebrow">À acheter</div><h1 style="margin:3px 0 0">'+left.length+' <span style="font-size:15px;color:#6f8174">produit'+(left.length!==1?'s':'')+'</span></h1></div><span style="font-size:35px">🛒</span></div><p class="subtext">Par défaut, les fruits/légumes et viandes non liés à un produit Carrefour vont chez Grand Frais. Change le magasin sur chaque ligne ; ton choix est mémorisé.</p></div>';
- out+='<div class="toolbar"><button class="btn" data-action="add-extra">＋ Ajouter un produit</button><button class="btn secondary" data-action="copy-list">⧉ Tout copier</button></div><button class="btn ghost" data-action="go-products">Voir mes produits habituels →</button>';
- if(state.staples.length)out+='<div class="section-head"><h2>Vos favoris</h2><span class="subtext">Appuyer pour ajouter</span></div><div class="favorites">'+state.staples.map(x=>'<button class="favorite-chip" data-action="quick-staple" data-id="'+x.id+'">＋ '+html(x.name)+'</button>').join('')+'</div>';
+ const items=shopping(),w=getWeek();
+ const active=items.filter(x=>!x.excluded&&!x.covered&&!x.checked),
+  checked=items.filter(x=>x.checked&&!x.excluded&&!x.covered),
+  excluded=items.filter(x=>x.excluded),
+  covered=items.filter(x=>x.covered&&!x.excluded),
+  carrefour=active.filter(x=>x.store==='carrefour'),
+  grand=active.filter(x=>x.store==='grandfrais');
  const order=['Fruits et légumes','Viandes et poissons','Produits frais','Épicerie et divers','Hygiène et maison'];
- function section(store,title,emoji,count,rows){
-  let htmlSection='<div class="shop-heading '+(store==='grandfrais'?'fresh':'')+'"><span>'+emoji+' '+title+'</span><span class="pill">'+count+' à acheter</span></div>';
-  htmlSection+='<p class="helper">'+(store==='carrefour'?'Seuls ces produits sont envoyés au panier automatique Carrefour.':'Ces produits ne sont jamais envoyés au Drive. Copie-les directement dans Notes.')+'</p>';
-  if(store==='grandfrais')htmlSection+='<button class="btn wide" data-action="copy-grand-frais" '+(!count?'disabled':'')+'>📋 Copier la liste Grand Frais pour Notes</button>';
-  else htmlSection+='<button class="btn secondary wide" data-action="go-drive" '+(!count?'disabled':'')+'>🛒 Préparer le panier Carrefour</button>';
-  if(rows.length){
-   for(const cat of order){
-    const selected=rows.filter(x=>x.category===cat);
-    if(selected.length)htmlSection+='<div class="shopping-category">'+cat+'</div>'+selected.map(shoppingRow).join('')
-   }
-  }else htmlSection+='<div class="note">Aucun produit affecté à ce magasin pour le moment.</div>';
-  return htmlSection
+ let out=pageHeading('Achats de la semaine','Mes courses','Les quantités sont calculées depuis vos repas. Ici, prépare uniquement ce qu’il reste à acheter.');
+ out+='<div class="course-summary"><div class="course-shop-count carrefour"><strong>'+carrefour.length+'</strong><span>🛒 Carrefour Drive</span></div>'+
+ '<div class="course-shop-count grand"><strong>'+grand.length+'</strong><span>🥬 Grand Frais</span></div></div>';
+ out+='<button class="btn wide course-add-btn" data-action="add-extra">＋ Ajouter un article à cette semaine</button>';
+ if(state.staples.length){
+  out+='<details class="course-optional"><summary>☆ Ajouter depuis mes favoris <span class="pill gray">'+state.staples.length+'</span></summary>'+
+   '<div class="favorites">'+state.staples.map(x=>'<button class="favorite-chip" data-action="quick-staple" data-id="'+html(x.id)+'">＋ '+html(x.name)+'</button>').join('')+'</div></details>'
  }
- out+=section('carrefour','Carrefour Drive','🛒',todoDrive,drive);
- out+=section('grandfrais','Grand Frais','🥬',todoGrand,grand);
- if(covered.length)out+='<div class="section-head"><h2>🏠 Couvert par le stock maison</h2><span class="pill gray">'+covered.length+'</span></div>'+
- covered.map(x=>'<div class="shopping-row"><span class="grow">'+html(x.name)+' · '+html(quantity(x.stockAmount,x.stockUnit))+' disponible</span><button class="btn tiny secondary" data-action="home-stock" data-id="'+html(x.id)+'">Modifier</button></div>').join('');
- if(excluded.length)out+='<div class="section-head"><h2>Déjà à la maison · retirés des achats</h2><span class="pill gray">'+excluded.length+'</span></div>'+excluded.map(x=>'<div class="shopping-row"><span class="grow muted">'+html(x.name)+' · '+html(quantity(x.qty,x.unit))+'</span><button class="btn tiny secondary" data-action="include" data-id="'+html(x.id)+'">Réintégrer</button></div>').join('');
- if(w.extras.length)out+='<div class="section-head"><h2>Produits ajoutés cette semaine</h2></div>'+w.extras.map(x=>'<div class="shopping-row"><span class="grow shopping-name">'+html(x.name)+'</span><span class="shopping-qty">'+html(quantity(x.qty,x.unit))+'</span><button class="icon-btn" data-action="delete-extra" data-id="'+x.id+'" aria-label="Supprimer">×</button></div>').join('');
+ function section(store,title,icon,rows){
+  const isDrive=store==='carrefour';
+  let section='<section class="course-store '+(isDrive?'drive':'fresh')+'"><div class="course-store-head"><div><div class="eyebrow">À acheter</div><h2>'+icon+' '+title+'</h2></div><span class="pill">'+rows.length+' article'+(rows.length===1?'':'s')+'</span></div>';
+  section+='<button class="btn '+(isDrive?'secondary':'')+' wide" data-action="'+(isDrive?'go-drive':'copy-grand-frais')+'" '+(!rows.length?'disabled':'')+'>'+
+   (isDrive?'🛒 Préparer mon panier Carrefour':'📋 Copier Grand Frais dans Notes')+'</button>';
+  if(rows.length){
+   if(rows.length>=6){
+    for(const cat of order){const filtered=rows.filter(x=>x.category===cat);if(filtered.length)section+='<div class="shopping-category">'+cat+'</div>'+filtered.map(shoppingRow).join('')}
+    const other=rows.filter(x=>!order.includes(x.category));if(other.length)section+=other.map(shoppingRow).join('')
+   }else section+=rows.map(shoppingRow).join('');
+  }else section+='<div class="course-empty">Aucun achat prévu dans ce magasin.</div>';
+  return section+'</section>'
+ }
+ out+=section('carrefour','Carrefour Drive','🛒',carrefour);
+ out+=section('grandfrais','Grand Frais','🥬',grand);
+ if(checked.length)out+='<details class="course-optional"><summary>✓ Articles cochés <span class="pill gray">'+checked.length+'</span></summary>'+
+  '<p class="helper">Décoche un article pour le remettre dans les achats.</p>'+checked.map(shoppingRow).join('')+'</details>';
+ if(covered.length||excluded.length){
+  out+='<details class="course-optional"><summary>🏠 Déjà chez nous / retirés <span class="pill gray">'+(covered.length+excluded.length)+'</span></summary>'+
+   (covered.length?'<p class="helper">Couverts par votre stock : corrige la quantité si nécessaire.</p>'+
+     covered.map(x=>'<div class="course-house-row"><span class="grow"><strong>'+html(x.name)+'</strong><small> · '+html(quantity(x.stockAmount,x.stockUnit))+' disponible</small></span><button class="btn tiny secondary" data-action="home-stock" data-id="'+html(x.id)+'">Modifier le stock</button></div>').join(''):'')+
+   (excluded.length?'<p class="helper">Retirés manuellement des achats de cette semaine.</p>'+
+     excluded.map(x=>'<div class="course-house-row"><span class="grow">'+html(x.name)+'</span><button class="btn tiny secondary" data-action="include" data-id="'+html(x.id)+'">Réintégrer</button></div>').join(''):'')+'</details>'
+ }
+ if(w.extras.length){
+  out+='<details class="course-optional"><summary>Gérer les ajouts manuels <span class="pill gray">'+w.extras.length+'</span></summary>'+
+   '<p class="helper">Ces articles figurent déjà dans les magasins ci-dessus. Ici, tu peux supprimer uniquement leur ajout manuel.</p>'+
+   w.extras.map(x=>'<div class="course-house-row"><span class="grow">'+html(x.name)+' · '+html(quantity(x.qty,x.unit))+'</span><button class="btn tiny secondary" data-action="delete-extra" data-id="'+html(x.id)+'" aria-label="Supprimer l’ajout manuel">Supprimer</button></div>').join('')+'</details>'
+ }
  return out
 }
 function grandFraisText(){

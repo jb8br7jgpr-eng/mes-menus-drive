@@ -993,31 +993,41 @@ async function copyDriveTransfer(){
  try{await navigator.clipboard.writeText(text);toast('Codes et quantités copiés ! Ouvre Carrefour dans Safari.')}
  catch(e){toast('Utilise le champ de copie manuelle.');$('#driveTransferFallback')?.focus()}
 }
-function renderDrive(){const items=shopping().filter(x=>!x.checked&&!x.excluded&&!x.covered&&x.store==='carrefour'),grandFraisCount=shopping().filter(x=>!x.checked&&!x.excluded&&!x.covered&&x.store==='grandfrais').length,transfers=driveTransferRows(),ready=transfers.filter(x=>x.ready),directUrl=driveDirectUrl();
- let out=pageHeading('Carrefour École-Valentin','Mon Drive','Prépare les références et les quantités pour ton Carrefour Drive.');
+function renderDrive(){
+ const items=shopping().filter(x=>!x.checked&&!x.excluded&&!x.covered&&x.store==='carrefour'),
+  transfers=driveTransferRows(),ready=transfers.filter(x=>x.ready),missing=transfers.filter(x=>!x.ready),url=driveDirectUrl();
+ let out=pageHeading('Carrefour École-Valentin','Mon Drive','Vérifie les références puis prépare ton panier Carrefour.');
  out+=weekSwitcher()+courseGenerationBanner(getWeek(),'drive');
- out+='<div class="card"><div class="drive-illustration">🛍️</div><div class="row between"><h2>'+items.length+' produit'+(items.length!==1?'s':'')+' à acheter</h2><span class="pill">Drive favori</span></div><p class="subtext">Carrefour Besançon-Valentin · École-Valentin (à vérifier sur Carrefour.fr)</p><div class="divider"></div>';
- out+='<p class="subtext">Contrôle avant Drive : '+ready.length+' référence'+(ready.length!==1?'s':'')+' prête'+(ready.length!==1?'s':'')+' · '+(transfers.length-ready.length)+' à compléter.</p>';
- if(transfers.some(x=>!x.ready)){
-  out+='<div class="drive-preflight"><strong>⚠️ Références à compléter avant Carrefour</strong><p class="helper">Ces produits ne seront pas envoyés automatiquement tant que leur fiche n’est pas prête.</p>';
-  for(const item of transfers.filter(x=>!x.ready)){
-   out+='<div class="drive-preflight-item"><div class="grow"><strong>'+html(item.name)+'</strong><p>'+html(item.reason)+'</p></div>'+
-    '<button class="btn tiny secondary" data-action="fix-drive-item" data-id="'+html(item.id)+'">Compléter</button></div>'
-  }
-  out+='</div>'
+ out+='<div class="drive-v29-summary"><div class="drive-v29-head"><div><small>Préparation du panier</small>'+
+  '<h2>🛒 Carrefour Drive</h2></div><span class="pill">'+items.length+' article'+(items.length!==1?'s':'')+'</span></div>'+
+  '<div class="drive-v29-stats"><div class="drive-stat-ready"><strong>'+ready.length+'</strong><span>✓ Prêts</span></div>'+
+  '<div class="'+(missing.length?'drive-stat-missing':'drive-stat-clear')+'"><strong>'+missing.length+'</strong><span>À compléter</span></div></div>'+
+  '<p class="helper">Drive choisi : Carrefour Besançon-Valentin · à vérifier sur Carrefour.fr. Le transfert n’effectue jamais de paiement.</p>'+
+  '<button class="btn wide drive-v29-primary" data-action="open-drive-in-safari" '+(!url?'disabled':'')+'>🛒 Constituer mon panier Carrefour</button>'+
+  (items.length&&!url?'<p class="helper">Le transfert direct nécessite au moins une référence prête et une liste compatible avec Safari.</p>':'')+
+  '</div>';
+ if(missing.length){
+  out+='<details class="drive-v29-details drive-v29-warnings" open><summary>⚠️ '+missing.length+' référence'+(missing.length>1?'s':'')+' à compléter</summary>'+
+  '<div class="drive-v29-details-body"><p class="helper">Ces produits ne seront pas ajoutés automatiquement au panier.</p>'+
+  missing.map(x=>'<div class="drive-preflight-item"><div class="grow"><strong>'+html(x.name)+'</strong><p>'+html(x.reason)+'</p></div>'+
+    '<button class="btn tiny secondary" data-action="fix-drive-item" data-id="'+html(x.id)+'">Compléter</button></div>').join('')+
+  '</div></details>';
  }else if(transfers.length){
-  out+='<div class="drive-ready">✅ Toutes les références sélectionnées sont prêtes pour la vérification de disponibilité Carrefour.</div>'
+  out+='<p class="drive-v29-complete">✓ Toutes les références sélectionnées sont prêtes pour la vérification Carrefour.</p>'
  }
- out+=directUrl?'<button class="btn wide" data-action="open-drive-in-safari">🛒 Constituer mon panier Carrefour</button>':'<button class="btn wide" disabled>🛒 Constituer mon panier Carrefour</button>';
- out+='<button class="btn secondary wide" style="margin-top:9px" data-action="prepare-drive-transfer" '+(!items.length?'disabled':'')+'>📋 Détails et copie de secours</button>';
- // La copie de Grand Frais reste dans Courses : ce panneau est exclusivement dédié à Carrefour.
- out+='<a class="btn secondary wide" style="margin-top:9px" href="https://www.carrefour.fr/" target="_blank" rel="noopener noreferrer">Ouvrir Carrefour ↗</a></div>';
- out+='<div class="note" style="margin-top:16px"><strong>Ce panneau est réservé à Carrefour.</strong> La liste Grand Frais est à copier dans l’onglet Courses. <strong>Ajout au panier réel — test.</strong> En appuyant sur le bouton principal, tu autorises Userscripts à ajouter les produits confirmés disponibles au panier Carrefour actif. Les absents seront signalés. Aucun paiement ni commande automatique. Vérifie le Drive École-Valentin avant de continuer.</div>';
- out+='<div class="section-head"><h2>Ta liste à préparer</h2></div>';
- out+=items.length?'<div class="card">'+items.map(x=>'<div class="row between" style="padding:8px 0;border-bottom:1px solid #eef1ea"><span class="grow" style="font-size:13px">'+html(x.name)+(x.needed?' <small class="muted">(besoin : '+html(x.needed)+')</small>':'')+(productById(x.productId)?.url?'<br><a href="'+html(productById(x.productId).url)+'" target="_blank" rel="noopener noreferrer" style="font-size:11px">Voir sur Carrefour ↗</a>':'')+'</span><strong style="font-size:12px">'+html(quantity(x.qty,x.unit))+'</strong></div>').join('')+'</div>':emptyView('🥬','Aucun produit au Drive',grandFraisCount?'Tous les achats de cette liste sont prévus chez Grand Frais. Tu peux copier cette liste dans Notes.':'Remplis ton planning et ta liste de courses.','<button class="btn" data-action="go-courses">Voir mes deux listes de courses</button>');
+ out+='<details class="drive-v29-details"><summary>Voir mes '+items.length+' article'+(items.length!==1?'s':'')+' Carrefour</summary>'+
+  '<div class="drive-v29-details-body">'+
+  (items.length?items.map(x=>'<div class="drive-v29-item"><span>'+html(x.name)+'</span><strong>'+html(quantity(x.qty,x.unit))+'</strong></div>').join(''):
+   '<p class="helper">Aucun article prévu chez Carrefour pour cette semaine.</p>')+
+  '</div></details>';
+ out+='<details class="drive-v29-details"><summary>Options de secours et vérification</summary>'+
+  '<div class="drive-v29-details-body"><p class="helper">Si Safari ne s’ouvre pas ou qu’un produit est indisponible, retrouve ici les codes-barres, la copie manuelle et les informations nécessaires.</p>'+
+  '<button class="btn secondary wide" data-action="prepare-drive-transfer" '+(!items.length?'disabled':'')+'>📋 Détails et copie de secours</button>'+
+  '<a class="btn secondary wide" style="margin-top:9px" href="https://www.carrefour.fr/" target="_blank" rel="noopener noreferrer">Ouvrir Carrefour ↗</a>'+
+  '</div></details>';
+ out+='<p class="helper drive-v29-footer">La liste des courses reste dans Courses. Ici, seules les références Carrefour prêtes sont transmises à Safari via Userscripts. Vérifie le magasin et le panier avant de poursuivre.</p>';
  return out
 }
-
 function showModal(title,body){modalRoot.innerHTML='<div class="modal-overlay" data-overlay="true"><div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle"><div class="modal-head"><h2 id="modalTitle">'+title+'</h2><button class="close-btn" aria-label="Fermer" data-action="close-modal">×</button></div>'+body+'</div></div>';const first=modalRoot.querySelector('input,button');if(first)first.focus()}
 function closeModal(){modalRoot.innerHTML='';pendingIngredientLinkId=null}
 function selectOptions(values,value){return values.map(x=>'<option value="'+html(x)+'" '+(x===value?'selected':'')+'>'+html(x)+'</option>').join('')}

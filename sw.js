@@ -1,5 +1,5 @@
-const CACHE='menus-drive-v3-navigation-20261028';
-const ASSETS=['./','./index.html','./styles.css?v=20261028-3','./app.js?v=20261028-3','./manifest.webmanifest','./icon.svg'];
+const CACHE='menus-drive-v4-backups-packages-20261028';
+const ASSETS=['./','./index.html','./styles.css?v=20261028-4','./app.js?v=20261028-4','./manifest.webmanifest','./icon.svg'];
 self.addEventListener('install',event=>{
   event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(ASSETS)).then(()=>self.skipWaiting()));
 });

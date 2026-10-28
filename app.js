@@ -73,7 +73,7 @@ function emptyView(emoji,title,description,button){return '<div class="empty"><d
 function mealDishes(meal){
  if(meal?.type==='recipe'&&meal.recipeId)return [{recipeId:meal.recipeId,people:Number(meal.people)||2}];
  if(meal?.type==='multi'&&Array.isArray(meal.dishes))
-   return meal.dishes.filter(d=>d&&d.recipeId&&Number(d.people)>0)
+   return meal.dishes.filter(d=>d&&d.type!=='leftovers'&&d.recipeId&&Number(d.people)>0)
      .map(d=>({recipeId:d.recipeId,people:Number(d.people)}));
  return []
 }
@@ -85,11 +85,9 @@ function mealCard(meal,i){
   note=(meal.leftoverPortions||2)+' portions · sans nouvelles courses'
  }else{
   const dishes=mealDishes(meal);
-  if(dishes.length){
-   names=dishes.map(d=>{const r=recipeById(d.recipeId);return (r?r.name:'Plat supprimé')+' · '+d.people+' portion'+(d.people>1?'s':'')});
-   classes=' filled';
-   note=dishes.length===1?'1 plat':' '+dishes.length+' plats pour ce repas'
-  }
+  if(dishes.length){names=dishes.map(d=>{const r=recipeById(d.recipeId);return (r?r.name:'Plat supprimé')+' · '+d.people+' portion'+(d.people>1?'s':'')})}
+  mealLeftovers(meal).forEach(x=>{const r=recipeById(x.recipeId);names.push('🍱 Restes : '+(r?.name||'Autre plat')+' · '+x.people+' portion'+(x.people>1?'s':''))});
+  if(names.length){classes=' filled';note=names.length===1?'1 plat':names.length+' plats pour ce repas'}
  }
  return '<button class="meal-tile'+classes+'" data-action="pick-meal" data-index="'+i+'" aria-label="'+html(days[Math.floor(i/2)])+' '+(i%2?'soir':'midi')+', '+html(names.join(' et ')||'ajouter un plat')+'"><span class="meal-type">'+(i%2?'Soir':'Midi')+(note?' · '+html(note):'')+'</span>'+
  (names.length?names.map(n=>'<strong>'+html(n)+'</strong>').join(''):'<span class="add">＋ Ajouter un plat</span>')+'</button>';
@@ -411,9 +409,15 @@ function recipeEditor(id){const r=recipeById(id),title=r?'Modifier le plat':'Ajo
   showModal(title,body)
 }
 function pickMeal(index){
- const meal=getWeek().meals[index],dishes=mealDishes(meal),extraDefault=dishes.length?1:4;
+ const meal=getWeek().meals[index],dishes=mealDishes(meal),leftovers=mealLeftovers(meal),extraDefault=dishes.length?1:4;
  let out='';
- if(meal?.type==='leftovers')out+='<div class="note" style="margin-bottom:12px"><strong>🍱 Restes de repas</strong><p>Ce repas n’ajoute pas de courses. Choisis un plat ci-dessous si tu veux le remplacer.</p></div>';
+ if(leftovers.length){
+  out+='<div class="section-head"><h3>Restes prévus pour ce repas</h3></div>';
+  leftovers.forEach((left,n)=>{
+   const r=recipeById(left.recipeId),source=Number.isInteger(left.fromIndex)?' · préparé '+days[Math.floor(left.fromIndex/2)]+' '+(left.fromIndex%2?'soir':'midi'):'';
+   out+='<div class="meal-dish"><div class="grow"><strong>🍱 '+html(r?.name||'Restes')+'</strong><div class="helper">'+left.people+' portion'+(left.people>1?'s':'')+html(source)+' · sans courses supplémentaires</div></div><button class="btn tiny secondary" data-action="remove-leftover" data-index="'+index+'" data-leftover="'+n+'">Retirer</button></div>'
+  })
+ }
  if(dishes.length){
   out+='<div class="section-head"><h3>Plats prévus pour ce repas</h3><span class="pill">'+dishes.length+' plat'+(dishes.length>1?'s':'')+'</span></div>';
   dishes.forEach((d,n)=>{
@@ -425,7 +429,7 @@ function pickMeal(index){
  '<input type="number" id="mealPeople" min="1" max="30" value="'+extraDefault+'">'+
  '<div class="helper">1 portion par plat si vous mangez deux plats différents · 2 portions pour un repas à deux · 4 portions pour deux repas à deux. La quantité est propre à chaque plat.</div></div>';
  out+='<div class="section-head"><h3>'+ (dishes.length?'Ajouter un autre plat':'Choisir un plat')+'</h3></div>';
- out+='<div class="recipe-picker"><button class="picker-item" data-action="choose-leftovers" data-index="'+index+'"><span class="emoji">🍱</span><span class="grow"><strong>Restes d’un autre repas</strong><small>Remplace les plats de ce repas, sans ajouter de courses</small></span><span class="end">＋</span></button>';
+ out+='<div class="recipe-picker"><button class="picker-item" data-action="choose-leftovers" data-index="'+index+'"><span class="emoji">🍱</span><span class="grow"><strong>Placer des restes ici</strong><small>Choisis leur plat d’origine et le nombre de portions, même plusieurs jours après</small></span><span class="end">＋</span></button>';
  state.recipes.slice().sort((a,b)=>a.name.localeCompare(b.name,'fr')).forEach(r=>{
   if(dishes.some(d=>d.recipeId===r.id))return;
   out+='<button class="picker-item" data-action="choose-recipe" data-id="'+r.id+'" data-index="'+index+'"><span class="emoji">'+html(icons[r.category]||'🍽️')+'</span><span class="grow"><strong>'+html(r.name)+'</strong><small>'+r.ingredients.length+' ingrédients · recette de base pour '+r.people+' portions</small></span><span class="end">＋</span></button>'
@@ -454,46 +458,104 @@ async function refreshBackupList(){
 }
 function peopleInput(){return Math.min(30,Math.max(1,Number($('#mealPeople')?.value)||1))}
 function portionInputForDish(dish){
- const value=Number($('[data-dish-qty="'+dish+'"]')?.value);
- return Number.isInteger(value)&&value>=1&&value<=30?value:null
+ const n=Number($('[data-dish-qty="'+dish+'"]')?.value);
+ return Number.isInteger(n)&&n>0&&n<=30?n:null
+}
+// Compatibilité avec les anciennes recettes et les anciens restes.
+function mealLeftovers(meal){
+ if(meal?.type==='leftovers')return [{type:'leftovers',recipeId:meal.recipeId||null,fromIndex:Number.isInteger(meal.fromIndex)?meal.fromIndex:null,people:Number(meal.leftoverPortions)||2}];
+ if(meal?.type==='multi'&&Array.isArray(meal.dishes))return meal.dishes.filter(x=>x?.type==='leftovers')
+  .map(x=>({type:'leftovers',recipeId:x.recipeId||null,fromIndex:Number.isInteger(x.fromIndex)?x.fromIndex:null,people:Number(x.people)||2}));
+ return []
+}
+function mealParts(meal){return [...mealDishes(meal),...mealLeftovers(meal)]}
+function storeMealParts(w,index,parts){
+ const valid=parts.filter(p=>p&&Number.isInteger(Number(p.people))&&Number(p.people)>=1&&Number(p.people)<=30);
+ if(!valid.length){w.meals[index]=null;return}
+ if(valid.length===1){
+  const p=valid[0];
+  if(p.type==='leftovers')w.meals[index]={type:'leftovers',recipeId:p.recipeId||undefined,fromIndex:Number.isInteger(p.fromIndex)?p.fromIndex:undefined,leftoverPortions:Number(p.people)};
+  else w.meals[index]={type:'recipe',recipeId:p.recipeId,people:Number(p.people)}
+ }else w.meals[index]={type:'multi',dishes:valid.map(p=>p.type==='leftovers'?{type:'leftovers',recipeId:p.recipeId||null,fromIndex:p.fromIndex,people:Number(p.people)}:{recipeId:p.recipeId,people:Number(p.people)})}
+}
+function sourceBudget(w,fromIndex,recipeId){
+ const dishes=mealDishes(w.meals[fromIndex]);
+ const d=dishes.find(x=>x.recipeId===recipeId);
+ if(!d)return 0;
+ return Math.max(0,d.people-(dishes.length===1?2:1))
+}
+function usedLeftovers(w,fromIndex,recipeId,exceptIndex=-1){
+ let used=0;w.meals.forEach((m,i)=>{if(i!==exceptIndex)mealLeftovers(m).forEach(x=>{
+  if(x.fromIndex===fromIndex&&x.recipeId===recipeId)used+=x.people
+ })});return used
+}
+function availableLeftoverSources(w,targetIndex){
+ const results=[];
+ w.meals.forEach((m,i)=>{
+  if(i>=targetIndex)return;
+  mealDishes(m).forEach(d=>{
+   const free=sourceBudget(w,i,d.recipeId)-usedLeftovers(w,i,d.recipeId,targetIndex);
+   if(free>0&&recipeById(d.recipeId))results.push({sourceIndex:i,recipeId:d.recipeId,available:free})
+  })
+ });
+ return results
+}
+function reconcileLeftovers(w,sourceIndex){
+ const budget=new Map();
+ mealDishes(w.meals[sourceIndex]).forEach(d=>budget.set(d.recipeId,sourceBudget(w,sourceIndex,d.recipeId)));
+ for(let i=0;i<w.meals.length;i++){
+  if(i===sourceIndex)continue;
+  const parts=mealParts(w.meals[i]);
+  if(!parts.some(p=>p.type==='leftovers'&&p.fromIndex===sourceIndex))continue;
+  const next=[];
+  for(const p of parts){
+   if(p.type!=='leftovers'||p.fromIndex!==sourceIndex){next.push(p);continue}
+   const free=i>sourceIndex?(budget.get(p.recipeId)||0):0;
+   if(free<=0)continue;
+   const granted=Math.min(p.people,free);budget.set(p.recipeId,free-granted);
+   next.push({...p,people:granted})
+  }
+  storeMealParts(w,i,next)
+ }
 }
 function clearMealWithPair(w,index){
  if(index<0||index>=w.meals.length)return;
- if(w.meals[index+1]?.type==='leftovers'&&w.meals[index+1].fromIndex===index)
-  w.meals[index+1]=null;
- w.meals[index]=null
+ w.meals[index]=null;reconcileLeftovers(w,index)
 }
 function setMealDishes(w,index,dishes){
  if(index<0||index>=w.meals.length)return;
  const clean=dishes.filter(d=>d&&recipeById(d.recipeId)&&Number.isInteger(Number(d.people))&&Number(d.people)>=1&&Number(d.people)<=30)
   .map(d=>({recipeId:d.recipeId,people:Number(d.people)}));
- clearMealWithPair(w,index);
- if(!clean.length)return;
- if(clean.length===1){
-  w.meals[index]={type:'recipe',recipeId:clean[0].recipeId,people:clean[0].people};
-  // Restes automatiques uniquement pour une préparation unique de 4+ portions.
-  if(clean[0].people>=4&&index+1<w.meals.length&&!w.meals[index+1])
-   w.meals[index+1]={type:'leftovers',recipeId:clean[0].recipeId,fromIndex:index,leftoverPortions:Math.max(2,clean[0].people-2)};
- }else{
-  w.meals[index]={type:'multi',dishes:clean};
-  // Si un seul des plats prépare aussi des restes, on conserve ce repas suivant,
-  // même si l'autre personne mange un plat différent à ce repas.
-  const leftoverDishes=clean.filter(d=>d.people>=4);
-  if(leftoverDishes.length===1&&index+1<w.meals.length&&!w.meals[index+1]){
-   const d=leftoverDishes[0];
-   w.meals[index+1]={type:'leftovers',recipeId:d.recipeId,fromIndex:index,leftoverPortions:Math.max(2,d.people-2)};
-  }
- }
+ storeMealParts(w,index,[...clean,...mealLeftovers(w.meals[index])]);
+ reconcileLeftovers(w,index)
 }
-function selectRecipeForMeal(w,index,recipeId,portions){
- setMealDishes(w,index,[{recipeId,people:portions}])
-}
+function selectRecipeForMeal(w,index,recipeId,portions){setMealDishes(w,index,[{recipeId,people:portions}])}
 function addRecipeToMeal(w,index,recipeId,portions){
  if(!recipeById(recipeId))return false;
  const current=mealDishes(w.meals[index]);
  if(current.some(d=>d.recipeId===recipeId))return false;
- setMealDishes(w,index,[...current,{recipeId,people:portions}]);
+ setMealDishes(w,index,[...current,{recipeId,people:portions}]);return true
+}
+function addLeftoversToMeal(w,targetIndex,sourceIndex,recipeId,portions){
+ if(targetIndex<=sourceIndex||!recipeById(recipeId)||!Number.isInteger(portions)||portions<1)return false;
+ const source=availableLeftoverSources(w,targetIndex).find(x=>x.sourceIndex===sourceIndex&&x.recipeId===recipeId);
+ if(!source||portions>source.available)return false;
+ storeMealParts(w,targetIndex,[...mealParts(w.meals[targetIndex]),{type:'leftovers',recipeId,fromIndex:sourceIndex,people:portions}]);
  return true
+}
+function pickLeftoverSource(index){
+ const w=getWeek(),choices=availableLeftoverSources(w,index);
+ let body='<p class="subtext">Choisis le plat préparé précédemment. Les restes se placeront uniquement dans ce repas, sans créer de nouvelles courses.</p>';
+ if(choices.length){
+  body+='<div class="field"><label for="leftoverPeople">Portions à manger ici</label><input type="number" id="leftoverPeople" min="1" max="30" value="'+Math.min(2,Math.max(...choices.map(x=>x.available)))+'"><div class="helper">Regarde la quantité disponible sous chaque plat.</div></div><div class="recipe-picker">';
+  choices.forEach(x=>{
+   const r=recipeById(x.recipeId);
+   body+='<button class="picker-item" data-action="apply-leftovers" data-index="'+index+'" data-source="'+x.sourceIndex+'" data-id="'+html(x.recipeId)+'"><span class="emoji">🍱</span><span class="grow"><strong>'+html(r.name)+'</strong><small>Préparé '+html(days[Math.floor(x.sourceIndex/2)]+' '+(x.sourceIndex%2?'soir':'midi'))+' · '+x.available+' portion'+(x.available>1?'s':'')+' disponible'+(x.available>1?'s':'')+'</small></span><span class="end">＋</span></button>'
+  });
+  body+='</div>'
+ }else body+='<div class="note">Aucun reste disponible avant ce repas. Prévois davantage de portions lors de la cuisson d’un plat (par exemple 4 pour deux personnes), puis choisis ici le jour où manger les restes.</div>';
+ body+='<button class="btn secondary wide" style="margin-top:14px" data-action="pick-meal" data-index="'+index+'">← Retour au repas</button>';
+ showModal('🍱 Choisir les restes',body)
 }
 function populate(mode){
  if(!state.recipes.length){toast('Ajoute d’abord quelques plats à ton catalogue.');currentTab='plats';render();return}

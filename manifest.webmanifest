@@ -1,0 +1,19 @@
+{
+  "name": "Menus & Drive — Mes courses",
+  "short_name": "Menus & Drive",
+  "description": "Planifie 14 repas, ajoute tes produits et prépare ta liste Carrefour Drive.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f9f7f1",
+  "theme_color": "#245943",
+  "lang": "fr",
+  "icons": [
+    {
+      "src": "./icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

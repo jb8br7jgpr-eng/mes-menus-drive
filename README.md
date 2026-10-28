@@ -89,3 +89,17 @@ Aucun mot de passe, cookie, token ni donnée de compte n’est lu, enregistré o
 
 **Suite du développement :** concevoir le transfert volontaire de la liste de courses depuis notre application vers le module Safari, puis seulement des essais d'identification de références en lecture seule. Un test d’ajout d’un article réel au panier nécessitera un nouvel accord explicite.
 
+
+
+## Importer depuis une fiche Carrefour sur iPhone (script Safari 0.2)
+
+- **Principe :** dans Safari sur un produit `https://www.carrefour.fr/p/...`, le userscript `scripts/carrefour-diagnostic.user.js` propose le bouton « ➕ Mes produits ».
+- L'utilisateur appuie sur le bouton, vérifie l'aperçu et confirme « Ouvrir la fiche dans Menus & Drive ». Le script récupère uniquement les informations de la **page affichée** : nom (titre `h1` ou métadonnée), marque et contenance si les données structurées sont accessibles, code EAN-13 depuis l'adresse lorsqu'il est présent, lien direct de la fiche.
+- Le transfert se fait **après clic** via un fragment d'URL vers `https://jb8br7jgpr-eng.github.io/mes-menus-drive/`, sans serveur, cookie, mot de passe, historique de compte ni requête réseau depuis le script.
+- Dans Menus & Drive, un formulaire prérempli apparaît. L'utilisateur doit **enregistrer explicitement**. Aucun ajout aux courses ou au panier n'est fait automatiquement.
+- Le nom, la marque et le conditionnement peuvent ne pas être détectés ; ils sont **corrigeables**. Un produit déjà connu par son URL ou son code est signalé pour limiter les doublons.
+- Seuls les 13 chiffres présents dans l'adresse sont repris ; le code doit être vérifié en cas de doute. Il ne garantit ni le stock ni la disponibilité dans le Drive choisi.
+- L'import est **expérimental** et fonctionne dans Safari sur le site GitHub Pages. Une application web installée sur l'écran d'accueil peut utiliser un stockage local distinct de celui de Safari sur iPhone : vérifier dans le catalogue où le produit est enregistré.
+- **Installation de la nouvelle version du script :** si le diagnostic 0.1 est déjà installé, ouvrir l'URL raw du script `.user.js` dans Safari, ouvrir Userscripts et accepter la mise à jour 0.2. Ne pas créer deux copies actives du même script. La configuration d'auto-mise-à-jour a été ajoutée en version 0.2.
+- **Sécurité :** aucune opération sur le panier Carrefour ; ne jamais fournir d'identifiants dans le script. Si le formulaire n'apparaît pas ou que les données détectées sont erronées, revenir et signaler le problème, sans supprimer le catalogue existant.
+

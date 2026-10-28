@@ -1,5 +1,5 @@
-const CACHE='menus-drive-v8-ean-quantity-20261028';
-const ASSETS=['./','./index.html','./styles.css?v=20261028-8','./app.js?v=20261028-8','./manifest.webmanifest','./icon.svg'];
+const CACHE='menus-drive-v9-direct-carrefour-20261028';
+const ASSETS=['./','./index.html','./styles.css?v=20261028-9','./app.js?v=20261028-9','./manifest.webmanifest','./icon.svg'];
 self.addEventListener('install',event=>{
   event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(ASSETS)).then(()=>self.skipWaiting()));
 });

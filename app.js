@@ -204,8 +204,18 @@ function ingredientRowsCatalogue(){
    }else details='<span class="catalog-status unlinked">À associer à Carrefour</span>';
   }else details='Pour votre liste Grand Frais · aucune référence nécessaire';
   return '<article class="ingredient-catalog-card"><div class="grow"><strong>'+html(x.name)+'</strong><div class="ingredient-catalog-details">'+details+'</div></div>'+
-   '<div class="ingredient-catalog-actions"><button class="btn tiny secondary" data-action="edit-ingredient" data-id="'+html(x.id)+'" aria-label="Gérer la fiche '+html(x.name)+'">Gérer</button></div></article>'
+   '<div class="ingredient-catalog-actions"><button class="btn tiny" data-action="add-ingredient-to-courses" data-id="'+html(x.id)+'" aria-label="Ajouter '+html(x.name)+' aux courses">＋ Courses</button>'+
+ '<button class="btn tiny secondary" data-action="edit-ingredient" data-id="'+html(x.id)+'" aria-label="Gérer la fiche '+html(x.name)+'">Gérer</button></div></article>'
  }).join('')
+}
+function addIngredientToCoursesModal(id){
+ const ing=ingredientById(id);if(!ing)return;
+ const unit=preferredIngredientUnit(ing);
+ const out='<p class="helper">Ajout ponctuel aux courses de cette semaine. L’ingrédient reste enregistré dans Produits ; son magasin habituel est '+(ingredientStore(ing)==='carrefour'?'Carrefour Drive':'Grand Frais')+'.</p>'+
+ '<div class="row" style="align-items:start"><div class="field grow"><label for="extraIngredientQty">Quantité nécessaire</label><input id="extraIngredientQty" type="number" min=".01" step="any" value="1"></div>'+
+ '<div class="field grow"><label for="extraIngredientUnit">Unité</label><select id="extraIngredientUnit">'+selectOptions(units,unit)+'</select></div></div>'+
+ '<button class="btn wide" data-action="save-ingredient-to-courses" data-id="'+html(id)+'">＋ Ajouter aux courses</button>';
+ showModal('Ajouter aux courses · '+html(ing.name),out)
 }
 function ingredientEditor(id,draftName=''){
  const ing=ingredientById(id),store=ing?ingredientStore(ing):ingredientStoreTab;
@@ -1083,6 +1093,13 @@ document.addEventListener('click',e=>{const tab=e.target.closest('[data-tab]');i
   else if(mode==='add-product')productEditor(null);
   else if(mode==='ingredient-store-tab'){ingredientStoreTab=a.dataset.store==='grandfrais'?'grandfrais':'carrefour';render(true)}
   else if(mode==='add-catalog-ingredient')ingredientEditor(null);
+  else if(mode==='add-ingredient-to-courses')addIngredientToCoursesModal(id);
+  else if(mode==='save-ingredient-to-courses'){
+   const ing=ingredientById(id),qty=Number($('#extraIngredientQty')?.value),unit=$('#extraIngredientUnit')?.value;
+   if(!ing||!Number.isFinite(qty)||qty<=0||!units.includes(unit)){toast('Vérifie la quantité et l’unité.');return}
+   w.extras.push({id:uid(),ingredientId:ing.id,productId:ing.productId||null,name:ing.name,qty,unit});
+   persist();closeModal();currentTab='courses';render();toast(ing.name+' ajouté aux courses !')
+  }
   else if(mode==='edit-ingredient')ingredientEditor(id);
   else if(mode==='new-linked-product'){
    const ing=ingredientById(id);if(!ing)return;

@@ -248,3 +248,27 @@ Le bilan indique les lignes encore à traiter pendant l'exécution. Une fois ter
 
 La version doit être actualisée **sur chaque iPhone** depuis le même lien Userscripts habituel. Les tests d'interface utilisent des données simulées (ajouté / déjà présent / indisponible / partiel), tandis que les ajouts réels ont été confirmés auparavant sur un essai de deux produits. La robustesse sur un panier de 5 à 10 références, dont une indisponible et une partielle, reste à vérifier en situation réelle.
 
+
+
+## Recettes préparées pour deux repas et courses Carrefour / Grand Frais
+
+### Cuisine en deux fois pour deux personnes
+
+- **Règle par défaut : 4 portions cuisinées une fois**, pour 2 personnes à deux repas. La recette du catalogue indique le nombre de portions correspondant à ses quantités d'ingrédients (4 par défaut pour les nouvelles recettes ; les anciennes fiches conservent leur base, souvent 2).
+- Lorsqu'un plat est ajouté à un repas, l'application propose de **cuisiner 4 portions**. Le repas immédiatement suivant, **s'il est vide**, devient automatiquement **« Restes : [nom du plat] »**, lié au premier repas. On peut saisir **2 portions** pour cuisiner uniquement pour un repas. Rien n'est écrasé si le repas suivant est déjà occupé ou si l'on est en fin de semaine.
+- **Liste de courses : la recette est comptée une seule fois**, selon le nombre de portions effectivement préparées. Par exemple une recette enregistrée pour 2 portions avec 300 g de poulet demande 600 g pour 4 portions, qu'on mange sur deux repas. Le créneau « Restes » n'ajoute **aucun ingrédient**.
+- Modifier/supprimer le premier repas supprime seulement ses **restes automatiquement liés**, sans toucher aux autres plats ni aux restes ajoutés manuellement. La génération intelligente remplit les créneaux par paires plat + restes lorsque les deux sont libres et réserve d'abord les restes des recettes de 4 portions déjà planifiées. La génération ne remplace pas les repas manuels en mode « Compléter ».
+
+### Répartition des courses entre deux magasins
+
+- **Carrefour Drive** : uniquement les lignes affectées à Carrefour Drive sont transmises au système d'ajout automatique EAN-13, avec les mêmes calculs et contrôles qu'avant.
+- **Grand Frais** : section séparée dans **Mes courses** et bouton **« 📋 Copier la liste Grand Frais pour Notes »**. La liste de texte contient noms et quantités des produits Grand Frais ni cochés ni marqués « déjà à la maison », et s'utilise par copier-coller dans Notes. **Aucun accès à Grand Frais ni connexion externe** pour cette liste.
+- Chaque ligne de Mes courses comporte un **sélecteur magasin** (Carrefour Drive / Grand Frais). Les choix sont mémorisés **pour les semaines suivantes**, soit par produit du catalogue, soit par ingrédient/produit et unité. Chaque fiche du catalogue possède également un **magasin habituel**, modifiable ; un produit issu de l'import Carrefour reste Carrefour par défaut.
+- Les produits frais **sans fiche de produit liée** de catégories Fruits et légumes et Viandes et poissons sont placés par défaut à **Grand Frais** ; les autres lignes non liées et les produits du catalogue existant restent par défaut sur Carrefour. Tout est modifiable.
+- Les lignes affectées à Grand Frais sont filtrées **avant** le calcul des codes-barres et quantités Carrefour, même si un EAN Carrefour est renseigné sur la fiche. Cette séparation est une règle de sécurité.
+- Les nouvelles préférences magasin résident dans `state.storePreferences` et les fiches `products[].store`. Elles sont incluses dans les **exports JSON** et réimportées lors d'une restauration. Les anciennes sauvegardes au schéma 1 demeurent valides et reçoivent les préférences par défaut. Les données ne se synchronisent toujours **pas automatiquement entre les deux iPhone** : transférer un export JSON pour répliquer le catalogue et les choix de magasin.
+
+### Tests de non-régression
+
+Contrôler : (1) nouvelle recette 4 portions → 2 repas / ingrédients une fois, (2) recette existante 2 portions → multiplication des ingrédients pour 4, (3) choix 2 portions → un seul repas, (4) mode générer / compléter, (5) affectation Grand Frais / Carrefour conservée après changement de semaine, (6) notes Grand Frais copiable, (7) transfert Carrefour ne contient **jamais** les produits affectés Grand Frais, (8) sauvegarde JSON compatible. Le script Userscripts v0.9 et le moteur réel du panier restent **inchangés**.
+

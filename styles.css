@@ -63,3 +63,15 @@
   overflow:hidden;
   text-overflow:clip;
 }
+
+/* Ergonomie d'ajout de recettes sur iPhone : le focus Safari ne zoome plus les
+   formulaires aux caractères inférieurs à 16px. Le zoom manuel reste possible. */
+.ingredient-add-bottom{display:flex;margin:12px 0 8px;min-height:44px}
+@supports (-webkit-touch-callout: none){
+ .modal input:not([type="checkbox"]):not([type="radio"]),
+ .modal select,
+ .modal textarea,
+ .store-select,
+ .text-input{font-size:16px!important}
+ .ingredient-edit-row input,.ingredient-edit-row select,.ingredient-product{font-size:16px!important}
+}

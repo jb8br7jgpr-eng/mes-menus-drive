@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#f9f7f1">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Menus & Drive">
+  <meta name="description" content="Organise tes 14 repas et prépare tes courses Carrefour Drive en quelques minutes.">
+  <title>Menus & Drive — Mes courses simplifiées</title>
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="icon" href="./icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="./styles.css">
+  <script defer src="./app.js"></script>
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <div class="brand-mark" aria-hidden="true">✳</div>
+      <div class="brand-copy"><strong>Menus <span>&</span> Drive</strong><small>Moins de listes. Plus de temps.</small></div>
+      <button class="round-btn" id="settingsBtn" aria-label="Sauvegardes et paramètres" title="Sauvegardes">⚙</button>
+    </header>
+    <main id="app" class="content" aria-live="polite">
+      <div class="loading"><span class="spinner"></span>Préparation de l'application…</div>
+    </main>
+    <nav class="bottom-nav" aria-label="Navigation principale">
+      <button data-tab="menus" class="nav-item active" aria-current="page"><span class="nav-icon">▦</span><span>Menus</span></button>
+      <button data-tab="plats" class="nav-item"><span class="nav-icon">♨</span><span>Plats</span></button>
+      <button data-tab="courses" class="nav-item"><span class="nav-icon">☑</span><span>Courses</span></button>
+      <button data-tab="drive" class="nav-item"><span class="nav-icon">▣</span><span>Drive</span></button>
+    </nav>
+  </div>
+  <div id="modalRoot"></div>
+  <div id="toast" role="status" aria-live="polite"></div>
+</body>
+</html>

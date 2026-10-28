@@ -181,3 +181,19 @@ Après **Mon Drive → Copier les codes-barres et quantités** dans l'applicatio
 
 Le bouton de copie individuelle des fiches Carrefour vers l'application iPhone est conservé. Les tests locaux vérifient la classification « référence trouvée », « inconnue », « offre locale non confirmée » et « indiquée indisponible » sur des réponses simulées. **Il reste à valider en situation réelle** dans Safari, notamment la compatibilité de l'extension Userscripts iOS avec les réponses Carrefour.
 
+
+
+## Ouverture directe Carrefour depuis l’application installée (Userscripts v0.7)
+
+Le copier-coller entre l’icône iPhone et Safari n’est plus requis pour préparer une liste normale :
+
+1. Dans l’icône iPhone **Menus & Drive → Mon Drive**, appuyer sur le bouton principal **« 🚀 Ouvrir Carrefour avec ma liste »**.
+2. L’application calcule les lignes **EAN-13 + quantité achetable** non cochées/non exclues, puis ouvre `https://www.carrefour.fr/#md-drive-v1=<liste encodée>` dans Safari / navigateur externe.
+3. Le script Userscripts v0.7 reconnaît **uniquement** ce fragment URL, retire son fragment de l’adresse visible, ouvre automatiquement le panneau, affiche les références et leurs quantités, puis lance la vérification **GET uniquement** (Drive actif + recherche Carrefour). Aucune opération d’écriture sur le panier.
+4. Le bouton **« 📋 Détails et copie de secours »** dans Mon Drive reste disponible pour voir les produits incomplets et, si iOS n’injecte pas Userscripts après l’ouverture externe, copier manuellement les codes-barres.
+5. Les fiches Carrefour peuvent toujours être copiées dans **Mes produits** via l’ancienne fonctionnalité indépendante.
+
+**Limites :** le lien est volontairement plafonné à 120 références ou 2 900 caractères de données encodées pour ne pas dépendre de longues URL iPhone ; au-delà, la copie de secours reste accessible. Le fragment de lien contient uniquement EAN et quantité, pas de recettes, adresses, cookies, mots de passe ou identité. Un fragment d’URL n’est pas envoyé dans le chemin de la requête HTTP ; il reste toutefois visible au JavaScript du site Carrefour, puisque le script s’exécute dessus. L’ouverture d’un lien externe depuis une PWA iPhone vers Safari, et l’injection Userscripts sur cette navigation, devront être validées **sur le véritable iPhone**.
+
+Le script n'ajoute aucun article au panier, ne vérifie pas définitivement les stocks et ne paie jamais. Si le script n'est pas installé ou encore à la version 0.6, la page Carrefour s'ouvre mais le transfert automatique ne sera pas intercepté. Mettre à jour **le script 0.7** et ne garder qu'une copie active.
+

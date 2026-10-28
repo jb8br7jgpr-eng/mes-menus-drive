@@ -481,3 +481,16 @@ Le bouton **« Placer des restes ici »** ne dépend pas des filtres et reste vi
 **Protection des recettes** : les listes agrègent parfois une quantité calculée depuis les recettes et un complément saisi manuellement ; chaque source manuelle porte désormais son identifiant de semaine dans les lignes calculées (champ éphémère `manualExtraIds` de shopping()). Modifier ou supprimer ce complément ne touche jamais `weeks[date].generatedIngredients`, les recettes ni les autres compléments. Les produits associés à Carrefour conservent leur même EAN, leur conditionnement et leur calcul de paquets ; la suppression d'un complément laisse intacte la quantité issue des recettes.
 
 **Données** : aucune modification du schéma de stockage : chaque achat conserve son ID, son unité et sa quantité dans `weeks[date].extras`. Les favoris restent distincts des ajouts manuels de la semaine. Tests simulés : import et réutilisation de 3 paquets depuis le cumul recette+manuel, modification d'un des deux achats identiques, suppression avec confirmation, protection des ingrédients calculés, stock couvrant l'article, exclusion, filtre par type et recherche dans Menus, catégories anciennes. Vérifier le confort final sur iPhone.
+
+
+## V28 — Produits réunis dans un catalogue unique (branche de travail, non déployée)
+
+- **Un seul écran Produits** : les ingrédients et les achats du quotidien apparaissent dans une liste commune, triée par nom. Un produit Carrefour déjà lié à un ingrédient n'est pas affiché une seconde fois comme achat indépendant.
+- **Deux filtres cumulables** : `Tous / Ingrédients / Quotidien` et `Tous / Carrefour / Grand Frais`, plus la recherche instantanée.
+- **Ajouter un produit** : choix entre **Ingrédient** (proposable dans les recettes) et **Achat du quotidien** (courses uniquement). Les fiches des deux types proposent maintenant un nom, un magasin, une catégorie, une **quantité habituelle** et une **unité** ; la quantité d'un ingrédient stockée dans sa fiche n'altère jamais les quantités des recettes.
+- **Même action + Courses** pour les deux : quantité et unité ajustables avant ajout manuel. Pour un ingrédient Carrefour lié à un produit conditionné, le moteur existant continue à calculer les emballages ; pour un achat du quotidien, les unités de catalogue restent prises en compte. Le stock maison est commun via **Courses**, par semaine.
+- **Même action Gérer** : modification des fiches existantes, et suppression protégée des ingrédients (impossible si utilisés dans les recettes). L'import et la modification de références Carrefour demeurent accessibles.
+- **Compatibilité** : aucun changement de schéma IndexedDB/JSON, aucune conversion des fiches enregistrées, ni changement de la génération explicite des courses, des menus, des scripts Userscripts ou du fonctionnement du Drive.
+- **Vérifications de logique en environnement simulé** : 9 assertions initiales réussies (articles liés sans doublon, filtres, recherche, calcul de paquets, articles du quotidien et absence de génération spontanée). Validation du rendu sur iPhone à réaliser **avant tout déploiement**.
+
+Cette modification est enregistrée sur la branche `refonte-produits-unifies-v28` issue de `developpement-v1`. La branche utilisée par GitHub Pages et `main` restent inchangées jusqu'à validation explicite du déploiement.

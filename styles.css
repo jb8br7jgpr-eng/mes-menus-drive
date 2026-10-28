@@ -279,3 +279,16 @@
 .ingredient-add-bottom{scroll-margin-bottom:24px}
 @media(max-width:380px){.recipe-filters{gap:7px}.recipe-filters select{padding:9px 7px;font-size:11px}}
 @supports (-webkit-touch-callout:none){.recipe-filters select{font-size:16px!important}}
+
+/* V26 : recherche et filtre type directement dans le sélecteur de repas. */
+.meal-picker-filters{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,.85fr);gap:8px;margin:6px 0 7px}
+.meal-picker-filters .field{min-width:0;margin:0}
+.meal-picker-filters .field label{font-size:11px}
+.meal-picker-filters input,.meal-picker-filters select{width:100%;min-width:0;min-height:43px;padding:8px 9px;background:#f7faf4;border:1px solid #d9e5d9;border-radius:12px;color:#31503d;font-size:12px;line-height:1.35}
+.meal-picker-count{font-size:11px;color:#738275;font-weight:650;margin:3px 0 9px}
+.meal-picker-scroll{max-height:45dvh;overscroll-behavior:contain}
+#mealRecipeResults{display:grid;gap:7px;min-width:0}
+.meal-picker-section-heading{font-size:11px;font-weight:850;letter-spacing:.02em;color:#5f8066;padding:8px 2px 3px}
+.meal-picker-empty{padding:15px 12px;border:1px dashed #d5e4d3;border-radius:12px;text-align:center;font-size:12px;line-height:1.45;color:#7c8c7d}
+@media(max-width:380px){.meal-picker-filters{gap:6px}.meal-picker-filters input,.meal-picker-filters select{padding:7px 6px;font-size:11px}}
+@supports (-webkit-touch-callout:none){.meal-picker-filters input,.meal-picker-filters select{font-size:16px!important}}

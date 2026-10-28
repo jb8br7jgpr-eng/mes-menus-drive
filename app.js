@@ -103,32 +103,60 @@ function validCarrefourLink(raw){
   catch(e){throw Error('Utilise un lien HTTPS provenant de carrefour.fr.')}
 }
 // Échange volontaire depuis Safari Carrefour : fragment d’URL, jamais d'accès au stockage d'un autre site.
+const CARREFOUR_CLIP_PREFIX='MD-CARREFOUR-V1:';
+function openImportedCarrefourProduct(data){
+  if(!data||data.v!==1||typeof data.url!=='string')throw Error('Format non reconnu');
+  const url=validCarrefourLink(data.url);
+  if(!new URL(url).pathname.startsWith('/p/'))throw Error('Ce lien n’est pas une fiche produit');
+  const name=String(data.name||'').trim().slice(0,100);
+  const brand=String(data.brand||'').trim().slice(0,80);
+  const packaging=String(data.packaging||'').trim().slice(0,80);
+  const ean=/^\d{13}$/.test(String(data.ean||''))?String(data.ean):'';
+  if(!name)throw Error('Nom du produit introuvable');
+  const already=state.products.find(p=>(p.url&&p.url.split(/[?#]/)[0]===url.split(/[?#]/)[0])||(ean&&p.ean===ean));
+  currentTab='produits';render();
+  if(already){
+    showModal('Produit déjà enregistré','<div class="note"><strong>'+html(already.name)+'</strong><p>Cette référence Carrefour est déjà dans ton catalogue. Tu peux modifier sa fiche au lieu de créer un doublon.</p></div><button class="btn wide" data-action="edit-product" data-id="'+html(already.id)+'">Modifier la fiche existante</button>');
+  }else{
+    productEditor(null,{name,brand,packaging,category:'Autres',qty:1,unit:'paquet',url,ean,packAmount:null,packUnit:null});
+  }
+}
 function importCarrefourProductFromHash(){
   const prefix='#carrefour-product=';
   if(!location.hash.startsWith(prefix))return false;
   const raw=location.hash.slice(prefix.length);
-  // Retirer immédiatement le fragment du navigateur pour ne pas laisser les données dans l'historique courant.
   if(typeof history!=='undefined'&&history.replaceState)history.replaceState(null,'',location.pathname+location.search);
   if(raw.length>5000){toast('Lien de produit trop long.');return true}
+  try{openImportedCarrefourProduct(JSON.parse(decodeURIComponent(raw)))}
+  catch(error){toast('Import Carrefour impossible : '+String(error.message||'lien invalide'))}
+  return true
+}
+function carrefourClipboardModal(){
+  const body='<div class="note"><strong>Depuis l’icône sur ton iPhone</strong><p>Sur Carrefour.fr, copie le produit avec notre bouton vert. Reviens ici avec l’icône Menus & Drive, puis appuie sur « Coller et vérifier ».</p></div>'+
+    '<button class="btn wide" data-action="read-carrefour-clipboard" style="margin:13px 0">📋 Coller et vérifier le produit</button>'+
+    '<div class="field"><label for="carrefourPaste">Si le collage automatique ne marche pas</label><textarea id="carrefourPaste" class="text-input" rows="3" placeholder="Appuie ici longtemps puis choisis Coller"></textarea></div>'+
+    '<button class="btn secondary wide" data-action="import-pasted-carrefour">Vérifier le texte collé</button>'+
+    '<p class="helper">L’import ne supprime aucune recette et ne modifie pas le panier Carrefour. La fiche doit encore être validée avant d’être enregistrée.</p>';
+  showModal('Importer un produit Carrefour',body)
+}
+function importCopiedCarrefourProduct(raw){
   try{
-    const data=JSON.parse(decodeURIComponent(raw));
-    if(!data||data.v!==1||typeof data.url!=='string')throw Error('Format non reconnu');
-    const url=validCarrefourLink(data.url);
-    if(!new URL(url).pathname.startsWith('/p/'))throw Error('Ce lien n’est pas une fiche produit');
-    const name=String(data.name||'').trim().slice(0,100);
-    const brand=String(data.brand||'').trim().slice(0,80);
-    const packaging=String(data.packaging||'').trim().slice(0,80);
-    const ean=/^\d{13}$/.test(String(data.ean||''))?String(data.ean):'';
-    if(!name)throw Error('Nom de produit introuvable');
-    const already=state.products.find(p=>(p.url&&p.url.split(/[?#]/)[0]===url.split(/[?#]/)[0])||(ean&&p.ean===ean));
-    currentTab='produits';render();
-    if(already){
-      showModal('Produit déjà enregistré','<div class="note"><strong>'+html(already.name)+'</strong><p>Ce produit Carrefour est déjà présent dans ton catalogue. Tu peux modifier sa fiche, sans créer de doublon.</p></div><button class="btn wide" data-action="edit-product" data-id="'+html(already.id)+'">Modifier la fiche existante</button>');
-    }else{
-      productEditor(null,{name,brand,packaging,category:'Autres',qty:1,unit:'paquet',url,ean,packAmount:null,packUnit:null});
-    }
-    return true;
-  }catch(error){toast('Import Carrefour impossible : '+String(error.message||'lien invalide'));return true}
+    const text=String(raw||'').trim();
+    if(text.length>5000)throw Error('Texte trop long');
+    if(!text.startsWith(CARREFOUR_CLIP_PREFIX))throw Error('Ce texte ne vient pas du bouton Carrefour « Copier pour mon appli ».');
+    const parsed=JSON.parse(text.slice(CARREFOUR_CLIP_PREFIX.length));
+    openImportedCarrefourProduct(parsed);
+  }catch(e){toast('Import impossible : '+String(e.message||'texte invalide'))}
+}
+async function readCarrefourClipboard(){
+  if(!navigator.clipboard?.readText){toast('Appuie longtemps sur le champ ci-dessous puis choisis « Coller ».');$('#carrefourPaste')?.focus();return}
+  try{
+    const content=await navigator.clipboard.readText();
+    importCopiedCarrefourProduct(content);
+  }catch(e){
+    toast('Accès au presse-papiers refusé. Utilise le champ et « Coller ».');
+    $('#carrefourPaste')?.focus();
+  }
 }
 function productBadge(p){return (p.category==='Hygiène'?'🧴':p.category==='Maison'?'🧻':p.category==='Fruits et légumes'?'🥕':p.category==='Produits frais'?'🥛':p.category==='Viandes et poissons'?'🥩':'🛍️')}
 function productRows(){
@@ -139,7 +167,7 @@ function productRows(){
 function renderProduits(){
   let out=pageHeading('Vos achats habituels','Mes produits','Enregistre vos références préférées pour les ajouter aux courses sans les rechercher à chaque fois.');
   out+='<div class="toolbar"><button class="btn wide" data-action="add-product">＋ Ajouter un produit</button></div>';
-  out+='<div class="card soft"><strong>📲 Depuis Carrefour.fr</strong><p class="subtext">Ouvre une fiche produit dans Safari, touche « ➕ Mes produits », puis confirme son import ici. Le lien et le nom sont récupérés automatiquement lorsque Carrefour les fournit.</p><a href="https://www.carrefour.fr/" target="_blank" rel="noopener noreferrer" class="btn secondary wide">Ouvrir Carrefour.fr ↗</a></div>';
+  out+='<div class="card soft"><strong>📲 Importer depuis Carrefour</strong><p class="subtext">Sur Carrefour.fr, touche le bouton vert « ➕ Mes produits » puis « Copier pour mon appli ». Reviens ici par ton icône iPhone et colle le produit.</p><button class="btn wide" data-action="open-carrefour-import" style="margin:8px 0">📋 Coller un produit Carrefour</button><a href="https://www.carrefour.fr/" target="_blank" rel="noopener noreferrer" class="btn secondary wide">Ouvrir Carrefour.fr ↗</a></div>';
   out+='<div class="field"><input class="text-input" id="productSearch" value="'+html(productSearch)+'" placeholder="⌕ Rechercher un produit ou une marque…" aria-label="Rechercher un produit"></div>';
   out+='<div class="chip-row" aria-label="Filtrer par catégorie">'+['Toutes',...productCategories].map(x=>'<button class="chip'+(productCategory===x?' active':'')+'" data-action="filter-products" data-category="'+html(x)+'">'+html(x)+'</button>').join('')+'</div>';
   out+='<div class="section-head"><h2>Votre catalogue</h2><span class="pill">'+state.products.length+' produit'+(state.products.length===1?'':'s')+'</span></div><div id="productResults">'+productRows()+'</div>';
@@ -304,6 +332,9 @@ document.addEventListener('click',e=>{const tab=e.target.closest('[data-tab]');i
   else if(mode==='add-recipe')recipeEditor(null);
   else if(mode==='edit-recipe')recipeEditor(id);
   else if(mode==='add-product')productEditor(null);
+  else if(mode==='open-carrefour-import')carrefourClipboardModal();
+  else if(mode==='read-carrefour-clipboard')readCarrefourClipboard();
+  else if(mode==='import-pasted-carrefour')importCopiedCarrefourProduct($('#carrefourPaste')?.value);
   else if(mode==='edit-product')productEditor(id);
   else if(mode==='add-catalog-product')addCatalogProduct(id);
   else if(mode==='filter-products'){productCategory=a.dataset.category;render(true)}

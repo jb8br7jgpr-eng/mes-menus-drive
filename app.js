@@ -16,14 +16,51 @@ function monday(d){const x=new Date(d.getFullYear(),d.getMonth(),d.getDate(),12)
 function offsetDate(s,n){const d=parseDate(s);d.setDate(d.getDate()+n);return localDate(d)}
 function niceDate(s){return parseDate(s).toLocaleDateString('fr-FR',{day:'numeric',month:'short'})}
 function getWeek(key=currentWeek){if(!state.weeks[key])state.weeks[key]={meals:Array(14).fill(null),extras:[],checked:[],excluded:[]};const w=state.weeks[key];if(!Array.isArray(w.meals))w.meals=Array(14).fill(null);if(!Array.isArray(w.extras))w.extras=[];if(!Array.isArray(w.checked))w.checked=[];if(!Array.isArray(w.excluded))w.excluded=[];return w}
-function openDatabase(){return new Promise((resolve,reject)=>{const r=indexedDB.open('menus-drive-v1',1);r.onupgradeneeded=()=>{if(!r.result.objectStoreNames.contains('records'))r.result.createObjectStore('records')};r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error)})}
+// Données principales dans IndexedDB ; historique de points de restauration indépendants.
+function openDatabase(){return new Promise((resolve,reject)=>{const r=indexedDB.open('menus-drive-v1',2);r.onupgradeneeded=()=>{if(!r.result.objectStoreNames.contains('records'))r.result.createObjectStore('records');if(!r.result.objectStoreNames.contains('snapshots'))r.result.createObjectStore('snapshots',{keyPath:'id',autoIncrement:true})};r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error)})}
 function readRecord(){return new Promise((resolve,reject)=>{const req=db.transaction('records','readonly').objectStore('records').get('state');req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error)})}
 function writeRecord(value){return new Promise((resolve,reject)=>{const tx=db.transaction('records','readwrite');tx.objectStore('records').put(value,'state');tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error)})}
-let saveQueue=Promise.resolve();
+function readSnapshots(){if(!db||usingFallback)return Promise.resolve([]);return new Promise((resolve,reject)=>{const req=db.transaction('snapshots','readonly').objectStore('snapshots').getAll();req.onsuccess=()=>resolve((req.result||[]).reverse());req.onerror=()=>reject(req.error)})}
+function writeSnapshot(snapshot,label='Sauvegarde automatique',force=false){
+ if(!db||usingFallback)return Promise.resolve(false);
+ return new Promise((resolve,reject)=>{
+  const tx=db.transaction('snapshots','readwrite'),store=tx.objectStore('snapshots');
+  const cursor=store.openCursor(null,'prev');
+  cursor.onsuccess=()=>{const latest=cursor.result?.value;
+   // Une version locale au maximum toutes les 10 minutes, sauf restauration/suppression.
+   if(!force&&latest&&Date.now()-latest.time<600000)return;
+   store.add({time:Date.now(),label,data:snapshot});
+   const keys=store.getAllKeys();
+   keys.onsuccess=()=>{const excess=keys.result.length-10;for(let i=0;i<excess;i++)store.delete(keys.result[i])};
+  };
+  tx.oncomplete=()=>resolve(true);tx.onerror=()=>reject(tx.error);tx.onabort=()=>reject(tx.error);
+ })
+}
+let saveQueue=Promise.resolve(),saveError=false;
 function persist(){
-  const snapshot=JSON.parse(JSON.stringify(state));
-  if(usingFallback){try{localStorage.setItem('menus-drive-backup',JSON.stringify(snapshot))}catch(e){toast('Espace local insuffisant : exporte une sauvegarde.')}return}
-  saveQueue=saveQueue.catch(()=>{}).then(()=>writeRecord(snapshot)).catch(()=>toast('Sauvegarde impossible : exporte tes données.'));
+ const snapshot=JSON.parse(JSON.stringify(state));
+ if(usingFallback){try{localStorage.setItem('menus-drive-backup',JSON.stringify(snapshot));saveError=false}catch(e){saveError=true;toast('Stockage saturé : exporte une sauvegarde JSON.')}return}
+ saveQueue=saveQueue.catch(()=>{}).then(async()=>{
+  await writeRecord(snapshot);saveError=false;
+  try{await writeSnapshot(snapshot)}catch(e){/* Les versions locales peuvent dépasser le quota : données principales conservées. */}
+ }).catch(()=>{saveError=true;toast('Enregistrement impossible : exporte une sauvegarde JSON.')});
+}
+function checkpoint(label){
+ const snapshot=JSON.parse(JSON.stringify(state));
+ if(usingFallback)return Promise.resolve(false);
+ // La file d'écriture protège l'ordre des opérations en cas de clics rapides.
+ const job=saveQueue.catch(()=>{}).then(()=>writeSnapshot(snapshot,label,true));
+ saveQueue=job.catch(()=>{});return job;
+}
+async function restoreSnapshot(id){
+ try{
+  const records=await readSnapshots(),selected=records.find(x=>x.id===Number(id));
+  if(!selected||!selected.data||!Array.isArray(selected.data.recipes))throw Error('Sauvegarde introuvable.');
+  if(!confirm('Remplacer tes données actuelles par cette sauvegarde locale ?'))return;
+  await checkpoint('Avant restauration');
+  state={...baseState(),...selected.data,products:Array.isArray(selected.data.products)?selected.data.products:[]};
+  persist();await saveQueue;closeModal();render();toast('Version précédente restaurée !')
+ }catch(e){toast('Restauration impossible. Exporte ton JSON si nécessaire.')}
 }
 let toastTimer;
 function toast(message){const el=$('#toast');el.textContent=message;el.classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>el.classList.remove('show'),2800)}
@@ -149,7 +186,22 @@ function pickMeal(index){const w=getWeek(),meal=w.meals[index],existing=meal?.ty
   showModal(days[Math.floor(index/2)]+' '+(index%2?'soir':'midi'),out)
 }
 function extraModal(){let out='<form id="extraForm"><div class="field"><label for="extraName">Produit</label><input id="extraName" maxlength="80" placeholder="Ex. papier toilette, baume à lèvres…" required></div><div class="row" style="align-items:start"><div class="field grow"><label for="extraQty">Quantité</label><input id="extraQty" type="number" min=".01" step="any" value="1" required></div><div class="field grow"><label for="extraUnit">Unité</label><select id="extraUnit">'+selectOptions(units,'paquet')+'</select></div></div><label class="row" style="font-size:13px;margin:5px 0 19px"><input type="checkbox" id="extraFavorite" checked> Mémoriser dans mes favoris</label><button class="btn wide" type="submit">＋ Ajouter aux courses</button></form>';showModal('Ajouter un produit',out)}
-function settingsModal(){let out='<div class="card soft"><strong>Stockage sur cet iPhone</strong><p class="subtext">Aucune connexion, aucun serveur, aucun compte. Les données restent dans le navigateur. En effaçant les données de Safari ou en changeant de téléphone, tu peux les perdre.</p></div><div class="section-head"><h3>Sauvegarder mes données</h3></div><p class="helper">Exporte régulièrement un fichier JSON pour retrouver recettes, photos, menus, catalogue de produits et favoris.</p><button class="btn wide" data-action="export-data">↓ Exporter une sauvegarde</button><div class="divider"></div><div class="field"><label for="importFile">Restaurer une sauvegarde</label><input id="importFile" type="file" accept=".json,application/json"></div><div class="note">La restauration remplace toutes les données actuellement enregistrées sur cet iPhone.</div><div class="divider"></div><button class="btn danger wide" data-action="clear-all">Effacer toutes les données locales</button>';showModal('Sauvegardes et paramètres',out)}
+function settingsModal(){
+ let out='<div class="card soft"><strong>Sauvegarde automatique activée</strong><p class="subtext">Chaque modification est enregistrée immédiatement sur cet iPhone. Jusqu’à 10 points de restauration locaux sont conservés automatiquement (espacés d’environ 10 min).</p></div>';
+ out+='<div class="section-head"><h3>Versions locales précédentes</h3><button class="btn tiny secondary" data-action="refresh-backups">Actualiser</button></div><div id="snapshotList" class="subtext">Chargement…</div>';
+ out+='<div class="note" style="margin:13px 0">Important : ces sauvegardes restent sur ce téléphone. Effacer les données Safari ou perdre l’iPhone peut supprimer l’original et ses copies. Seul un export dans iCloud Drive protège contre cela.</div>';
+ out+='<div class="section-head"><h3>Sauvegarde hors du téléphone</h3></div><p class="helper">Exporte régulièrement le JSON dans Fichiers → iCloud Drive : recettes, photos, produits, liens Carrefour, menus et favoris.</p><button class="btn wide" data-action="export-data">↓ Exporter vers Fichiers / iCloud</button>';
+ out+='<div class="divider"></div><div class="field"><label for="importFile">Restaurer depuis un fichier JSON</label><input id="importFile" type="file" accept=".json,application/json"></div><div class="note">La restauration depuis un fichier remplace les données actuelles.</div>';
+ out+='<div class="divider"></div><button class="btn danger wide" data-action="clear-all">Effacer toutes les données locales</button>';
+ showModal('Sauvegardes et paramètres',out);refreshBackupList()
+}
+async function refreshBackupList(){
+ const box=$('#snapshotList');if(!box)return;
+ if(usingFallback){box.textContent='Navigateur en mode de secours : pas d’historique automatique. Utilise l’export JSON.';return}
+ try{const rows=await readSnapshots();if(!$('#snapshotList'))return;
+  $('#snapshotList').innerHTML=rows.length?rows.map(s=>'<div class="shopping-row"><div class="grow"><strong style="font-size:12px">'+html(s.label)+'</strong><div class="shopping-meta">'+new Date(s.time).toLocaleString('fr-FR')+'</div></div><button class="btn tiny secondary" data-action="restore-backup" data-id="'+s.id+'">Restaurer</button></div>').join(''):'Aucune version précédente pour le moment. Elles apparaissent au fil des modifications.';
+ }catch(e){box.textContent='Impossible de lire les versions locales.'}
+}
 function peopleInput(){return Math.min(30,Math.max(1,Number($('#mealPeople')?.value)||2))}
 function populate(mode){if(!state.recipes.length){toast('Ajoute d’abord quelques plats à ton catalogue.');currentTab='plats';render();return}const w=getWeek();if(mode==='generate'&&w.meals.some(Boolean)&&!confirm('Remplacer les 14 repas de cette semaine ?'))return;
   if(mode==='generate')w.meals=Array(14).fill(null);
@@ -177,7 +229,7 @@ async function copyList(){const value=listText();if(!value){toast('Aucun produit
 function exportData(){const blob=new Blob([JSON.stringify({...state,exportedAt:new Date().toISOString()},null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='mes-menus-drive-sauvegarde-'+localDate(new Date())+'.json';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);toast('Sauvegarde créée. Conserve le fichier !')}
 async function importData(file){if(!file)return;try{if(file.size>25*1024*1024)throw Error('Fichier trop volumineux.');const raw=JSON.parse(await file.text());if(raw.schema!==1||!Array.isArray(raw.recipes)||!raw.weeks||typeof raw.weeks!=='object'||!Array.isArray(raw.staples))throw Error('Format de sauvegarde non reconnu.');
   if(!confirm('Remplacer les données actuelles par celles de ce fichier ?'))return;
-  state={schema:1,recipes:raw.recipes,products:Array.isArray(raw.products)?raw.products:[],weeks:raw.weeks,staples:raw.staples,settings:{people:2,...raw.settings}};persist();closeModal();render();toast('Sauvegarde restaurée !')
+  checkpoint('Avant import JSON');state={schema:1,recipes:raw.recipes,products:Array.isArray(raw.products)?raw.products:[],weeks:raw.weeks,staples:raw.staples,settings:{people:2,...raw.settings}};persist();closeModal();render();toast('Sauvegarde restaurée !')
 }catch(err){toast(err.message||'Importation impossible.')}}
 document.addEventListener('click',e=>{const tab=e.target.closest('[data-tab]');if(tab){currentTab=tab.dataset.tab;render();return}
   const a=e.target.closest('[data-action]');if(!a){if(e.target.matches('[data-overlay]'))closeModal();return}
@@ -195,7 +247,7 @@ document.addEventListener('click',e=>{const tab=e.target.closest('[data-tab]');i
   else if(mode==='edit-product')productEditor(id);
   else if(mode==='add-catalog-product')addCatalogProduct(id);
   else if(mode==='filter-products'){productCategory=a.dataset.category;render(true)}
-  else if(mode==='delete-product'){if(confirm('Supprimer ce produit du catalogue ? Les courses déjà saisies resteront.')){state.products=state.products.filter(x=>x.id!==id);state.recipes.forEach(r=>r.ingredients.forEach(i=>{if(i.productId===id)i.productId=null}));persist();closeModal();render();toast('Produit supprimé du catalogue.')}}
+  else if(mode==='delete-product'){if(confirm('Supprimer ce produit du catalogue ? Les courses déjà saisies resteront.')){checkpoint('Avant suppression de produit');state.products=state.products.filter(x=>x.id!==id);state.recipes.forEach(r=>r.ingredients.forEach(i=>{if(i.productId===id)i.productId=null}));persist();closeModal();render();toast('Produit supprimé du catalogue.')}}
   else if(mode==='add-ingredient')$('#ingredientRows').insertAdjacentHTML('beforeend',ingredientRow());
   else if(mode==='remove-ingredient')a.closest('.ingredient-line')?.remove();
   else if(mode==='choose-recipe'){w.meals[index]={type:'recipe',recipeId:id,people:peopleInput()};persist();closeModal();render()}
@@ -211,9 +263,11 @@ document.addEventListener('click',e=>{const tab=e.target.closest('[data-tab]');i
   else if(mode==='exclude'){if(!w.excluded.includes(id))w.excluded.push(id);persist();render(true)}
   else if(mode==='include'){w.excluded=w.excluded.filter(x=>x!==id);persist();render(true)}
   else if(mode==='copy-list')copyList();
-  else if(mode==='delete-recipe'){if(confirm('Supprimer ce plat ? Il disparaîtra aussi des menus qui l’utilisent.')){state.recipes=state.recipes.filter(r=>r.id!==id);Object.values(state.weeks).forEach(week=>{week.meals=week.meals.map(m=>m?.recipeId===id?null:m)});persist();closeModal();render();toast('Plat supprimé.')}}
+  else if(mode==='delete-recipe'){if(confirm('Supprimer ce plat ? Il disparaîtra aussi des menus qui l’utilisent.')){checkpoint('Avant suppression de plat');state.recipes=state.recipes.filter(r=>r.id!==id);Object.values(state.weeks).forEach(week=>{week.meals=week.meals.map(m=>m?.recipeId===id?null:m)});persist();closeModal();render();toast('Plat supprimé.')}}
   else if(mode==='export-data')exportData();
-  else if(mode==='clear-all'){if(confirm('Effacer définitivement tous les plats, menus et produits locaux ?')){state=baseState();persist();closeModal();render();toast('Données locales effacées.')}}
+  else if(mode==='refresh-backups')refreshBackupList();
+  else if(mode==='restore-backup')restoreSnapshot(id);
+  else if(mode==='clear-all'){if(confirm('Effacer toutes les données actuelles ? Une copie locale sera conservée dans les versions précédentes.')){checkpoint('Avant effacement');state=baseState();persist();closeModal();render();toast('Données actuelles effacées.')}}
 });
 document.addEventListener('change',e=>{if(e.target.matches('[data-check]')){const w=getWeek(),id=e.target.dataset.check;w.checked=e.target.checked?[...new Set([...w.checked,id])]:w.checked.filter(x=>x!==id);persist();render(true)}else if(e.target.id==='importFile')importData(e.target.files?.[0])});
 document.addEventListener('input',e=>{if(e.target.id==='recipeSearch'){search=e.target.value;const result=$('#recipeResults');if(result)result.innerHTML=recipeRows()}else if(e.target.id==='productSearch'){productSearch=e.target.value;const result=$('#productResults');if(result)result.innerHTML=productRows()}});

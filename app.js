@@ -94,11 +94,15 @@ function mealCard(meal,i){
  return '<button class="meal-tile'+classes+'" data-action="pick-meal" data-index="'+i+'" aria-label="'+html(days[Math.floor(i/2)])+' '+(i%2?'soir':'midi')+', '+html(names.join(' et ')||'ajouter un plat')+'"><span class="meal-type">'+(i%2?'Soir':'Midi')+(note?' · '+html(note):'')+'</span>'+
  (names.length?names.map(n=>'<strong>'+html(n)+'</strong>').join(''):'<span class="add">＋ Ajouter un plat</span>')+'</button>';
 }
-function renderMenus(){const w=getWeek(),count=w.meals.filter(Boolean).length, last=offsetDate(currentWeek,6),isThis=currentWeek===monday(new Date());
+function renderMenus(){const w=getWeek(),count=w.meals.filter(Boolean).length, last=offsetDate(currentWeek,6),isThis=currentWeek===monday(new Date()),planned=shopping().filter(x=>x.source.includes('Recettes'));
   let out='<div class="hero"><div class="eyebrow">Planificateur hebdomadaire</div><h1>Qu’est-ce qu’on mange cette semaine ?</h1><p>Pour vous deux : cuisine 4 portions, puis choisis librement quand manger les restes. Tu peux aussi faire deux plats différents au même repas !</p><button class="btn cream" data-action="complete-week">✦ Compléter ma semaine</button></div>';
   out+='<div class="section-head"><h2>Votre semaine</h2><span class="pill">'+count+' / 14 repas</span></div>';
   out+='<div class="week-control"><button class="icon-btn" aria-label="Semaine précédente" data-action="week-prev">‹</button><div class="week-label">Du '+niceDate(currentWeek)+' au '+niceDate(last)+(isThis?'<small>Cette semaine</small>':'<small>Planning personnalisé</small>')+'</div><button class="icon-btn" aria-label="Semaine suivante" data-action="week-next">›</button></div>';
   out+='<div class="status-bar"><span style="width:'+(count/14*100)+'%"></span></div>';
+  out+='<div class="menus-courses-link"><div class="grow"><strong>🛒 Courses synchronisées avec vos menus</strong><p>'+(
+    planned.length?planned.length+' référence'+(planned.length>1?'s':'')+' calculée'+(planned.length>1?'s':'')+' depuis vos recettes. Les quantités sont additionnées automatiquement.':
+    'Dès qu’un plat est ajouté au calendrier, ses ingrédients alimentent automatiquement les courses.'
+   )+'</p></div><button class="btn secondary" data-action="go-courses">Voir les courses</button></div>';
   out+='<div class="meal-list">';
   for(let day=0;day<7;day++){
    const d=offsetDate(currentWeek,day),hasMeals=Boolean(w.meals[day*2]||w.meals[day*2+1]);
@@ -108,7 +112,6 @@ function renderMenus(){const w=getWeek(),count=w.meals.filter(Boolean).length, l
   }
   out+='</div><div class="toolbar"><button class="btn secondary" data-action="generate-week">✦ Générer les 14 repas</button><button class="btn secondary" data-action="repeat-week">↻ Reprendre la semaine passée</button></div>'+
   '<button class="btn danger wide clear-week-btn" data-action="clear-week" '+(!count?'disabled':'')+'>🗑️ Vider tous les repas de cette semaine</button>';
-  out+='<button class="btn wide" data-action="go-courses">Voir ma liste de courses →</button>';
   out+='<p class="helper">Choisis librement quand manger les restes : touche le repas souhaité, puis « Placer des restes ici ». La sélection indique les plats cuisinés et les portions encore disponibles. Aucun repas de restes n’est rempli automatiquement.</p>';
   return out
 }
@@ -296,19 +299,25 @@ function renderProduits(){
  out+='<div class="section-head"><h2>Ingrédients</h2><span class="pill">'+total+'</span></div>'+
  '<p class="helper catalog-help">'+(isCarrefour?'Associe une référence Carrefour une seule fois à chaque ingrédient.':'Aucun lien ni code-barres nécessaire pour Grand Frais.')+'</p>'+
  '<div id="ingredientCatalogResults">'+ingredientRowsCatalogue()+'</div>';
- out+='<details class="catalog-independent" '+(independentProductsOpen||productSearch?'open':'')+'><summary>Articles indépendants <span class="pill gray">'+independent+'</span></summary>'+
- '<p class="helper">Produits sans recette associée : boissons, entretien, produits habituels… Une référence déjà liée à un ingrédient ne s’affiche pas ici.</p>'+
- '<button class="btn secondary wide" data-action="add-product">＋ Ajouter un article indépendant</button>'+
- '<div id="productResults">'+productRows()+'</div></details>';
+ out+='<section class="daily-products"><div class="daily-products-heading"><div class="daily-icon">🧻</div><div class="grow"><h2>Achats du quotidien</h2><p>Papier toilette, sopalin, chewing-gum, mascara, produits ménagers…</p></div><span class="pill gray">'+independent+'</span></div>'+
+ '<p class="helper">Ce sont les articles qui ne sont pas des ingrédients de recettes. Garde-les ici pour les ajouter aux courses quand tu en as besoin.</p>'+
+ '<button class="btn wide" data-action="add-product">＋ Ajouter un achat du quotidien</button>'+
+ '<div class="daily-suggestions"><span class="helper">Exemples :</span>'+
+ '<button class="daily-suggestion" data-action="daily-example" data-name="Papier toilette" data-category="Hygiène" data-unit="paquet">＋ PQ</button>'+
+ '<button class="daily-suggestion" data-action="daily-example" data-name="Sopalin" data-category="Maison" data-unit="rouleau">＋ Sopalin</button>'+
+ '<button class="daily-suggestion" data-action="daily-example" data-name="Chewing-gum" data-category="Épicerie" data-unit="paquet">＋ Chewing-gum</button>'+
+ '<button class="daily-suggestion" data-action="daily-example" data-name="Mascara" data-category="Hygiène" data-unit="pièce">＋ Mascara</button></div>'+
+ '<details class="catalog-independent" '+(independentProductsOpen||productSearch?'open':'')+'><summary>Mes articles enregistrés <span class="pill gray">'+independent+'</span></summary>'+
+ '<div id="productResults">'+productRows()+'</div></details></section>';
  if(isCarrefour){
   out+='<p class="helper catalog-footer">Import Carrefour inchangé : copie une référence depuis Carrefour.fr, puis utilise « Importer Carrefour » ci-dessus. Tu peux aussi importer depuis la fiche de chaque ingrédient.</p>';
  }
  return out
 }
 function productEditor(id,draft=null,linkedIngredientId=null){
- const p=productById(id)||draft,title=id?'Modifier le produit':draft?'Importer depuis Carrefour':'Ajouter un produit';
+ const p=productById(id)||draft,title=id?'Modifier le produit':draft?.url?'Importer depuis Carrefour':draft?'Nouvel achat du quotidien':'Ajouter un achat du quotidien';
  const body='<form id="productForm" data-id="'+html(p?.id||'')+'" data-ingredient-id="'+html(linkedIngredientId||'')+'"><div class="field"><label for="productName">Nom du produit</label><input id="productName" maxlength="100" required placeholder="Ex. Papier toilette" value="'+html(p?.name||'')+'"></div><div class="field"><label for="productBrand">Marque (facultatif)</label><input id="productBrand" maxlength="80" placeholder="Ex. Lotus" value="'+html(p?.brand||'')+'"></div><div class="field"><label for="productPackaging">Conditionnement (facultatif)</label><input id="productPackaging" maxlength="80" placeholder="Ex. Lot de 12 rouleaux" value="'+html(p?.packaging||'')+'"></div><div class="field"><label for="productCategory">Catégorie</label><select id="productCategory">'+selectOptions(productCategories,p?.category||'Autres')+'</select></div><div class="field"><label for="productStore">Magasin habituel</label><select id="productStore"><option value="carrefour" '+((state.storePreferences?.['product:'+p?.id]||p?.store||'carrefour')==='carrefour'?'selected':'')+'>Carrefour Drive</option><option value="grandfrais" '+((state.storePreferences?.['product:'+p?.id]||p?.store)==='grandfrais'?'selected':'')+'>Grand Frais</option></select></div><div class="row" style="align-items:start"><div class="field grow"><label for="productQty">Quantité habituelle à acheter</label><input id="productQty" type="number" min=".01" step="any" required value="'+(p?.qty||1)+'"></div><div class="field grow"><label for="productUnit">Unité</label><select id="productUnit">'+selectOptions(units,p?.unit||'paquet')+'</select></div></div><div class="card soft" style="margin:12px 0"><strong>Contenu d’un emballage (facultatif)</strong><p class="helper">Exemple : un paquet contenant 1 kg de riz, pour calculer le nombre de paquets à acheter.</p><div class="row" style="align-items:start"><div class="field grow"><label for="packAmount">Contenu</label><input id="packAmount" type="number" min=".01" step="any" placeholder="Ex. 1" value="'+html(p?.packAmount??'')+'"></div><div class="field grow"><label for="packUnit">Unité de contenu</label><select id="packUnit">'+selectOptions(contentUnits,p?.packUnit||'g')+'</select></div></div></div><div class="field"><label for="productEan">Code-barres EAN-13 (facultatif)</label><input id="productEan" maxlength="13" inputmode="numeric" pattern="[0-9]{13}" placeholder="13 chiffres" value="'+html(p?.ean||'')+'"><div class="helper">Code de la fiche Carrefour, à vérifier sur l’emballage si nécessaire.</div></div><div class="field"><label for="productUrl">Lien du produit Carrefour (facultatif)</label><input id="productUrl" type="url" maxlength="2000" autocomplete="off" placeholder="https://www.carrefour.fr/p/..." value="'+html(p?.url||'')+'"><div class="helper">Colle le lien exact depuis Carrefour.fr. Aucune connexion à ton compte n’est demandée.</div></div><button class="btn wide" type="submit">✓ Enregistrer le produit</button></form>';
- showModal(title,(draft&&!id?'<div class="note" style="margin-bottom:12px"><strong>Import depuis Carrefour.fr</strong><p>Vérifie le nom, la marque, la quantité et le conditionnement avant d’enregistrer. Aucun panier n’est modifié.</p></div>':'')+body+(id?'<button class="btn danger wide" style="margin-top:10px" data-action="delete-product" data-id="'+html(id)+'">Supprimer ce produit</button>':''))
+ showModal(title,(draft?.url&&!id?'<div class="note" style="margin-bottom:12px"><strong>Import depuis Carrefour.fr</strong><p>Vérifie le nom, la marque, la quantité et le conditionnement avant d’enregistrer. Aucun panier n’est modifié.</p></div>':'')+body+(id?'<button class="btn danger wide" style="margin-top:10px" data-action="delete-product" data-id="'+html(id)+'">Supprimer ce produit</button>':''))
 }
 function saveProduct(e){
  e.preventDefault();
@@ -1176,6 +1185,11 @@ document.addEventListener('click',e=>{
    $('#addIngredientBottom')?.scrollIntoView?.({behavior:'smooth',block:'nearest'})
   }
   else if(mode==='add-product')productEditor(null);
+  else if(mode==='daily-example'){
+   productEditor(null,{name:a.dataset.name||'',category:a.dataset.category||'Autres',
+    brand:'',packaging:'',store:ingredientStoreTab,qty:1,unit:a.dataset.unit||'paquet',
+    url:'',ean:'',packAmount:null,packUnit:null})
+  }
   else if(mode==='ingredient-store-tab'){ingredientStoreTab=a.dataset.store==='grandfrais'?'grandfrais':'carrefour';render(true)}
   else if(mode==='add-catalog-ingredient')ingredientEditor(null);
   else if(mode==='add-ingredient-to-courses')addIngredientToCoursesModal(id);

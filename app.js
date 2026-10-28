@@ -230,6 +230,7 @@ function ingredientEditor(id,draftName=''){
  state.products.slice().sort((a,b)=>a.name.localeCompare(b.name,'fr')).map(p=>'<option value="'+html(p.id)+'" '+(ing?.productId===p.id?'selected':'')+'>'+html([p.name,p.brand,p.packaging].filter(Boolean).join(' · '))+'</option>').join('')+'</select>'+
  '<div class="helper">Pour Carrefour, sélectionne la référence dont le code EAN et le poids ou contenu du paquet ont été renseignés. La même référence sera utilisée dans toutes les recettes contenant cet ingrédient.</div></div>'+
  '<button class="btn wide" type="submit">✓ Enregistrer dans la base</button></form>';
+ if(ing&&store==='carrefour'&&productById(ing.productId))out+='<button class="btn wide" style="margin-top:10px" data-action="edit-product" data-id="'+html(ing.productId)+'">✎ Modifier la référence Carrefour liée</button>';
  if(ing&&store==='carrefour')out+='<button class="btn secondary wide" style="margin-top:10px" data-action="import-linked-product" data-id="'+html(ing.id)+'">📋 Importer un produit depuis Carrefour</button>'+
  '<button class="btn secondary wide" style="margin-top:8px" data-action="new-linked-product" data-id="'+html(ing.id)+'">＋ Créer une fiche produit manuellement</button>';
  else out+='<p class="helper">Enregistre d’abord cet ingrédient, puis tu pourras créer ou lier sa référence Carrefour.</p>';

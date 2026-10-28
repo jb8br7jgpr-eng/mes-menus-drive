@@ -93,3 +93,13 @@
 .ingredient-store-row .ingredient-store{min-width:0;max-width:62%;height:38px;padding:6px 8px;border:1px solid #d6e3d6;border-radius:10px;background:#f7faf5;color:#2d5440;font-size:12px;font-weight:700}
 .ingredient-link-note{font-size:10px;color:#728377;line-height:1.45;margin:7px 1px 2px;overflow-wrap:anywhere}
 @supports (-webkit-touch-callout:none){.ingredient-store-row .ingredient-store{font-size:16px!important}}
+
+/* Vidage pratique du calendrier : actions accessibles sur la carte du jour,
+   sans réduire les dimensions validées des cases de repas. */
+.day-card-head{display:flex;align-items:center;justify-content:space-between;gap:9px;margin:0 0 10px}
+.day-card-head .day-title{margin:0;min-width:0}
+.day-clear-btn{display:inline-flex;align-items:center;justify-content:center;min-height:30px;flex-shrink:0;padding:5px 9px;border:1px solid #eddbd6;border-radius:9px;background:#fff6f4;color:#98564a;font-size:11px;font-weight:750;line-height:1.2}
+.day-clear-btn:disabled{opacity:.35}
+.clear-week-btn{margin:6px 0 10px;min-height:44px}
+.ingredient-auto-note{margin:9px 0 12px;background:#eff7eb;color:#355a3d;border-color:#d7e9d0}
+@media(max-width:360px){.day-clear-btn{font-size:10px;padding:5px 7px}.day-card-head .day-title small{margin-left:2px}}

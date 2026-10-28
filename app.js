@@ -304,17 +304,48 @@ function groupFor(name,unit){const s=norm(name);if(/pq|papier toilette|lessive|s
 function productGroup(p){if(['Hygiène','Maison'].includes(p?.category))return 'Hygiène et maison';if(p?.category==='Viandes et poissons')return 'Viandes et poissons';if(p?.category==='Fruits et légumes')return 'Fruits et légumes';if(p?.category==='Produits frais')return 'Produits frais';return 'Épicerie et divers'}
 function shopping(){
  const w=getWeek(),map=new Map(),packs=new Map();
- function plain(name,qty,unit,source,productId){const clean=String(name||'').trim();if(!clean)return;const [v,u]=converted(qty,unit);if(!(v>0))return;const p=productById(productId);const key=(p?'produit:'+p.id:norm(clean))+'|'+u;if(!map.has(key))map.set(key,{id:key,name:clean,qty:0,unit:u,source:[],productId:p?.id||null});const item=map.get(key);item.qty+=v;if(!item.source.includes(source))item.source.push(source)}
- function add(name,qty,unit,source,productId,fromCatalogue=false){
-  const p=productById(productId),[val,u]=converted(qty,unit),[size,packUnit]=p&&p.packAmount>0?converted(p.packAmount,p.packUnit):[0,''];
-  const compatible=p&&size>0&&packUnit===u,catalogue=p&&fromCatalogue&&unit===p.unit;
-  if(compatible||catalogue){if(!packs.has(p.id))packs.set(p.id,{p,needed:0,needUnit:packUnit||u,size,manualPacks:0,source:[]});const item=packs.get(p.id);if(catalogue)item.manualPacks+=Number(qty);else item.needed+=val;if(!item.source.includes(source))item.source.push(source);return}
-  plain(name,qty,unit,source,productId)
+ function plain(name,qty,unit,source,productId,ingredientId,store){
+  const clean=String(name||'').trim();if(!clean)return;
+  const [v,u]=converted(qty,unit);if(!(v>0))return;
+  const p=productById(productId),ing=ingredientById(ingredientId);
+  const key=(ing?'ingredient:'+ing.id:(p?'produit:'+p.id:norm(clean)))+'|'+u;
+  if(!map.has(key))map.set(key,{id:key,name:ing?.name||clean,qty:0,unit:u,source:[],productId:p?.id||null,ingredientId:ing?.id||null,forcedStore:store||null});
+  const x=map.get(key);x.qty+=v;if(!x.source.includes(source))x.source.push(source)
  }
- w.meals.forEach(m=>mealDishes(m).forEach(d=>{const recipe=recipeById(d.recipeId);if(!recipe)return;const factor=(Number(d.people)||2)/Math.max(1,Number(recipe.people)||2);recipe.ingredients.forEach(x=>add(x.name,Number(x.qty)*factor,x.unit,'Recettes',x.productId))}));
- w.extras.forEach(x=>add(x.name,x.qty,x.unit,'Ajout manuel',x.productId,Boolean(x.fromCatalogue)));
- for(const [productId,item] of packs){const p=item.p,n=item.needed>0&&item.size>0?Math.ceil(item.needed/item.size-1e-9):0,count=n+item.manualPacks;if(count<=0)continue;const id='produit:'+productId+'|achat';map.set(id,{id,name:p.name,qty:count,unit:p.unit||'paquet',source:item.source,productId,needed:item.needed>0?quantity(item.needed,item.needUnit):'',packageDescription:p.packaging||((p.packAmount>0)?quantity(p.packAmount,p.packUnit):'')})}
- return [...map.values()].sort((a,b)=>a.name.localeCompare(b.name,'fr')).map(x=>{const category=x.productId?productGroup(productById(x.productId)):groupFor(x.name,x.unit);const item={...x,category,checked:w.checked.includes(x.id),excluded:w.excluded.includes(x.id)};return {...item,store:shoppingStore(item)}})
+ function add(name,qty,unit,source,productId,fromCatalogue=false,ingredientId=null){
+  const ing=ingredientById(ingredientId),store=ing?ingredientStore(ing):null;
+  const selectedProductId=ing?(ing.productId||null):productId;
+  const p=productById(selectedProductId);
+  const [val,u]=converted(qty,unit),[size,packUnit]=p&&p.packAmount>0?converted(p.packAmount,p.packUnit):[0,''];
+  const compatible=p&&size>0&&packUnit===u,catalogue=p&&fromCatalogue&&unit===p.unit;
+  if((compatible||catalogue)&&(!ing||store==='carrefour')){
+   if(!packs.has(p.id))packs.set(p.id,{p,needed:0,needUnit:packUnit||u,size,manualPacks:0,source:[],ingredientId:ing?.id||null});
+   const item=packs.get(p.id);
+   if(catalogue)item.manualPacks+=Number(qty);else item.needed+=val;
+   if(ing&&!item.ingredientId)item.ingredientId=ing.id;
+   if(!item.source.includes(source))item.source.push(source);
+   return
+  }
+  plain(ing?.name||name,qty,unit,source,(store==='grandfrais')?null:p?.id,ing?.id||null,store)
+ }
+ w.meals.forEach(m=>mealDishes(m).forEach(d=>{
+  const recipe=recipeById(d.recipeId);if(!recipe)return;
+  const factor=(Number(d.people)||2)/Math.max(1,Number(recipe.people)||2);
+  recipe.ingredients.forEach(x=>add(x.name,Number(x.qty)*factor,x.unit,'Recettes',x.productId,false,x.ingredientId))
+ }));
+ w.extras.forEach(x=>add(x.name,x.qty,x.unit,'Ajout manuel',x.productId,Boolean(x.fromCatalogue),x.ingredientId));
+ for(const [productId,item] of packs){
+  const p=item.p,n=item.needed>0&&item.size>0?Math.ceil(item.needed/item.size-1e-9):0,count=n+item.manualPacks;
+  if(count<=0)continue;
+  const id='produit:'+productId+'|achat';
+  map.set(id,{id,name:p.name,qty:count,unit:p.unit||'paquet',source:item.source,productId,ingredientId:item.ingredientId,
+   needed:item.needed>0?quantity(item.needed,item.needUnit):'',packageDescription:p.packaging||((p.packAmount>0)?quantity(p.packAmount,p.packUnit):'')})
+ }
+ return [...map.values()].sort((a,b)=>a.name.localeCompare(b.name,'fr')).map(x=>{
+  const category=x.productId?productGroup(productById(x.productId)):groupFor(x.name,x.unit);
+  const item={...x,category,checked:w.checked.includes(x.id),excluded:w.excluded.includes(x.id)};
+  return {...item,store:shoppingStore(item)}
+ })
 }
 function shoppingRow(x){
  const p=productById(x.productId);

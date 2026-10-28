@@ -1,5 +1,5 @@
-const CACHE='menus-drive-v20-home-stock-daily-20261028';
-const ASSETS=['./','./index.html','./styles.css?v=20261028-20','./app.js?v=20261028-20','./manifest.webmanifest','./icon.svg'];
+const CACHE='menus-drive-v21-two-meals-leftovers-20261028';
+const ASSETS=['./','./index.html','./styles.css?v=20261028-21','./app.js?v=20261028-21','./manifest.webmanifest','./icon.svg'];
 self.addEventListener('install',event=>{
   event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(ASSETS)).then(()=>self.skipWaiting()));
 });

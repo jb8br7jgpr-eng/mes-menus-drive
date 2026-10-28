@@ -264,9 +264,9 @@ function shoppingRow(x){
  '</div><label class="store-label" for="store-'+encodeURIComponent(x.id)+'">Magasin :</label>'+
  '<select class="store-select" id="store-'+encodeURIComponent(x.id)+'" data-store-item="'+html(x.id)+'" aria-label="Magasin pour '+html(x.name)+'">'+
  '<option value="carrefour" '+(x.store==='carrefour'?'selected':'')+'>🛒 Carrefour Drive</option>'+
- '<option value="grandfrais" '+(x.store==='grandfrais'?'selected':'')+'>🥬 Grand Frais</option></select></div>'+
- '<div class="shopping-qty">'+html(quantity(x.qty,x.unit))+'</div>'+
- '<button class="icon-btn" data-action="exclude" data-id="'+html(x.id)+'" aria-label="Déjà à la maison : '+html(x.name)+'" title="Déjà à la maison">−</button></div>'
+ '<option value="grandfrais" '+(x.store==='grandfrais'?'selected':'')+'>🥬 Grand Frais</option></select>'+ 
+ '<button class="home-owned" data-action="exclude" data-id="'+html(x.id)+'" title="Retirer des achats, sans supprimer la recette ni le produit">🏠 Déjà chez nous · Retirer</button></div>'+
+ '<div class="shopping-qty">'+html(quantity(x.qty,x.unit))+'</div></div>'
 }
 function renderCourses(){
  const items=shopping(),available=items.filter(x=>!x.excluded),excluded=items.filter(x=>x.excluded),left=available.filter(x=>!x.checked),w=getWeek();
@@ -292,7 +292,7 @@ function renderCourses(){
  }
  out+=section('carrefour','Carrefour Drive','🛒',todoDrive,drive);
  out+=section('grandfrais','Grand Frais','🥬',todoGrand,grand);
- if(excluded.length)out+='<div class="section-head"><h2>Déjà à la maison</h2><span class="pill gray">'+excluded.length+'</span></div>'+excluded.map(x=>'<div class="shopping-row"><span class="grow muted">'+html(x.name)+' · '+html(quantity(x.qty,x.unit))+'</span><button class="btn tiny secondary" data-action="include" data-id="'+html(x.id)+'">Réintégrer</button></div>').join('');
+ if(excluded.length)out+='<div class="section-head"><h2>Déjà à la maison · retirés des achats</h2><span class="pill gray">'+excluded.length+'</span></div>'+excluded.map(x=>'<div class="shopping-row"><span class="grow muted">'+html(x.name)+' · '+html(quantity(x.qty,x.unit))+'</span><button class="btn tiny secondary" data-action="include" data-id="'+html(x.id)+'">Réintégrer</button></div>').join('');
  if(w.extras.length)out+='<div class="section-head"><h2>Produits ajoutés cette semaine</h2></div>'+w.extras.map(x=>'<div class="shopping-row"><span class="grow shopping-name">'+html(x.name)+'</span><span class="shopping-qty">'+html(quantity(x.qty,x.unit))+'</span><button class="icon-btn" data-action="delete-extra" data-id="'+x.id+'" aria-label="Supprimer">×</button></div>').join('');
  return out
 }

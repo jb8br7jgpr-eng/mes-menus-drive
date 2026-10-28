@@ -409,3 +409,20 @@ Le nombre de portions renseigné lorsque l’on ajoute un plat correspond **à l
 
 Tests simulés : 4→2+2, absence de placement automatique, consommation jeudi de restes cuisinés lundi, ingrédients calculés une seule fois pour 4, diminution à 2, double plat 1+1, plat de 4 avec autre plat, édition sur iPhone. Le moteur Carrefour et Userscripts restent inchangés.
 
+
+
+## V22 — Courses générées explicitement, indépendamment pour chaque semaine (28/10/2026)
+
+Cette version remplace la synchronisation automatique Menus → Courses par une **génération volontaire des ingrédients des recettes**. Les cases du calendrier restent librement modifiables : aucun ingrédient n'apparaît dans les listes Carrefour ou Grand Frais tant que l'utilisateur n'a pas activé **« Générer les courses de cette semaine »**. Le bouton figure dans Menus et, si la semaine comporte déjà des plats, également dans Courses/Drive. Chaque liste est attachée à sa **semaine du lundi au dimanche** ; un sélecteur de semaine est désormais visible sur Courses et Drive comme sur Menus.
+
+### Cycle de vie
+
+- **Brouillon** : ajouter, déplacer ou supprimer des plats n'ajoute plus leurs ingrédients aux courses. Les articles ajoutés volontairement à la semaine (achats du quotidien, favoris, ingrédients ponctuels) restent visibles immédiatement dans Courses.
+- **Génération** : l'application prend un instantané des lignes d'ingrédients des plats *préparés* cette semaine, adaptées aux portions cuisinées. Exemple : cuisson de 4 portions → courses pour 4, 2 mangées et 2 restes à placer plus tard, sans nouveau comptage des ingrédients. Les lignes sont mémorisées dans `weeks[date].generatedIngredients` avec `generatedSignature` et `generatedAt`. Les listes Carrefour et Grand Frais utilisent ensuite cet instantané et les achats ajoutés manuellement. Le stock, les exclusions, les coches et le conditionnement continuent de s'appliquer normalement.
+- **Menus modifiés ensuite** : un changement de recette ou de quantités ne modifie pas silencieusement les courses déjà générées. Les onglets affichent **« Les menus ont été modifiés »**, puis un bouton **Actualiser**. L'utilisateur garde l'ancienne liste tant qu'il ne confirme pas une nouvelle génération.
+- **Régénération** : confirmation explicite si une liste était déjà générée. Les lignes d'ingrédients issus des anciennes recettes sont remplacées par celles du planning actuel. Les **ajouts manuels**, le **stock maison**, les choix de magasin, les cases cochées et les exclusions ne sont pas supprimés. Le Drive continue à ne transférer que les références Carrefour valides et disponibles après vérification par Userscripts. Aucune commande ni paiement n'est automatisé.
+- **Changement de semaine** : naviguer entre les semaines dans Menus, Courses ou Drive préserve la liste propre à chaque semaine sans fusionner les courses. Une semaine nouvelle comporte une liste non générée, jusqu'au clic.
+- **Compatibilité des données historiques** : une migration exécutée **une seule fois au premier chargement ou à l'import d'une sauvegarde ancienne** capture les ingrédients des semaines déjà remplies selon le comportement de la version précédente, afin d'éviter de faire disparaître les courses existantes. Le drapeau `coursesExplicitGenerationV1` empêche toute génération automatique lors des démarrages ultérieurs. Le schéma JSON reste `schema:1` : les champs facultatifs supplémentaires sont inclus dans l'export/import standard, et la restauration depuis un ancien JSON les reconstruit sans toucher aux recettes.
+- **Travail validé en simulation** : absence d'ingrédients recettes avant génération ; capture pour quatre portions ; liste de courses initiale ; modification de menus sans réécriture ; confirmation/cancel ; conservation des ajouts, stocks, coches et exclusions ; isolation entre deux semaines ; sauvegarde JSON et migration ancienne idempotente. Contrôle visuel sur iPhone à effectuer.
+
+Le moteur panier Carrefour et Userscripts 0.9.0, la banque des ingrédients et des produits, l'import Carrefour, la liste Notes Grand Frais, les autres jeux et la branche `main` restent inchangés.

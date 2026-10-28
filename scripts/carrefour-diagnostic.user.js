@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Menus & Drive — Diagnostic Carrefour (lecture seule)
 // @namespace    https://github.com/jb8br7jgpr-eng/mes-menus-drive
-// @version      0.2.0
-// @description  Importe les fiches produits Carrefour dans Mes produits, sans toucher au panier.
+// @version      0.3.0
+// @description  Copie une fiche Carrefour vers Menus & Drive installé sur iPhone, sans toucher au panier.
 // @match        https://www.carrefour.fr/*
 // @match        https://carrefour.fr/*
 // @run-at       document-idle
@@ -87,8 +87,13 @@
     const preview = document.createElement('p');
     preview.style.cssText='font-weight:700;overflow-wrap:anywhere';
     const importBtn = document.createElement('button');
-    importBtn.type='button';importBtn.className='import';importBtn.textContent='Ouvrir la fiche dans Menus & Drive';
+    importBtn.type='button';importBtn.className='import';importBtn.textContent='📋 Copier pour mon appli';
     let importDraft=null;
+    const manualCopy = document.createElement('textarea');
+    manualCopy.readOnly=true;
+    manualCopy.hidden=true;
+    manualCopy.setAttribute('aria-label','Code du produit Carrefour à copier');
+    manualCopy.style.cssText='width:100%;min-height:85px;border:1px solid #bfd4c4;border-radius:8px;padding:8px;font-size:12px;margin:7px 0;resize:none';
     const notice = document.createElement('div');
     notice.className = 'light';
     notice.innerHTML = '<strong>✅ Lecture seule</strong><div class="muted">Aucun produit ajouté, panier inchangé, aucune donnée envoyée.</div>';
@@ -99,7 +104,7 @@
     close.type = 'button';
     close.className = 'close';
     close.textContent = 'Fermer le diagnostic';
-    panel.append(heading, status, domain, ean, preview, importBtn, notice, shop, close);
+    panel.append(heading, status, domain, ean, preview, importBtn, manualCopy, notice, shop, close);
 
     const trigger = document.createElement('button');
     trigger.type = 'button';
@@ -129,11 +134,25 @@
       panel.classList.toggle('open');
       if (panel.classList.contains('open')) close.focus();
     });
-    importBtn.addEventListener('click',()=>{
+    importBtn.addEventListener('click',async()=>{
       if(!importDraft||!importDraft.name||!productPage())return;
-      const data=encodeURIComponent(JSON.stringify(importDraft));
-      if(data.length>5000)return;
-      location.assign(APP_URL+'#carrefour-product='+data);
+      const code='MD-CARREFOUR-V1:'+JSON.stringify(importDraft);
+      if(code.length>5000){notice.textContent='Fiche trop longue à copier.';return}
+      let success=false;
+      try{if(navigator.clipboard?.writeText){await navigator.clipboard.writeText(code);success=true}}
+      catch(e){/* Autorisation presse-papiers refusée : tentative alternative. */}
+      if(!success){
+        manualCopy.value=code;
+        manualCopy.hidden=false;
+        manualCopy.focus();manualCopy.select();
+        try{success=document.execCommand('copy')}catch(e){/* iOS peut demander un copier manuel. */}
+      }
+      if(success){
+        manualCopy.hidden=true;
+        notice.textContent='✅ Produit copié ! Ouvre maintenant ton icône Menus & Drive → Produits → Coller un produit Carrefour.';
+      }else{
+        notice.textContent='Appuie longtemps sur le texte sélectionné puis « Copier ». Ouvre ensuite ton icône Menus & Drive → Produits → Coller un produit Carrefour.';
+      }
     });
     close.addEventListener('click', () => {
       panel.classList.remove('open');

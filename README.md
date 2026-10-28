@@ -71,3 +71,21 @@ Pour tester sans publier, télécharger les fichiers de la branche et utiliser u
 ## Notes
 
 La génération automatique est volontairement simple dans cette première version : elle répartit les plats disponibles en essayant d'éviter les doublons sur la même semaine. Elle ne connaît pas encore vos goûts, les habitudes d'achat ni les dates de consommation. Les courses non achetées, les quantités et les substitutions Carrefour demandent une vérification humaine.
+
+
+## Module Safari Carrefour — diagnostic en lecture seule
+
+Fichier : `scripts/carrefour-diagnostic.user.js`. Ce module de test est **indépendant de l’application** et ne modifie jamais le panier.
+
+**Installation sur iPhone :**
+
+1. Installer l’application gratuite **Userscripts** depuis l’App Store, puis l’ouvrir une fois.
+2. Dans Réglages → Apps → Safari → Extensions → Userscripts, activer l’extension. Lui donner l’autorisation d’exécution pour **carrefour.fr**.
+3. Dans Safari, ouvrir `https://raw.githubusercontent.com/jb8br7jgpr-eng/mes-menus-drive/developpement-v1/scripts/carrefour-diagnostic.user.js`, puis ouvrir l’extension Userscripts depuis le menu de la page et accepter l’installation proposée. Si cette méthode échoue, enregistrer le fichier `.user.js` dans le dossier Userscripts sélectionné depuis l’application.
+4. Ouvrir `https://www.carrefour.fr/` dans **Safari** (pas dans l’application web installée sur l’écran d’accueil) et chercher le bouton « 🧪 Test Menus & Drive ».
+5. Appuyer sur le bouton. Le panneau affiche « Extension active », le nom de domaine et, uniquement pour les pages produits dont l’URL contient 13 chiffres, l’identifiant détecté dans l’adresse.
+
+Aucun mot de passe, cookie, token ni donnée de compte n’est lu, enregistré ou transmis. Pas d’appel réseau, de recherche des produits ni d’action d’ajout au panier. Le Drive École-Valentin doit être sélectionné et vérifié **manuellement** sur le site. La correspondance entre chiffres d’URL et EAN n’est pas encore vérifiée avec le catalogue Carrefour.
+
+**Suite du développement :** concevoir le transfert volontaire de la liste de courses depuis notre application vers le module Safari, puis seulement des essais d'identification de références en lecture seule. Un test d’ajout d’un article réel au panier nécessitera un nouvel accord explicite.
+

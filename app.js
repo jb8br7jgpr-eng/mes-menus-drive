@@ -345,6 +345,8 @@ function saveUnifiedCatalogue(e){
   if((packAmount!==null&&(!Number.isFinite(packAmount)||packAmount<=0||!contentUnits.includes(packUnit)))||
     (ean&&!/^\d{13}$/.test(ean))){toast('Vérifie le contenu du paquet et le code-barres.');return}
   let url='';try{url=validCarrefourLink($('#catalogueUrl')?.value)}catch(err){toast(err.message);return}
+  const existingIngredient=!old&&!e.target.dataset.ingredientId?ingredientByName(name):null;
+  if(existingIngredient){toast('Ce produit existe déjà comme ingrédient. Utilise sa fiche.');ingredientEditor(existingIngredient.id);return}
   const duplicate=state.products.find(p=>p.id!==old?.id&&
     ((ean&&p.ean===ean)||(url&&p.url&&p.url.split(/[?#]/)[0]===url.split(/[?#]/)[0])||
      (norm(p.name)===norm(name)&&norm(p.brand)===norm(brand)&&norm(p.packaging)===norm(packaging))));

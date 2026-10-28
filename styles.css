@@ -269,3 +269,13 @@
 .hero-menu-actions .hero-repeat-btn:hover{background:#ffffff23}
 .hero-menu-actions .week-complete-note{margin:0;min-height:49px;justify-content:center;text-align:center;font-size:11px}
 @media(max-width:380px){.hero-menu-actions{gap:7px}.hero-menu-actions .btn{font-size:11px;padding:9px 6px}}
+
+/* V25 : tri des plats lisible sur iPhone, défilement automatique des ingrédients. */
+.recipe-filters{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;margin:2px 0 11px}
+.recipe-filters .field{min-width:0;margin-bottom:4px}
+.recipe-filters label{font-size:11px;color:#526b56}
+.recipe-filters select{min-width:0;width:100%;height:44px;padding:9px 10px;font-weight:650;font-size:12px;color:#31543a;background:#f5f9f3;border:1px solid #dbe6db;border-radius:11px}
+.modal{scroll-padding-bottom:78px}
+.ingredient-add-bottom{scroll-margin-bottom:24px}
+@media(max-width:380px){.recipe-filters{gap:7px}.recipe-filters select{padding:9px 7px;font-size:11px}}
+@supports (-webkit-touch-callout:none){.recipe-filters select{font-size:16px!important}}

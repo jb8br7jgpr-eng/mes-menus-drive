@@ -476,6 +476,13 @@ function setMealDishes(w,index,dishes){
    w.meals[index+1]={type:'leftovers',recipeId:clean[0].recipeId,fromIndex:index,leftoverPortions:Math.max(2,clean[0].people-2)};
  }else{
   w.meals[index]={type:'multi',dishes:clean};
+  // Si un seul des plats prépare aussi des restes, on conserve ce repas suivant,
+  // même si l'autre personne mange un plat différent à ce repas.
+  const leftoverDishes=clean.filter(d=>d.people>=4);
+  if(leftoverDishes.length===1&&index+1<w.meals.length&&!w.meals[index+1]){
+   const d=leftoverDishes[0];
+   w.meals[index+1]={type:'leftovers',recipeId:d.recipeId,fromIndex:index,leftoverPortions:Math.max(2,d.people-2)};
+  }
  }
 }
 function selectRecipeForMeal(w,index,recipeId,portions){

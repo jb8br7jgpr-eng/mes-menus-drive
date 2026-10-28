@@ -1,5 +1,5 @@
 // ==UserScript==
-// @name         Menus & Drive — Carrefour
+// @name         Menus & Drive — Diagnostic Carrefour (lecture seule)
 // @namespace    https://github.com/jb8br7jgpr-eng/mes-menus-drive
 // @version      0.8.0
 // @description  Constitue le panier Drive avec les références disponibles, sans commande ni paiement.
@@ -225,7 +225,7 @@
       listStatus.textContent=data.rows.length+' référence'+(data.rows.length!==1?'s':'')+' transférée'+(data.rows.length!==1?'s':'')+' (code-barres + quantité).';
       const note=document.createElement('p');
       note.className='muted';
-      note.textContent='Ces codes ne sont pas encore vérifiés dans le catalogue Carrefour. Aucun panier modifié.';
+      note.textContent='Codes reçus. Le panier ne sera modifié que si Carrefour confirme une disponibilité suffisante.';
       listPreview.append(note);
       for(const item of data.rows){
         const line=document.createElement('div');line.className='line';
@@ -238,7 +238,7 @@
         listPreview.append(line);
       }
       const safe=document.createElement('p');safe.className='light';
-      safe.textContent='🔒 Mode aperçu : aucun article ajouté au panier. Vérifie ton Drive d’École-Valentin directement sur Carrefour.fr.';
+      safe.textContent='🛒 Ton panier peut être constitué automatiquement : vérifie impérativement le Drive affiché, puis les quantités avant paiement.';
       listPreview.append(safe);
       pasteField.hidden=true;pasteConfirm.hidden=true;
     }
@@ -404,8 +404,9 @@
       const existing=cartOutcomes.filter(x=>x.kind==='existing');
       const missing=cartOutcomes.filter(x=>x.kind==='missing');
       const partial=cartOutcomes.filter(x=>x.kind==='partial');
+      const pending=Math.max(0,previewRows.length-cartOutcomes.length);
       const title=document.createElement('strong');
-      title.textContent='🛒 '+added.length+' ajouté(s) · '+existing.length+' déjà présent(s) · '+(missing.length+partial.length)+' à vérifier';
+      title.textContent='🛒 '+added.length+' ajouté(s) · '+existing.length+' déjà présent(s) · '+(missing.length+partial.length)+' à vérifier'+(pending?' · '+pending+' restant(s)':'');
       const details=document.createElement('div');
       details.textContent=note||'Seules les références confirmées disponibles sont ajoutées. Vérifie ton panier avant paiement.';
       cartSummary.replaceChildren(title,details);
@@ -505,7 +506,7 @@
             const msg=String(e.message||'Erreur inconnue');
             cartOutcomes.push({ean:row.ean,name,kind:'missing',reason:'Échec technique : '+msg});
             showCartSummary();
-            if(/STOP : le Drive actif a changé/.test(msg)||[401,403,429].includes(e.status)){
+            if(/STOP : le Drive actif a changé/.test(msg)||[400,401,403,429].includes(e.status)){
               lookupStatus.textContent='⛔ Arrêt du transfert : '+msg;
               break
             }

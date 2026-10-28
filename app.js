@@ -498,7 +498,7 @@ function shopping(){
   const stockAmount=Math.max(0,Number(w.pantry[pantryKey])||0);
   const grossNeed=item.needed>0?item.needed+item.manualPacks*item.size:item.manualPacks;
   const netNeed=Math.max(0,grossNeed-stockAmount);
-  const count=item.needed>0&&item.size>0?Math.ceil(netNeed/item.size-1e-9):Math.ceil(netNeed-1e-9);
+  const count=item.needed>0&&item.size>0?Math.ceil(netNeed/item.size-1e-9):netNeed;
   const id='produit:'+productId+'|achat';
   map.set(id,{id,name:p.name,qty:count,unit:p.unit||'paquet',source:item.source,productId,ingredientId:item.ingredientId,
    needed:netNeed>0?quantity(netNeed,stockUnit):'',grossNeeded:grossNeed>0?quantity(grossNeed,stockUnit):'',
@@ -579,7 +579,7 @@ function homeStockModal(itemId){
  '<div class="row stock-editor-row"><div class="field grow"><label for="homeStockAmount">Quantité disponible</label>'+
  '<input id="homeStockAmount" type="number" min="0" step="any" inputmode="decimal" value="'+html(Number(amount.toFixed(3)))+'"></div>'+
  '<div class="field grow"><label for="homeStockUnit">Unité</label><select id="homeStockUnit" data-previous="'+html(selected)+'">'+
- choices.map(u=>'<option value="'+html(u)+'" '+(selected===u?'selected':'')+'>'+html(u==='paquet'?'paquet entier':u)+'</option>').join('')+'</select></div></div>';
+ choices.map(u=>'<option value="'+html(u)+'" '+(selected===u?'selected':'')+'>'+html(u==='paquet'?'paquet':u)+'</option>').join('')+'</select></div></div>';
  if(choices.includes('paquet')&&packSize>0)htmlBody+='<p class="helper">1 paquet = '+html(quantity(packSize,packUnit))+'. Tu peux indiquer un stock en paquets ou dans une unité de poids/volume.</p>';
  htmlBody+='<div class="stock-quick-actions"><button class="btn secondary" data-action="stock-zero">Aucun stock</button><button class="btn secondary" data-action="stock-all">✓ J’ai tout</button></div>'+
  '<div id="homeStockPreview" class="stock-preview">'+html(stockPreview(x,Number(amount),selected))+'</div>'+

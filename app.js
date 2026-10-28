@@ -703,7 +703,10 @@ function pickMeal(index){
  });
  out+='</div>';
  if(!state.recipes.length)out+='<div class="note" style="margin-top:10px">Ajoute d’abord tes plats au catalogue, puis retrouve-les ici.</div>';
- if(meal)out+='<button class="btn secondary wide" style="margin-top:12px" data-action="remove-meal" data-index="'+index+'">Vider ce repas</button>';
+ if(meal)out+='<div class="meal-transfer-actions">'+
+ '<button class="btn secondary" data-action="move-copy-meal" data-mode="copy" data-index="'+index+'" '+(!dishes.length?'disabled':'')+'>⧉ Copier</button>'+
+ '<button class="btn secondary" data-action="move-copy-meal" data-mode="move" data-index="'+index+'">↔ Déplacer</button></div>'+
+ '<button class="btn secondary wide" style="margin-top:12px" data-action="remove-meal" data-index="'+index+'">Vider ce repas</button>';
  showModal(days[Math.floor(index/2)]+' '+(index%2?'soir':'midi'),out)
 }
 function extraModal(){let out='<form id="extraForm"><div class="field"><label for="extraName">Produit</label><input id="extraName" maxlength="80" placeholder="Ex. papier toilette, baume à lèvres…" required></div><div class="row" style="align-items:start"><div class="field grow"><label for="extraQty">Quantité</label><input id="extraQty" type="number" min=".01" step="any" value="1" required></div><div class="field grow"><label for="extraUnit">Unité</label><select id="extraUnit">'+selectOptions(units,'paquet')+'</select></div></div><label class="row" style="font-size:13px;margin:5px 0 19px"><input type="checkbox" id="extraFavorite" checked> Mémoriser dans mes favoris</label><button class="btn wide" type="submit">＋ Ajouter aux courses</button></form>';showModal('Ajouter un produit',out)}
@@ -803,6 +806,45 @@ function clearCalendarWeek(w){
  if(!w.meals.some(Boolean))return false;
  w.meals=Array(14).fill(null);
  return true
+}
+function moveCopyMeal(w,source,target,mode){
+ if(!Number.isInteger(source)||!Number.isInteger(target)||source===target||source<0||target<0||source>=w.meals.length||target>=w.meals.length)return false;
+ const original=w.meals[source];if(!original)return false;
+ const parts=mealParts(original),dishes=mealDishes(original),leftovers=mealLeftovers(original);
+ if(mode==='copy'&&!dishes.length)return false; // Les mêmes restes ne peuvent pas être consommés deux fois.
+ if(mode==='copy'){
+  clearMealWithPair(w,target);
+  storeMealParts(w,target,dishes.map(x=>({...x})));
+  return true
+ }
+ if(mode!=='move')return false;
+ const moved=JSON.parse(JSON.stringify(original));
+ clearMealWithPair(w,target);
+ w.meals[source]=null;w.meals[target]=moved;
+ // Les restes liés suivent le plat cuisiné qui change de jour.
+ for(let i=0;i<w.meals.length;i++){
+  if(i===target)continue;
+  const parts=mealParts(w.meals[i]);let changed=false;
+  for(const p of parts)if(p.type==='leftovers'&&p.fromIndex===source){p.fromIndex=target;changed=true}
+  if(changed)storeMealParts(w,i,parts)
+ }
+ // Un reste ne peut pas précéder son plat d'origine.
+ const retained=mealParts(w.meals[target]).filter(p=>p.type!=='leftovers'||p.fromIndex===null||p.fromIndex<target);
+ if(retained.length!==mealParts(w.meals[target]).length)storeMealParts(w,target,retained);
+ reconcileLeftovers(w,target);
+ return true
+}
+function moveCopyMealModal(index,mode){
+ const w=getWeek(),source=w.meals[index];if(!source)return;
+ const dishes=mealDishes(source);
+ if(mode==='copy'&&!dishes.length){toast('Les restes ne peuvent pas être copiés : utilise Déplacer.');return}
+ let out='<p class="helper">'+(mode==='move'?'Déplacer les plats et leurs portions, en mettant à jour les restes liés.':'Copier les plats et leurs portions sans dupliquer les restes déjà consommés.')+' Choisis une case ci-dessous.</p><div class="meal-targets">';
+ for(let i=0;i<14;i++)if(i!==index){
+  out+='<button class="meal-target" data-action="apply-meal-transfer" data-index="'+index+'" data-target="'+i+'" data-mode="'+mode+'">'+
+   html(days[Math.floor(i/2)])+' '+(i%2?'soir':'midi')+(w.meals[i]?' · occupé':' · libre')+'</button>'
+ }
+ out+='</div>';
+ showModal(mode==='move'?'Déplacer ce repas':'Copier ce repas',out)
 }
 function setMealDishes(w,index,dishes){
  if(index<0||index>=w.meals.length)return;
@@ -950,6 +992,18 @@ document.addEventListener('click',e=>{const tab=e.target.closest('[data-tab]');i
    clearCalendarWeek(w);persist();render();toast('Calendrier de la semaine vidé !')
   }
   else if(mode==='pick-meal')pickMeal(index);
+  else if(mode==='move-copy-meal')moveCopyMealModal(index,a.dataset.mode);
+  else if(mode==='apply-meal-transfer'){
+   const target=Number(a.dataset.target),action=a.dataset.mode;
+   if(!Number.isInteger(target)||target<0||target>13||!w.meals[index])return;
+   if(w.meals[target]&&!confirm('Le repas cible contient déjà des plats. Le remplacer ?'))return;
+   if(action==='move'&&target>index){
+    const earlier=w.meals.some((m,i)=>i>index&&i<=target&&mealLeftovers(m).some(x=>x.fromIndex===index));
+    if(earlier&&!confirm('Des restes étaient prévus avant le nouveau jour de cuisson. Ils seront retirés du planning. Continuer ?'))return
+   }
+   if(!moveCopyMeal(w,index,target,action)){toast('Impossible de déplacer ou copier ce repas.');return}
+   persist();closeModal();render();toast(action==='move'?'Repas déplacé !':'Repas copié !')
+  }
   else if(mode==='add-recipe')recipeEditor(null);
   else if(mode==='edit-recipe')recipeEditor(id);
   else if(mode==='duplicate-recipe'){const r=recipeById(id);if(r)recipeEditor(null,{...r,id:null,name:r.name+' (variante)',ingredients:r.ingredients.map(x=>({...x}))})}

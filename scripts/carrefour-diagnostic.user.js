@@ -340,6 +340,7 @@
       // Effacer le fragment après consommation pour éviter de réimporter en rechargeant.
       try{history.replaceState(null,'',location.pathname+location.search)}catch(e){}
       panel.classList.add('open');
+      if(imported)heading.textContent='🛒 Ma liste Menus & Drive';
       if(imported){
         listStatus.textContent+=' · Import direct depuis ton appli ✓';
         // Le clic "Ouvrir Carrefour avec ma liste" autorise la simple lecture de

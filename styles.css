@@ -103,3 +103,31 @@
 .clear-week-btn{margin:6px 0 10px;min-height:44px}
 .ingredient-auto-note{margin:9px 0 12px;background:#eff7eb;color:#355a3d;border-color:#d7e9d0}
 @media(max-width:360px){.day-clear-btn{font-size:10px;padding:5px 7px}.day-card-head .day-title small{margin-left:2px}}
+
+/* Parcours premium : ingrédients, stock, calendrier, sécurité du Drive. */
+.ingredient-suggestions{display:flex;flex-wrap:wrap;gap:5px;margin:4px 0 1px}
+.ingredient-suggestion,.ingredient-favorite{border:1px solid #c9ddc9;background:#eaf4e9;color:#315b40;border-radius:20px;padding:7px 10px;font-size:11px;font-weight:750;line-height:1.25;cursor:pointer}
+.ingredient-favorites{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:10px 0 12px}
+.ingredient-favorites .helper{flex:0 0 100%}
+.ingredient-store:disabled{opacity:.8;background:#e9eeeb;cursor:not-allowed}
+.recipe-actions{flex-direction:column;align-items:stretch}
+.recipe-actions .icon-btn{align-self:flex-end}
+.recipe-actions .btn.tiny{font-size:10px;white-space:nowrap;min-height:30px}
+.home-stock-btn{display:block;margin:7px 0 2px;border:1px solid #d7e4d2;background:#eff7ed;color:#346844;border-radius:9px;padding:7px 9px;min-height:33px;font-size:11px;font-weight:750;text-align:left;cursor:pointer}
+.meal-transfer-actions{display:flex;gap:8px;margin:12px 0 0}
+.meal-transfer-actions .btn{flex:1;min-width:0}
+.meal-targets{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;max-height:54dvh;overflow-y:auto;margin:12px 0}
+.meal-target{min-width:0;border:1px solid #dbe8dd;border-radius:11px;padding:11px 7px;background:#f5faf3;color:#315a41;font-size:12px;font-weight:700;line-height:1.3;text-align:center}
+.meal-target:active{background:#deebdc}
+.drive-preflight{border:1px solid #efdab5;background:#fff9ed;border-radius:14px;padding:12px;margin:12px 0}
+.drive-preflight>strong{font-size:13px;color:#835e26}
+.drive-preflight-item{display:flex;align-items:center;gap:10px;border-top:1px solid #f1e3cc;padding:9px 0}
+.drive-preflight-item:first-of-type{margin-top:8px}
+.drive-preflight-item .grow{flex:1;min-width:0}
+.drive-preflight-item strong{font-size:12px;color:#534332}
+.drive-preflight-item p{font-size:11px;line-height:1.4;color:#806b4c;margin:3px 0}
+.drive-preflight-item .btn{flex-shrink:0}
+.drive-ready{background:#e8f4e8;color:#2d633e;border-radius:11px;padding:10px 12px;font-size:12px;font-weight:700;margin:11px 0}
+@supports (-webkit-touch-callout:none){
+ .meal-targets button,.ingredient-favorite,.ingredient-suggestion{touch-action:manipulation}
+}

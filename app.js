@@ -827,28 +827,32 @@ function editManualExtraModal(extraId){
  showModal('Modifier l’achat · '+entry.name,out)
 }
 function shoppingRow(x){
- const p=productById(x.productId);
+ const p=productById(x.productId),stock=x.stockAmount>0;
+ const name=html(x.name),q=html(quantity(x.qty,x.unit));
+ let detail=stock?'Maison : '+quantity(x.stockAmount,x.stockUnit):
+  x.source.join(' + ');
+ if(x.grossNeeded)detail=(stock?'Maison : '+quantity(x.stockAmount,x.stockUnit)+' · ':'')+
+  'Besoin : '+x.grossNeeded;
+ if(p?.packaging)detail+=' · '+p.packaging;
+ return '<div class="shopping-row shopping-clean v29-shopping-row'+(x.checked?' checked':'')+'">'+
+  '<input class="check" type="checkbox" data-check="'+html(x.id)+'" '+(x.checked?'checked':'')+' aria-label="Marquer '+name+' comme acheté">'+
+  '<div class="grow"><div class="shopping-row-top"><strong class="shopping-name">'+name+'</strong><span class="shopping-qty">'+q+'</span></div>'+
+  '<div class="shopping-meta">'+html(detail)+'</div>'+
+  '<div class="shopping-store-chip">'+(x.store==='grandfrais'?'🥬 Grand Frais':'🛒 Carrefour')+'</div></div>'+
+  '<button class="btn tiny secondary shopping-modify" data-action="edit-shopping-item" data-id="'+html(x.id)+'" aria-label="Modifier '+name+'">Modifier</button></div>';
+}
+function editShoppingItemModal(id){
+ const x=shopping().find(row=>row.id===id);if(!x)return;
  const stock=x.stockAmount>0;
- let detail='';
- if(x.grossNeeded){
-  detail='Besoin : '+html(x.grossNeeded);
-  if(stock)detail+=' · Maison : '+html(quantity(x.stockAmount,x.stockUnit));
-  if(x.needed&&stock)detail+=' · Reste : '+html(x.needed);
- }else{
-  detail=html(x.source.join(' + '));
-  if(stock)detail+=' · Stock : '+html(quantity(x.stockAmount,x.stockUnit));
- }
- if(p?.packaging)detail+=' · '+html(p.packaging);
- return '<div class="shopping-row shopping-clean'+(x.checked?' checked':'')+'">'+
- '<input class="check" type="checkbox" data-check="'+html(x.id)+'" '+(x.checked?'checked':'')+' aria-label="Marquer '+html(x.name)+' comme acheté">'+
- '<div class="grow"><div class="shopping-row-top"><strong class="shopping-name">'+html(x.name)+'</strong><span class="shopping-qty">'+html(quantity(x.qty,x.unit))+'</span></div>'+
- '<div class="shopping-meta">'+detail+'</div>'+
- '<div class="shopping-controls"><label class="store-label" for="store-'+encodeURIComponent(x.id)+'">Magasin</label>'+
- '<select class="store-select" id="store-'+encodeURIComponent(x.id)+'" data-store-item="'+html(x.id)+'" aria-label="Changer le magasin de '+html(x.name)+'">'+
- '<option value="carrefour" '+(x.store==='carrefour'?'selected':'')+'>Carrefour</option>'+
- '<option value="grandfrais" '+(x.store==='grandfrais'?'selected':'')+'>Grand Frais</option></select>'+
- '<button class="home-stock-btn" data-action="home-stock" data-id="'+html(x.id)+'">'+(stock?'🏠 Stock : '+html(quantity(x.stockAmount,x.stockUnit)):'🏠 Stock')+'</button>'+
- '<button class="home-owned" data-action="exclude" data-id="'+html(x.id)+'" title="Ne pas acheter cette semaine">Retirer</button>'+manualEditControl(x)+'</div></div></div>'
+ let out='<div class="shopping-detail-header"><strong>'+html(x.name)+'</strong><span class="pill">'+html(quantity(x.qty,x.unit))+'</span></div>'+
+ '<p class="helper">Modifie cet achat pour cette semaine. Aucun changement n’est appliqué aux autres produits du catalogue.</p>'+
+ '<div class="field"><label for="shoppingDetailStore">Magasin</label>'+
+ '<select id="shoppingDetailStore" data-store-item="'+html(x.id)+'"><option value="carrefour" '+(x.store==='carrefour'?'selected':'')+'>Carrefour Drive</option>'+
+ '<option value="grandfrais" '+(x.store==='grandfrais'?'selected':'')+'>Grand Frais</option></select></div>'+
+ '<button class="btn secondary wide" data-action="home-stock" data-id="'+html(x.id)+'">'+(stock?'🏠 Modifier le stock · '+html(quantity(x.stockAmount,x.stockUnit)):'🏠 Renseigner le stock maison')+'</button>';
+ if(x.manualExtraIds?.length)out+='<button class="btn secondary wide" style="margin-top:9px" data-action="edit-manual-row" data-id="'+html(x.id)+'">✎ Modifier la quantité ajoutée manuellement</button>';
+ out+='<button class="btn secondary wide" style="margin-top:9px" data-action="exclude" data-id="'+html(x.id)+'">Retirer des achats de cette semaine</button>';
+ showModal('Gérer un achat',out);
 }
 function renderCourses(){
  const items=shopping(),w=getWeek();
@@ -1467,6 +1471,7 @@ document.addEventListener('click',e=>{
    if(x.ingredientId){ingredientEditor(x.ingredientId);return}
    ingredientEditor(null,x.name)
   }
+  else if(mode==='edit-shopping-item')editShoppingItemModal(id);
   else if(mode==='home-stock')homeStockModal(id);
   else if(mode==='stock-zero'||mode==='stock-all'){
    const x=shopping().find(i=>i.id===$('#homeStockItemId')?.value);if(!x)return;
@@ -1665,7 +1670,7 @@ document.addEventListener('click',e=>{
    w.extras=w.extras.filter(x=>x.id!==id);persist();closeModal();render(true);toast('Ajout manuel retiré de cette semaine.')
   }
   else if(mode==='delete-extra'){w.extras=w.extras.filter(x=>x.id!==id);persist();render()}
-  else if(mode==='exclude'){if(!w.excluded.includes(id))w.excluded.push(id);persist();render(true)}
+  else if(mode==='exclude'){if(!w.excluded.includes(id))w.excluded.push(id);persist();closeModal();render(true)}
   else if(mode==='include'){w.excluded=w.excluded.filter(x=>x!==id);persist();render(true)}
   else if(mode==='copy-list')copyList();
   else if(mode==='copy-grand-frais')copyGrandFrais();

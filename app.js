@@ -139,6 +139,7 @@ function productRows(){
 function renderProduits(){
   let out=pageHeading('Vos achats habituels','Mes produits','Enregistre vos références préférées pour les ajouter aux courses sans les rechercher à chaque fois.');
   out+='<div class="toolbar"><button class="btn wide" data-action="add-product">＋ Ajouter un produit</button></div>';
+  out+='<div class="card soft"><strong>📲 Depuis Carrefour.fr</strong><p class="subtext">Ouvre une fiche produit dans Safari, touche « ➕ Mes produits », puis confirme son import ici. Le lien et le nom sont récupérés automatiquement lorsque Carrefour les fournit.</p><a href="https://www.carrefour.fr/" target="_blank" rel="noopener noreferrer" class="btn secondary wide">Ouvrir Carrefour.fr ↗</a></div>';
   out+='<div class="field"><input class="text-input" id="productSearch" value="'+html(productSearch)+'" placeholder="⌕ Rechercher un produit ou une marque…" aria-label="Rechercher un produit"></div>';
   out+='<div class="chip-row" aria-label="Filtrer par catégorie">'+['Toutes',...productCategories].map(x=>'<button class="chip'+(productCategory===x?' active':'')+'" data-action="filter-products" data-category="'+html(x)+'">'+html(x)+'</button>').join('')+'</div>';
   out+='<div class="section-head"><h2>Votre catalogue</h2><span class="pill">'+state.products.length+' produit'+(state.products.length===1?'':'s')+'</span></div><div id="productResults">'+productRows()+'</div>';

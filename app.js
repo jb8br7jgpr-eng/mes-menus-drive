@@ -18,7 +18,7 @@ function parseDate(s){const [y,m,d]=s.split('-').map(Number);return new Date(y,m
 function monday(d){const x=new Date(d.getFullYear(),d.getMonth(),d.getDate(),12);x.setDate(x.getDate()-((x.getDay()+6)%7));return localDate(x)}
 function offsetDate(s,n){const d=parseDate(s);d.setDate(d.getDate()+n);return localDate(d)}
 function niceDate(s){return parseDate(s).toLocaleDateString('fr-FR',{day:'numeric',month:'short'})}
-function getWeek(key=currentWeek){if(!state.weeks[key])state.weeks[key]={meals:Array(14).fill(null),extras:[],checked:[],excluded:[]};const w=state.weeks[key];if(!Array.isArray(w.meals))w.meals=Array(14).fill(null);if(!Array.isArray(w.extras))w.extras=[];if(!Array.isArray(w.checked))w.checked=[];if(!Array.isArray(w.excluded))w.excluded=[];if(!w.pantry||typeof w.pantry!=='object'||Array.isArray(w.pantry))w.pantry={};return w}
+function getWeek(key=currentWeek){if(!state.weeks[key])state.weeks[key]={meals:Array(14).fill(null),extras:[],checked:[],excluded:[]};const w=state.weeks[key];if(!Array.isArray(w.meals))w.meals=Array(14).fill(null);if(!Array.isArray(w.extras))w.extras=[];if(!Array.isArray(w.checked))w.checked=[];if(!Array.isArray(w.excluded))w.excluded=[];if(!w.pantry||typeof w.pantry!=='object'||Array.isArray(w.pantry))w.pantry={};if(!w.pantryUnits||typeof w.pantryUnits!=='object'||Array.isArray(w.pantryUnits))w.pantryUnits={};return w}
 // Données principales dans IndexedDB ; historique de points de restauration indépendants.
 function openDatabase(){return new Promise((resolve,reject)=>{const r=indexedDB.open('menus-drive-v1',2);r.onupgradeneeded=()=>{if(!r.result.objectStoreNames.contains('records'))r.result.createObjectStore('records');if(!r.result.objectStoreNames.contains('snapshots'))r.result.createObjectStore('snapshots',{keyPath:'id',autoIncrement:true})};r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error)})}
 function readRecord(){return new Promise((resolve,reject)=>{const req=db.transaction('records','readonly').objectStore('records').get('state');req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error)})}
@@ -484,15 +484,16 @@ function shopping(){
  }));
  w.extras.forEach(x=>add(x.name,x.qty,x.unit,'Ajout manuel',x.productId,Boolean(x.fromCatalogue),x.ingredientId));
  for(const [productId,item] of packs){
-  const p=item.p,stockUnit=item.needed>0?item.needUnit:(p.unit||'paquet');
+  const stockUnit=item.needed>0?item.needUnit:(p.unit||'paquet');
   const pantryKey='produit:'+productId+'|'+stockUnit;
   const stockAmount=Math.max(0,Number(w.pantry[pantryKey])||0);
-  const netNeed=Math.max(0,item.needed-stockAmount);
-  const manualRemaining=item.needed>0?item.manualPacks:Math.max(0,item.manualPacks-stockAmount);
-  const count=(netNeed>0&&item.size>0?Math.ceil(netNeed/item.size-1e-9):0)+manualRemaining;
+  const grossNeed=item.needed>0?item.needed+item.manualPacks*item.size:item.manualPacks;
+  const netNeed=Math.max(0,grossNeed-stockAmount);
+  const count=item.needed>0&&item.size>0?Math.ceil(netNeed/item.size-1e-9):Math.ceil(netNeed-1e-9);
   const id='produit:'+productId+'|achat';
   map.set(id,{id,name:p.name,qty:count,unit:p.unit||'paquet',source:item.source,productId,ingredientId:item.ingredientId,
-   needed:netNeed>0?quantity(netNeed,item.needUnit):'',grossNeeded:item.needed>0?quantity(item.needed,item.needUnit):'',
+   needed:netNeed>0?quantity(netNeed,stockUnit):'',grossNeeded:grossNeed>0?quantity(grossNeed,stockUnit):'',
+   totalNeedAmount:grossNeed,totalNeedUnit:stockUnit,
    stockKey:pantryKey,stockAmount,stockUnit,covered:count<=0,
    packageDescription:p.packaging||((p.packAmount>0)?quantity(p.packAmount,p.packUnit):'')})
  }
@@ -501,18 +502,80 @@ function shopping(){
   const stockKey=x.stockKey||x.id,stockAmount=Math.max(0,Number(w.pantry[stockKey])||0);
   const fromPack=Boolean(x.stockKey),qty=fromPack?x.qty:Math.max(0,x.qty-stockAmount);
   const item={...x,qty,stockKey,stockAmount:fromPack?x.stockAmount:stockAmount,stockUnit:fromPack?x.stockUnit:x.unit,
-   covered:fromPack?x.covered:qty<=0,grossQty:fromPack?x.qty:x.qty,
+   covered:fromPack?x.covered:qty<=0,grossQty:fromPack?x.totalNeedAmount:x.qty,
+   totalNeedAmount:fromPack?x.totalNeedAmount:x.qty,totalNeedUnit:fromPack?x.totalNeedUnit:x.unit,
    category,checked:w.checked.includes(x.id),excluded:w.excluded.includes(x.id)};
   return {...item,store:shoppingStore(item)}
  })
 }
+function stockUnitChoices(x){
+ const unit=x.stockUnit,p=productById(x.productId);
+ const arr=[unit];if(unit==='g')arr.push('kg');
+ if(unit==='ml')arr.push('cl','l');
+ if(p?.packAmount>0&&p.packUnit){
+  const [v,u]=converted(p.packAmount,p.packUnit);
+  if(v>0&&u===unit&&unit!=='paquet')arr.push('paquet')
+ }
+ return [...new Set(arr)]
+}
+function stockInputToBase(x,amount,unit){
+ if(!Number.isFinite(amount)||amount<0)return null;
+ if(unit==='paquet'&&x.stockUnit!=='paquet'){
+  const p=productById(x.productId);
+  if(!p||!(p.packAmount>0))return null;
+  const [size,baseUnit]=converted(p.packAmount,p.packUnit);
+  return baseUnit===x.stockUnit?amount*size:null
+ }
+ const [value,base]=converted(amount,unit);
+ return base===x.stockUnit?value:null
+}
+function stockBaseToUnit(x,amount,unit){
+ if(unit==='paquet'&&x.stockUnit!=='paquet'){
+  const p=productById(x.productId),[size,base]=converted(p?.packAmount,p?.packUnit);
+  return size>0&&base===x.stockUnit?amount/size:amount
+ }
+ if(unit==='kg'&&x.stockUnit==='g')return amount/1000;
+ if(unit==='l'&&x.stockUnit==='ml')return amount/1000;
+ if(unit==='cl'&&x.stockUnit==='ml')return amount/10;
+ return amount
+}
+function stockPreview(x,amount,unit){
+ const val=stockInputToBase(x,amount,unit);
+ if(val===null)return 'Cette unité ne correspond pas au produit.';
+ const need=x.totalNeedAmount||0,left=Math.max(0,need-val);
+ let remaining='Reste à acheter : '+quantity(left,x.stockUnit);
+ const p=productById(x.productId);
+ const [packValue,packUnit]=p?.packAmount>0?converted(p.packAmount,p.packUnit):[0,''];
+ if(packValue>0&&packUnit===x.stockUnit){
+  const packs=Math.ceil(Math.max(0,left)/packValue-1e-9);
+  remaining+=' · '+packs+' '+(packs>1?'paquets':'paquet')+' Carrefour';
+ }
+ if(left===0)remaining='✓ Vous avez déjà tout ce qu’il faut pour ce produit.';
+ return 'Besoin : '+quantity(need,x.stockUnit)+' · Stock maison : '+quantity(val,x.stockUnit)+' · '+remaining
+}
+function refreshStockPreview(){
+ const id=$('#homeStockItemId')?.value,x=shopping().find(z=>z.id===id),amount=Number($('#homeStockAmount')?.value),unit=$('#homeStockUnit')?.value;
+ const target=$('#homeStockPreview');
+ if(x&&target)target.textContent=stockPreview(x,amount,unit)
+}
 function homeStockModal(itemId){
  const x=shopping().find(i=>i.id===itemId);if(!x)return;
- const out='<p class="helper">Indique ce que vous avez déjà chez vous. La quantité sera déduite des courses de cette semaine avant le calcul des paquets.</p>'+
- '<div class="field"><label for="homeStockAmount">Quantité déjà disponible ('+html(x.stockUnit)+')</label><input id="homeStockAmount" type="number" min="0" step="any" value="'+html(x.stockAmount||0)+'"></div>'+
- '<div class="note">Un stock couvrant tout le besoin retirera automatiquement ce produit de Carrefour et Grand Frais. Tu pourras modifier ce stock ici.</div>'+
+ const w=getWeek(),choices=stockUnitChoices(x),selected=choices.includes(w.pantryUnits[x.stockKey])?w.pantryUnits[x.stockKey]:choices[0];
+ const amount=stockBaseToUnit(x,x.stockAmount||0,selected);
+ const p=productById(x.productId),[packSize,packUnit]=p?.packAmount>0?converted(p.packAmount,p.packUnit):[0,''];
+ let htmlBody='<p class="helper">Note ce que vous avez déjà chez vous. Seuls les achats de cette semaine sont recalculés ; la fiche produit et les recettes ne changent pas.</p>'+
+ '<input id="homeStockItemId" type="hidden" value="'+html(x.id)+'">'+
+ '<div class="stock-overview"><div><small>Besoin pour les repas</small><strong>'+html(quantity(x.totalNeedAmount,x.totalNeedUnit))+'</strong></div>'+
+ '<div><small>Déjà à la maison</small><strong>'+html(quantity(x.stockAmount,x.stockUnit))+'</strong></div></div>'+
+ '<div class="row stock-editor-row"><div class="field grow"><label for="homeStockAmount">Quantité disponible</label>'+
+ '<input id="homeStockAmount" type="number" min="0" step="any" inputmode="decimal" value="'+html(Number(amount.toFixed(3)))+'"></div>'+
+ '<div class="field grow"><label for="homeStockUnit">Unité</label><select id="homeStockUnit">'+
+ choices.map(u=>'<option value="'+html(u)+'" '+(selected===u?'selected':'')+'>'+html(u==='paquet'?'paquet entier':u)+'</option>').join('')+'</select></div></div>';
+ if(choices.includes('paquet')&&packSize>0)htmlBody+='<p class="helper">1 paquet = '+html(quantity(packSize,packUnit))+'. Tu peux indiquer un stock en paquets ou dans une unité de poids/volume.</p>';
+ htmlBody+='<div class="stock-quick-actions"><button class="btn secondary" data-action="stock-zero">Aucun stock</button><button class="btn secondary" data-action="stock-all">✓ J’ai tout</button></div>'+
+ '<div id="homeStockPreview" class="stock-preview">'+html(stockPreview(x,Number(amount),selected))+'</div>'+
  '<button class="btn wide" data-action="save-home-stock" data-id="'+html(x.id)+'">✓ Enregistrer mon stock</button>';
- showModal('🏠 Stock maison · '+html(x.name),out)
+ showModal('🏠 Stock maison · '+x.name,htmlBody)
 }
 function shoppingRow(x){
  const p=productById(x.productId);
@@ -1055,10 +1118,20 @@ document.addEventListener('click',e=>{
    ingredientEditor(null,x.name)
   }
   else if(mode==='home-stock')homeStockModal(id);
+  else if(mode==='stock-zero'||mode==='stock-all'){
+   const x=shopping().find(i=>i.id===$('#homeStockItemId')?.value);if(!x)return;
+   const unit=$('#homeStockUnit')?.value,field=$('#homeStockAmount');
+   if(!field)return;
+   field.value=mode==='stock-zero'?'0':String(Number(stockBaseToUnit(x,x.totalNeedAmount||0,unit).toFixed(3)));
+   refreshStockPreview()
+  }
   else if(mode==='save-home-stock'){
-   const x=shopping().find(i=>i.id===id),value=Number($('#homeStockAmount')?.value);
-   if(!x||!Number.isFinite(value)||value<0){toast('Indique une quantité positive ou zéro.');return}
-   w.pantry[x.stockKey]=value;persist();closeModal();render();toast('Stock maison déduit des courses !')
+   const x=shopping().find(i=>i.id===id),field=$('#homeStockAmount'),unit=$('#homeStockUnit')?.value;
+   const amount=field?.value===''?NaN:Number(field?.value),value=x?stockInputToBase(x,amount,unit):null;
+   if(value===null||!Number.isFinite(value)){toast('Choisis une quantité positive et une unité compatible.');return}
+   w.pantry[x.stockKey]=value;
+   w.pantryUnits[x.stockKey]=unit;
+   persist();closeModal();render(true);toast('Stock maison déduit des achats !')
   }
   else if(mode==='week-prev'||mode==='week-next'){currentWeek=offsetDate(currentWeek,mode==='week-prev'?-7:7);render()}
   else if(mode==='clear-day'){
@@ -1201,7 +1274,7 @@ document.addEventListener('click',e=>{
   else if(mode==='restore-backup')restoreSnapshot(id);
   else if(mode==='clear-all'){if(confirm('Effacer toutes les données actuelles ? Une copie locale sera conservée dans les versions précédentes.')){checkpoint('Avant effacement');state=baseState();persist();closeModal();render();toast('Données actuelles effacées.')}}
 });
-document.addEventListener('change',e=>{if(e.target.matches('.ingredient-name')){
+document.addEventListener('change',e=>{if(e.target.id==='homeStockUnit'||e.target.id==='homeStockAmount')refreshStockPreview();if(e.target.matches('.ingredient-name')){
  const match=ingredientByName(e.target.value),row=e.target.closest('.ingredient-line');
  const store=row?.querySelector('.ingredient-store');
  if(match&&store)store.value=ingredientStore(match);
@@ -1211,7 +1284,7 @@ document.addEventListener('change',e=>{if(e.target.matches('.ingredient-name')){
   linked.textContent=ingredientStore(match)==='grandfrais'?'Grand Frais : aucune fiche produit nécessaire.':p?'Produit Carrefour lié : '+p.name:'Pas encore de produit Carrefour lié (à associer dans la base).'
  }
  }else if(e.target.matches('[data-store-item]')){setShoppingStore(e.target.dataset.storeItem,e.target.value)}else if(e.target.matches('[data-check]')){const w=getWeek(),id=e.target.dataset.check;w.checked=e.target.checked?[...new Set([...w.checked,id])]:w.checked.filter(x=>x!==id);persist();render(true)}else if(e.target.id==='importFile')importData(e.target.files?.[0])});
-document.addEventListener('input',e=>{if(e.target.matches?.('.ingredient-name'))refreshIngredientEntry(e.target.closest('.ingredient-line'));if(e.target.matches?.('.ingredient-unit'))e.target.closest('.ingredient-line').dataset.unitSelected='true';if(e.target.id==='recipeSearch'){search=e.target.value;const result=$('#recipeResults');if(result)result.innerHTML=recipeRows()}else if(e.target.id==='productSearch'){productSearch=e.target.value;if(productSearch.trim()){independentProductsOpen=true;const section=document.querySelector('.catalog-independent');if(section)section.open=true}const result=$('#productResults');if(result)result.innerHTML=productRows();const ings=$('#ingredientCatalogResults');if(ings)ings.innerHTML=ingredientRowsCatalogue()}});
+document.addEventListener('input',e=>{if(e.target.id==='homeStockAmount')refreshStockPreview();if(e.target.matches?.('.ingredient-name'))refreshIngredientEntry(e.target.closest('.ingredient-line'));if(e.target.matches?.('.ingredient-unit'))e.target.closest('.ingredient-line').dataset.unitSelected='true';if(e.target.id==='recipeSearch'){search=e.target.value;const result=$('#recipeResults');if(result)result.innerHTML=recipeRows()}else if(e.target.id==='productSearch'){productSearch=e.target.value;if(productSearch.trim()){independentProductsOpen=true;const section=document.querySelector('.catalog-independent');if(section)section.open=true}const result=$('#productResults');if(result)result.innerHTML=productRows();const ings=$('#ingredientCatalogResults');if(ings)ings.innerHTML=ingredientRowsCatalogue()}});
 document.addEventListener('submit',e=>{if(e.target.id==='recipeForm')saveRecipe(e);if(e.target.id==='ingredientCatalogForm')saveCatalogIngredient(e);if(e.target.id==='extraForm')addExtra(e);if(e.target.id==='productForm')saveProduct(e)});
 window.addEventListener('hashchange',()=>importCarrefourProductFromHash());
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal()});

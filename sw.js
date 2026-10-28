@@ -1,5 +1,5 @@
-const CACHE='menus-drive-v15-manual-leftovers-recipe-entry-20261028';
-const ASSETS=['./','./index.html','./styles.css?v=20261028-15','./app.js?v=20261028-15','./manifest.webmanifest','./icon.svg'];
+const CACHE='menus-drive-v16-ingredient-catalog-20261028';
+const ASSETS=['./','./index.html','./styles.css?v=20261028-16','./app.js?v=20261028-16','./manifest.webmanifest','./icon.svg'];
 self.addEventListener('install',event=>{
   event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(ASSETS)).then(()=>self.skipWaiting()));
 });

@@ -439,3 +439,12 @@ Une seule commande contextuelle est affichée dans le bandeau **Menus** :
 - Tests simulés : génération à vide, complément d’une semaine incomplète, conservation des repas occupés et des restes manuels, absence d'effet sur la liste de courses déjà générée, message de semaine complète et distinction des boutons de courses.
 
 Aucun changement du moteur Carrefour, du stockage, des recettes, des produits ni des commandes de paiement.
+
+
+## V24 — Deux actions côte à côte en haut du calendrier (28/10/2026)
+
+Dans le bandeau de **Menus**, deux actions apparaissent côte à côte : **« ✦ Générer les repas »** et **« ↻ Reprendre la semaine passée »**. Le bouton générateur garde sa seule logique existante : remplir les 14 cases d'une semaine vide ou les seules cases manquantes d'une semaine partiellement remplie, sans supprimer les plats ni les restes déjà prévus. Si le calendrier est complet, le message « ✓ Les 14 repas sont renseignés » remplace le bouton générateur ; « Reprendre la semaine passée » reste accessible.
+
+Le raccourci « Reprendre la semaine passée » est supprimé **du bas** du calendrier ; aucun doublon « Générer les 14 repas » n'est réintroduit. En bas, seule l'action distincte « Vider tous les repas de cette semaine » demeure. Les deux commandes du haut sont disposées en deux colonnes responsives, adaptées à l'iPhone.
+
+Le bouton **« Générer les courses de cette semaine »** reste distinct : aucune recette n'est transférée vers les achats sans action explicite. Les règles de portions, de restes, les listes par semaine, le stock et le panier Carrefour sont conservés. Tests simulés : un seul bouton de génération, libellé permanent, reprise de la semaine passée, génération à vide, complétion sans remplacement, semaine complète, conservation des courses déjà générées.

@@ -395,3 +395,17 @@ Le stock reste enregistré **dans la semaine** en unité canonique (`weeks[date]
 
 **Vérifications en simulation** : calcul initial recettes→courses, liste Grand Frais, 350 g demandés/200 g le paquet, conversions g↔kg↔paquet, rejet des unités incompatibles, conservation de l'unité choisie, déduction partielle ou totale du stock, article indépendant partiellement en stock, formulaire quotidien prérempli, champs Carrefour préservés, sérialisation JSON. Contrôle visuel réel à effectuer sur les deux iPhones.
 
+
+
+## V21 — 4 portions cuisinées = 2 mangées et 2 restes (28/10/2026)
+
+Le nombre de portions renseigné lorsque l’on ajoute un plat correspond **à la quantité totale préparée**, qui sert également au calcul des ingrédients et du Drive. Dans les cartes du calendrier, l’application affiche désormais **les portions effectivement mangées dans le créneau**, et le solde sous forme de restes.
+
+- **Plat préparé pour 4 portions : 2 mangées lors du premier repas, 2 restes**, que l’utilisateur décide de positionner manuellement dans n’importe quel créneau *ultérieur*. Aucun reste n'est attribué automatiquement. Les achats restent dimensionnés pour **4 portions préparées**.
+- **Plat préparé pour 2 portions : 2 mangées ici, aucun reste.**
+- **Deux plats différents pour deux personnes avec 1 portion préparée de chacun : 1 portion mangée de chaque plat, aucun reste.** Un plat de 4 portions ajouté avec un autre plat conserve malgré tout la règle 2 portions consommées + 2 disponibles comme restes.
+- Le formulaire de sélection/édition indique explicitement **« Portions préparées (pour les courses) »**, et son aide explique le calcul. Pour chaque plat déjà placé, les portions mangées dans le créneau, les restes au total et ceux encore disponibles sont visibles.
+- Les restes liés se déplacent et se recalculent comme auparavant : modifier la préparation de 4 à 2 portions supprime les allocations de restes devenues impossibles, sans supprimer la recette ni compter deux fois les ingrédients. Les anciennes données `type:'recipe'` et `type:'multi'` gardent le même format ; seul l'affichage de leur sens et la répartition explicite des préparations de 4 portions dans un repas à plusieurs plats sont améliorés.
+
+Tests simulés : 4→2+2, absence de placement automatique, consommation jeudi de restes cuisinés lundi, ingrédients calculés une seule fois pour 4, diminution à 2, double plat 1+1, plat de 4 avec autre plat, édition sur iPhone. Le moteur Carrefour et Userscripts restent inchangés.
+

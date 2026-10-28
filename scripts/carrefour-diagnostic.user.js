@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Menus & Drive — Diagnostic Carrefour (lecture seule)
 // @namespace    https://github.com/jb8br7jgpr-eng/mes-menus-drive
-// @version      0.4.0
-// @description  Transfère les produits et prévisualise les listes de courses Carrefour sans modifier le panier.
+// @version      0.5.0
+// @description  Prévisualise uniquement les codes-barres et quantités depuis Menus & Drive, sans modifier le panier.
 // @match        https://www.carrefour.fr/*
 // @match        https://carrefour.fr/*
 // @run-at       document-idle
@@ -101,11 +101,11 @@
     manualCopy.setAttribute('aria-label','Code du produit Carrefour à copier');
     manualCopy.style.cssText='width:100%;min-height:85px;border:1px solid #bfd4c4;border-radius:8px;padding:8px;font-size:12px;margin:7px 0;resize:none';
     const listBtn = document.createElement('button');
-    listBtn.type='button';listBtn.className='minor';listBtn.textContent='📋 Coller ma liste de courses';
+    listBtn.type='button';listBtn.className='minor';listBtn.textContent='📋 Coller mes codes-barres';
     const pasteField = document.createElement('textarea');
     pasteField.className='listArea';pasteField.hidden=true;
     pasteField.placeholder='Si Safari refuse le collage automatique : appui long ici → Coller';
-    pasteField.setAttribute('aria-label','Coller une liste de courses Menus & Drive');
+    pasteField.setAttribute('aria-label','Coller des codes-barres et leurs quantités');
     const pasteConfirm = document.createElement('button');
     pasteConfirm.type='button';pasteConfirm.className='minor';pasteConfirm.hidden=true;
     pasteConfirm.textContent='Vérifier la liste collée';
@@ -177,45 +177,41 @@
     });
     // Prévisualisation uniquement : ne fait aucun appel aux API Carrefour ni aucune action de panier.
     function validateTransfer(raw){
-      const prefix='MD-DRIVE-LIST-V1:';
       const text=String(raw||'').trim();
-      if(!text.startsWith(prefix))throw Error('Colle le texte obtenu avec « Préparer mon panier Carrefour » dans ton application.');
+      if(!text)throw Error('Aucun code-barres à lire.');
       if(text.length>60000)throw Error('Liste trop longue.');
-      let parsed;
-      try{parsed=JSON.parse(text.slice(prefix.length))}catch(e){throw Error('Liste illisible. Recommence la copie depuis l’application.')}
-      if(parsed?.format!=='mes-menus-drive-list'||parsed.v!==1||!Array.isArray(parsed.items)||parsed.items.length>200)throw Error('Format non reconnu.');
-      const rows=parsed.items.map(item=>{
-        if(!item||typeof item.name!=='string'||typeof item.unit!=='string')throw Error('Ligne invalide.');
-        const name=item.name.trim().slice(0,120),ean=String(item.ean||'');
-        const qty=Number(item.qty),unit=item.unit.slice(0,25);
-        if(!name||!Number.isFinite(qty)||qty<=0||qty>99999)throw Error('Quantité ou nom invalide.');
-        const countable=['pièce','paquet','boîte','rouleau','bouteille','pot','sachet'].includes(unit);
-        const ready=/^\d{13}$/.test(ean)&&countable&&Number.isInteger(qty)&&qty<=999;
-        return {name,qty,unit,ean,ready,reason:ready?'':String(item.reason||'À vérifier sur Carrefour').slice(0,140)};
-      });
-      return {rows,week:String(parsed.week||'').slice(0,20)};
+      const sourceLines=text.split(/\r?\n/).map(s=>s.trim()).filter(Boolean);
+      if(sourceLines.length>200)throw Error('Maximum 200 lignes.');
+      const totals=new Map();
+      for(const line of sourceLines){
+        const match=line.match(/^(\d{13})[\s;,]+([1-9]\d{0,2})$/);
+        if(!match)throw Error('Format attendu : 13 chiffres puis la quantité, par exemple 3270190010000 2.');
+        const ean=match[1],qty=Number(match[2]),total=(totals.get(ean)||0)+qty;
+        if(total>999)throw Error('Quantité trop grande pour '+ean+'.');
+        totals.set(ean,total);
+      }
+      return {rows:[...totals].map(([ean,qty])=>({ean,qty})).sort((a,b)=>a.ean.localeCompare(b.ean))};
     }
     function renderPreview(data){
       previewRows=data.rows;
       listPreview.replaceChildren();
-      const ready=data.rows.filter(x=>x.ready),unmatched=data.rows.filter(x=>!x.ready);
-      listStatus.textContent=data.rows.length+' lignes : '+ready.length+' avec référence et quantité, '+unmatched.length+' à vérifier.';
-      const caption=document.createElement('p');
-      caption.className='muted';
-      caption.textContent='Aperçu local uniquement. Aucun prix, stock ou panier Carrefour vérifié.';
-      listPreview.append(caption);
-      if(data.week){const week=document.createElement('p');week.className='muted';week.textContent='Semaine : '+data.week;listPreview.append(week)}
+      listStatus.textContent=data.rows.length+' référence'+(data.rows.length!==1?'s':'')+' transférée'+(data.rows.length!==1?'s':'')+' (code-barres + quantité).';
+      const note=document.createElement('p');
+      note.className='muted';
+      note.textContent='Ces codes ne sont pas encore vérifiés dans le catalogue Carrefour. Aucun panier modifié.';
+      listPreview.append(note);
       for(const item of data.rows){
         const line=document.createElement('div');line.className='line';
-        const headline=document.createElement('strong');headline.textContent=(item.ready?'✓ ':'⚠ ') + item.name;
-        headline.className=item.ready?'greenTxt':'orangeTxt';
+        const headline=document.createElement('strong');
+        headline.textContent=item.ean;
+        headline.className='greenTxt';
         const extra=document.createElement('small');
-        extra.textContent=item.qty+' '+item.unit+(item.ean?' · Code : '+item.ean:'')+(item.ready?' · À vérifier dans ce Drive':' · '+item.reason);
+        extra.textContent='Quantité : '+item.qty;
         line.append(headline,extra);
         listPreview.append(line);
       }
       const safe=document.createElement('p');safe.className='light';
-      safe.textContent='🔒 Test sans ajout au panier. Vérifie que ton magasin Carrefour actuel est bien le Drive d’École-Valentin.';
+      safe.textContent='🔒 Mode aperçu : aucun article ajouté au panier. Vérifie ton Drive d’École-Valentin directement sur Carrefour.fr.';
       listPreview.append(safe);
       pasteField.hidden=true;pasteConfirm.hidden=true;
     }
@@ -225,7 +221,7 @@
     }
     listBtn.addEventListener('click',async()=>{
       pasteField.hidden=false;pasteConfirm.hidden=false;
-      listStatus.textContent='Autorise le collage depuis Menus & Drive si Safari le demande.';
+      listStatus.textContent='Autorise le collage des codes-barres depuis Menus & Drive si Safari le demande.';
       if(!navigator.clipboard?.readText){pasteField.focus();return}
       try{const value=await navigator.clipboard.readText();if(!parseAndShow(value)){pasteField.focus()}}
       catch(e){listStatus.textContent='Collage automatique indisponible : appui long dans le champ, puis « Coller ».';pasteField.focus()}

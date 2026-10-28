@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192" role="img" aria-label="Menus et Drive">
+  <rect width="192" height="192" rx="40" fill="#245943"/>
+  <circle cx="96" cy="97" r="57" fill="#f5f2df"/>
+  <path d="M53 109c7 26 24 40 43 40s36-14 43-40H53z" fill="#d28559"/>
+  <path d="M49 105h94" stroke="#245943" stroke-width="8" stroke-linecap="round"/>
+  <path d="M81 81c-7-8 6-13 0-22M98 79c-7-8 6-13 0-22M115 81c-7-8 6-13 0-22" fill="none" stroke="#245943" stroke-width="6" stroke-linecap="round"/>
+  <circle cx="132" cy="49" r="18" fill="#b8d49d"/>
+  <path d="m125 48 5 6 10-12" stroke="#245943" stroke-width="5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

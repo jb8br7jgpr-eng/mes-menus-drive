@@ -237,6 +237,10 @@ function saveCatalogIngredient(e){
  if(duplicate&&duplicate.id!==old?.id){
   toast('Cet ingrédient existe déjà. Modifie sa fiche plutôt que de créer un doublon.');return
  }
+ if(!old){
+  const sim=ingredientSimilar(name);
+  if(sim.length&&!confirm('« '+sim[0].name+' » ressemble à ce nouvel ingrédient. Créer une fiche distincte quand même ?'))return
+ }
  const ing=old||makeIngredient(name,store,productId);
  if(!ing)return;
  const previous=ing.name;
@@ -623,7 +627,7 @@ async function copyDriveTransfer(){
  try{await navigator.clipboard.writeText(text);toast('Codes et quantités copiés ! Ouvre Carrefour dans Safari.')}
  catch(e){toast('Utilise le champ de copie manuelle.');$('#driveTransferFallback')?.focus()}
 }
-function renderDrive(){const items=shopping().filter(x=>!x.checked&&!x.excluded&&x.store==='carrefour'),grandFraisCount=shopping().filter(x=>!x.checked&&!x.excluded&&x.store==='grandfrais').length,transfers=driveTransferRows(),ready=transfers.filter(x=>x.ready),directUrl=driveDirectUrl();
+function renderDrive(){const items=shopping().filter(x=>!x.checked&&!x.excluded&&!x.covered&&x.store==='carrefour'),grandFraisCount=shopping().filter(x=>!x.checked&&!x.excluded&&!x.covered&&x.store==='grandfrais').length,transfers=driveTransferRows(),ready=transfers.filter(x=>x.ready),directUrl=driveDirectUrl();
  let out=pageHeading('Carrefour École-Valentin','Mon Drive','Prépare les références et les quantités pour ton Carrefour Drive.');
  out+='<div class="card"><div class="drive-illustration">🛍️</div><div class="row between"><h2>'+items.length+' produit'+(items.length!==1?'s':'')+' à acheter</h2><span class="pill">Drive favori</span></div><p class="subtext">Carrefour Besançon-Valentin · École-Valentin (à vérifier sur Carrefour.fr)</p><div class="divider"></div>';
  out+='<p class="subtext">Contrôle avant Drive : '+ready.length+' référence'+(ready.length!==1?'s':'')+' prête'+(ready.length!==1?'s':'')+' · '+(transfers.length-ready.length)+' à compléter.</p>';
@@ -648,7 +652,7 @@ function renderDrive(){const items=shopping().filter(x=>!x.checked&&!x.excluded&
 }
 
 function showModal(title,body){modalRoot.innerHTML='<div class="modal-overlay" data-overlay="true"><div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle"><div class="modal-head"><h2 id="modalTitle">'+title+'</h2><button class="close-btn" aria-label="Fermer" data-action="close-modal">×</button></div>'+body+'</div></div>';const first=modalRoot.querySelector('input,button');if(first)first.focus()}
-function closeModal(){modalRoot.innerHTML=''}
+function closeModal(){modalRoot.innerHTML='';pendingIngredientLinkId=null}
 function selectOptions(values,value){return values.map(x=>'<option value="'+html(x)+'" '+(x===value?'selected':'')+'>'+html(x)+'</option>').join('')}
 function ingredientRow(item={name:'',qty:'',unit:'g'}){
  const ing=canonicalIngredient(item);
@@ -659,7 +663,7 @@ function ingredientRow(item={name:'',qty:'',unit:'g'}){
  '<input class="ingredient-qty" type="number" min=".01" step="any" placeholder="Qté" aria-label="Quantité dans cette recette" value="'+html(item.qty)+'">'+
  '<select class="ingredient-unit" aria-label="Unité">'+selectOptions(units,item.unit)+'</select>'+
  '<button type="button" class="icon-btn" aria-label="Retirer cet ingrédient" data-action="remove-ingredient">×</button></div><div class="ingredient-suggestions"></div>'+
- '<div class="ingredient-store-row"><label>Ajouter dans Produits :</label><select class="ingredient-store" aria-label="Magasin habituel de cet ingrédient">'+
+ '<div class="ingredient-store-row"><label>Ajouter dans Produits :</label><select class="ingredient-store" aria-label="Magasin habituel de cet ingrédient" '+(ing?'disabled':'')+'>'+
  '<option value="carrefour" '+(store==='carrefour'?'selected':'')+'>🛒 Carrefour</option>'+
  '<option value="grandfrais" '+(store==='grandfrais'?'selected':'')+'>🥬 Grand Frais</option></select></div>'+
  '<p class="ingredient-link-note">'+(store==='grandfrais'?'Grand Frais : aucune fiche produit nécessaire.':
@@ -934,19 +938,20 @@ async function saveRecipe(e){
  if(!rows.length||rows.some(x=>!x.name||!Number.isFinite(x.qty)||x.qty<=0||!units.includes(x.unit)||!['carrefour','grandfrais'].includes(x.store))){
   toast('Chaque ingrédient doit avoir un nom, une quantité et un magasin.');return
  }
+ for(const x of rows){
+  if(ingredientByName(x.name))continue;
+  const sim=ingredientSimilar(x.name);
+  if(sim.length&&!confirm('« '+sim[0].name+' » existe déjà. Créer quand même « '+x.name+' » ? Appuie sur Annuler pour réutiliser la fiche existante.')){
+   toast('Réutilise la fiche proposée pour éviter le doublon.');return
+  }
+ }
  const old=recipeById(form.dataset.id);let image=old?.image||pendingRecipeDraftImage||'';
  try{if($('#recipePhoto').files[0])image=await compressImage($('#recipePhoto').files[0])}catch(err){toast(err.message);return}
  // Ne modifier la base que lorsque toute la recette est validée.
  const ingredients=[],unique=new Map();
  for(const x of rows){
   let ing=ingredientByName(x.name);
-  if(!ing){
-   const sim=ingredientSimilar(x.name);
-   if(sim.length&&!confirm('« '+sim[0].name+' » existe déjà. Créer quand même « '+x.name+' » ? Appuie sur Annuler pour réutiliser la fiche existante.')){
-    toast('Choisis la fiche existante pour éviter le doublon.');return
-   }
-   ing=makeIngredient(x.name,x.store,null);
-  }
+  if(!ing)ing=makeIngredient(x.name,x.store,null);
   // La fiche partagée reste maître du magasin : aucune recette ne le change.
   if(!ing)return;
   const row={ingredientId:ing.id,name:ing.name,qty:x.qty,unit:x.unit,productId:ing.productId||null};

@@ -272,3 +272,23 @@ La version doit être actualisée **sur chaque iPhone** depuis le même lien Use
 
 Contrôler : (1) nouvelle recette 4 portions → 2 repas / ingrédients une fois, (2) recette existante 2 portions → multiplication des ingrédients pour 4, (3) choix 2 portions → un seul repas, (4) mode générer / compléter, (5) affectation Grand Frais / Carrefour conservée après changement de semaine, (6) notes Grand Frais copiable, (7) transfert Carrefour ne contient **jamais** les produits affectés Grand Frais, (8) sauvegarde JSON compatible. Le script Userscripts v0.9 et le moteur réel du panier restent **inchangés**.
 
+
+
+## Plusieurs plats par repas, portions individuelles et retrait des courses
+
+Une case de calendrier peut désormais contenir **un ou plusieurs plats**. Au clic sur un repas, un formulaire permet de sélectionner un premier plat, préciser le **nombre de portions de celui-ci**, puis **ajouter un autre plat** avec son propre nombre de portions. Les plats déjà sélectionnés sont affichés chacun avec un contrôle de quantité et un bouton **Retirer** qui ne supprime pas la recette du catalogue.
+
+Cas courants :
+- **Un seul plat pour deux** : choisir 2 portions, pas de restes automatiques.
+- **Une préparation pour deux repas** : choisir 4 portions, les 2 restantes deviennent un créneau « Restes » automatique si le repas suivant est libre.
+- **Deux plats différents pour deux personnes** : choisir 1 portion du premier et 1 portion du second **dans le même créneau**. Chaque recette contribue à la liste de courses selon sa propre base de quantités ; aucun doublon implicite.
+- **Un plat en 4 portions + un autre plat** : si un seul plat du créneau est prévu pour 4 portions ou plus, ses restes peuvent rester automatiquement liés au créneau suivant s'il est libre. Si plusieurs plats prévoient chacun 4 portions, le planificateur ne crée pas automatiquement un créneau de restes ambigu ; à organiser manuellement.
+
+Compatibilité : une ancienne case `{type:'recipe',recipeId,people}` reste inchangée ; le nouveau format `{type:'multi',dishes:[{recipeId,people}, ...]}` n'est utilisé que pour les cases contenant **plusieurs** plats. Les sauvegardes JSON schéma 1, les menus historiques et les recettes existantes restent compatibles. Les calculs de courses, la génération de menus, les statistiques d'utilisation récente et la suppression d'une recette prennent en charge les deux formats.
+
+### « Déjà chez nous » dans les courses
+
+Sur chaque ligne des sections Carrefour Drive et Grand Frais apparaît une action explicite **« 🏠 Déjà chez nous · Retirer »**. Elle conserve le produit et la recette dans les catalogues, mais place la ligne dans la section « Déjà à la maison · retirés des achats ». Cette exclusion est enregistrée pour la semaine et la ligne disparaît immédiatement de la liste à copier Grand Frais et du transfert EAN/quantités vers le panier Carrefour. Bouton **Réintégrer** pour annuler, sans perte. La suppression définitive d'un produit du catalogue demeure une action différente.
+
+Le moteur Carrefour/Userscripts est inchangé. Les nouveaux calculs sont validés avec des tests simulés avant vérification sur iPhone.
+

@@ -1,7 +1,7 @@
 {
-  "name": "Menus & Drive — Mes courses",
-  "short_name": "Menus & Drive",
-  "description": "Planifie 14 repas, ajoute tes produits et prépare ta liste Carrefour Drive.",
+  "name": "Speedrive — Mes menus et mes courses",
+  "short_name": "Speedrive",
+  "description": "Organise les repas de la semaine et prépare tes courses Carrefour Drive et Grand Frais.",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
@@ -10,10 +10,10 @@
   "lang": "fr",
   "icons": [
     {
-      "src": "./icon.svg",
-      "sizes": "any",
-      "type": "image/svg+xml",
-      "purpose": "any maskable"
+      "src": "./speedrive-icon.PNG?v=20261028-30",
+      "sizes": "1024x1024",
+      "type": "image/png",
+      "purpose": "any"
     }
   ]
 }

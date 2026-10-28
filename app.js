@@ -253,7 +253,7 @@ function renderCourses(){
  const grand=available.filter(x=>x.store==='grandfrais'),drive=available.filter(x=>x.store==='carrefour');
  const todoGrand=grand.filter(x=>!x.checked).length,todoDrive=drive.filter(x=>!x.checked).length;
  let out=pageHeading('Liste intelligente','Mes courses','Deux magasins, une seule liste : choisis où acheter chaque produit.');
- out+='<div class="card soft"><div class="row between"><div><div class="eyebrow">À acheter</div><h1 style="margin:3px 0 0">'+left.length+' <span style="font-size:15px;color:#6f8174">produit'+(left.length!==1?'s':'')+'</span></h1></div><span style="font-size:35px">🛒</span></div><p class="subtext">Quantités calculées pour vos recettes, réparties entre Carrefour Drive et Grand Frais. Le choix du magasin est mémorisé.</p></div>';
+ out+='<div class="card soft"><div class="row between"><div><div class="eyebrow">À acheter</div><h1 style="margin:3px 0 0">'+left.length+' <span style="font-size:15px;color:#6f8174">produit'+(left.length!==1?'s':'')+'</span></h1></div><span style="font-size:35px">🛒</span></div><p class="subtext">Par défaut, les fruits/légumes et viandes non liés à un produit Carrefour vont chez Grand Frais. Change le magasin sur chaque ligne ; ton choix est mémorisé.</p></div>';
  out+='<div class="toolbar"><button class="btn" data-action="add-extra">＋ Ajouter un produit</button><button class="btn secondary" data-action="copy-list">⧉ Tout copier</button></div><button class="btn ghost" data-action="go-products">Voir mes produits habituels →</button>';
  if(state.staples.length)out+='<div class="section-head"><h2>Vos favoris</h2><span class="subtext">Appuyer pour ajouter</span></div><div class="favorites">'+state.staples.map(x=>'<button class="favorite-chip" data-action="quick-staple" data-id="'+x.id+'">＋ '+html(x.name)+'</button>').join('')+'</div>';
  const order=['Fruits et légumes','Viandes et poissons','Produits frais','Épicerie et divers','Hygiène et maison'];
@@ -438,6 +438,15 @@ function populate(mode){
  const w=getWeek();
  if(mode==='generate'&&w.meals.some(Boolean)&&!confirm('Remplacer les 14 repas de cette semaine ?'))return;
  if(mode==='generate')w.meals=Array(14).fill(null);
+ else {
+  // Si un plat déjà choisi prévoit quatre portions, réserver le repas suivant
+  // comme restes avant de compléter les autres cases vides.
+  for(let i=0;i<w.meals.length-1;i++){
+   const meal=w.meals[i];
+   if(meal?.type==='recipe'&&Number(meal.people)>=4&&!w.meals[i+1])
+    w.meals[i+1]={type:'leftovers',recipeId:meal.recipeId,fromIndex:i};
+  }
+ }
  const counts={},types={},history={};
  // Le générateur évite les plats récents, sans dépendance à une API ni aux données externes.
  [1,2,3].forEach((weeksAgo)=>{

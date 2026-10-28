@@ -103,3 +103,21 @@ Aucun mot de passe, cookie, token ni donnée de compte n’est lu, enregistré o
 - **Installation de la nouvelle version du script :** si le diagnostic 0.1 est déjà installé, ouvrir l'URL raw du script `.user.js` dans Safari, ouvrir Userscripts et accepter la mise à jour 0.2. Ne pas créer deux copies actives du même script. La configuration d'auto-mise-à-jour a été ajoutée en version 0.2.
 - **Sécurité :** aucune opération sur le panier Carrefour ; ne jamais fournir d'identifiants dans le script. Si le formulaire n'apparaît pas ou que les données détectées sont erronées, revenir et signaler le problème, sans supprimer le catalogue existant.
 
+
+
+## iPhone : importer dans l’application installée (correctif stockage Safari séparé)
+
+**Pourquoi :** sur iOS, le site ouvert dans Safari et l’application web ouverte depuis son icône ont des données IndexedDB différentes. Une fiche ajoutée dans Safari n’apparaîtra donc pas automatiquement dans l’application de l'écran d’accueil. Cette séparation est un comportement d’iOS.
+
+**Nouvelle procédure recommandée (Userscripts 0.3 + app 0.6) :**
+1. Ouvrir la fiche du produit sur Carrefour.fr dans **Safari**.
+2. Appuyer sur le bouton vert **« ➕ Mes produits »**, puis **« 📋 Copier pour mon appli »**.
+3. Revenir sur l’**écran d’accueil de l’iPhone**, et ouvrir l’icône déjà installée **Menus & Drive**. Ne pas la supprimer ni en créer une deuxième.
+4. Dans l'onglet **Produits**, appuyer sur **« 📋 Coller un produit Carrefour »**, puis **« 📋 Coller et vérifier le produit »**. Safari peut afficher une demande d’autorisation de collage : sélectionner « Coller ».
+5. Vérifier les données de la fiche préremplie. Appuyer sur **« Enregistrer le produit »**. L’enregistrement est effectué dans **l’espace local de l’application installée** et reste indépendant de Safari.
+
+**Si l’autorisation de collage échoue :** sur le panneau d'import, appuyer longtemps dans le champ prévu puis choisir « Coller », et cliquer « Vérifier le texte collé ». Le script côté Carrefour affiche également le code à copier manuellement si l’accès au presse-papiers a échoué.
+
+**Compatibilité :** l’ancienne méthode via lien `#carrefour-product=...` reste disponible pour les ouvertures dans Safari, mais ne partage pas ses données avec l’application de l’écran d’accueil. Le presse-papiers assure le passage de la fiche entre les deux applications sans serveur, sans compte, sans connexion à un service tiers et sans effacer les anciennes recettes.
+
+**Sécurité :** transfert d'une seule fiche produit publique par action utilisateur ; jamais de cookies Carrefour, d’identifiant ou de mot de passe, ni d’ajout au panier. Les données envoyées au presse-papiers peuvent être lues par d’autres applications autorisées à y accéder ; recopier ensuite un autre texte si souhaité.

@@ -1,33 +1,54 @@
 # Menus & Drive
 
-Application web mobile **sans compte, sans Supabase, sans synchronisation** : un catalogue de plats, un planning de 14 repas (midi/soir du lundi au dimanche), une liste de courses calculée automatiquement et les produits du quotidien.
+Une application mobile pour préparer les menus de la semaine et la liste de courses en quelques minutes. Conçue pour un seul iPhone et pour les achats au **Carrefour Drive École-Valentin**.
 
-## Statut
+## Fonctionnalités de la première version (branche `developpement-v1`)
 
-**Prototype V1 sur la branche `developpement-v1`.** Ne pas fusionner ni activer GitHub Pages sans validation de l’interface.
+- **Mes plats** : ajouter, modifier et supprimer les plats, avec ingrédients, quantités, catégorie et photo facultative. Pas d'étapes de préparation.
+- **Mes menus** : calendrier du lundi au dimanche, midi et soir (14 cases). Choix manuel, génération d'une semaine, remplissage des cases vides, reprise de la semaine précédente et case « Restes ».
+- **Portions** : deux personnes par défaut, nombre de personnes ajustable sur chaque repas.
+- **Mes courses** : somme des quantités pour tous les plats, conversion kg/g et l/ml/cl, produits manuels, favoris réutilisables, coches et retrait des produits déjà présents à la maison.
+- **Mon Drive** : récapitulatif des produits, copie de la liste et ouverture du site Carrefour.
 
-### Fonctionnalités disponibles
-- Ajout, modification et suppression de plats, ingrédients et photos locales.
-- Quantités de base pour **2 personnes** avec adaptation ponctuelle par repas.
-- Menus manuels, génération complète ou remplissage des cases vides, reprise de la semaine précédente et repas « Restes ».
-- Addition des ingrédients par nom et unité compatible (kg/g ; l/cl/ml), liste à cocher, exclusion des produits déjà possédés.
-- Ajout manuel de produits (papier toilette, baume à lèvres…), favoris réutilisables.
-- Copie de liste et ouverture de Carrefour dans le navigateur.
-- Sauvegarde locale IndexedDB et export/import JSON pour transférer/restaurer les données.
-- PWA pour installation sur l’écran d’accueil après activation de GitHub Pages.
+## État de l'intégration Carrefour
 
-### Important : Carrefour Drive
-La V1 **ne se connecte pas** au compte Carrefour, ne consulte **ni les prix ni les stocks en temps réel** et **ne crée pas** de panier. L’automatisation du panier nécessitera un prototype spécifique validé techniquement, sans divulguer d’identifiants ni stocker les mots de passe dans GitHub Pages. Carrefour École-Valentin est le magasin cible.
+**Le panier automatique n'est pas disponible dans cette version.** L'application ne se connecte pas à Carrefour, ne connaît ni les stocks ni les prix, ne choisit pas les références de produits et ne modifie aucun panier réel. Une intégration dédiée sera évaluée séparément.
 
-### Protection des données
-Les recettes, photos, menus et listes restent **dans le navigateur utilisé**. GitHub Pages n’héberge que le code public, pas les données personnelles. Effacer les données du navigateur ou changer d’iPhone peut entraîner une perte des données : utiliser régulièrement **⚙ → Exporter une sauvegarde** et conserver le JSON dans Fichiers/iCloud. Le mode privé est déconseillé.
+## Données et confidentialité
 
-### Mise en service après validation
-Fusionner `developpement-v1` dans `main`, activer Settings → Pages → Deploy from a branch → main, puis ouvrir l’URL fournie par GitHub. Sur iPhone, Safari → Partager → Sur l’écran d’accueil.
+- Pas de Supabase, pas de compte utilisateur, pas de synchronisation.
+- Les données sont conservées **sur l'iPhone utilisé**, dans IndexedDB (ou localStorage de secours si nécessaire).
+- Les sauvegardes JSON peuvent être **exportées** et **réimportées** depuis la roue dentée de l'application. Les photos éventuellement ajoutées sont incluses dans la sauvegarde.
+- **Important** : effacer les données du navigateur, utiliser la navigation privée, changer de téléphone ou supprimer le stockage du site peut effacer les recettes et les menus. Exporter régulièrement une sauvegarde, par exemple dans l'application Fichiers ou iCloud Drive.
+- Les données ne sont pas envoyées sur GitHub : GitHub Pages héberge uniquement le code public, sans les recettes personnelles enregistrées sur l'appareil.
 
-### Limites de V1
-- Le choix « Restes » n’ajoute pas automatiquement de portions au repas précédent. Il faut indiquer davantage de personnes au repas cuisiné.
-- Le rapprochement des ingrédients utilise leur nom normalisé : `tomate` et `tomates` sont distincts ; privilégier les mêmes libellés.
-- Pas encore de liaison à un catalogue Carrefour, de gestion des conditionnements disponibles ou d’estimation des prix.
+## Architecture
 
-Aucune dépendance externe : HTML/CSS/JavaScript uniquement.
+Application statique HTML/CSS/JavaScript.
+
+- `index.html` : structure et navigation.
+- `styles.css` : interface iPhone.
+- `app.js` : logique du planning, des recettes, des courses et stockage local.
+- `manifest.webmanifest` : installation en raccourci sur l'écran d'accueil.
+- `sw.js` : cache de l'interface pour une consultation hors ligne après le premier chargement.
+- `icon.svg` : icône de l'application.
+
+## Développement et validation
+
+La branche `developpement-v1` sert aux essais et n'est pas la branche de production. Le déploiement via GitHub Pages et toute fusion vers `main` nécessitent une validation distincte.
+
+Pour tester sans publier, télécharger les fichiers de la branche et utiliser un petit serveur web local HTTP. Les fonctionnalités de service worker et l'installation sur iPhone exigent une origine HTTPS compatible (par exemple GitHub Pages lorsqu'il sera activé).
+
+### Points de vérification avant publication
+
+1. Ajouter un plat pour deux personnes avec plusieurs ingrédients.
+2. Affecter le plat à plusieurs repas ; modifier les portions d'un repas.
+3. Vérifier la somme des ingrédients et les conversions d'unités.
+4. Ajouter manuellement un produit d'hygiène et le retrouver parmi les favoris.
+5. Générer une semaine, conserver les choix déjà faits, créer des restes.
+6. Exporter puis restaurer une sauvegarde et contrôler les données retrouvées.
+7. Vérifier le fonctionnement sur Safari iPhone, notamment après fermeture et réouverture de l'application.
+
+## Notes
+
+La génération automatique est volontairement simple dans cette première version : elle répartit les plats disponibles en essayant d'éviter les doublons sur la même semaine. Elle ne connaît pas encore vos goûts, les habitudes d'achat ni les dates de consommation. Les courses non achetées, les quantités et les substitutions Carrefour demandent une vérification humaine.

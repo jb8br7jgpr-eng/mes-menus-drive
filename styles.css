@@ -292,3 +292,20 @@
 .meal-picker-empty{padding:15px 12px;border:1px dashed #d5e4d3;border-radius:12px;text-align:center;font-size:12px;line-height:1.45;color:#7c8c7d}
 @media(max-width:380px){.meal-picker-filters{gap:6px}.meal-picker-filters input,.meal-picker-filters select{padding:7px 6px;font-size:11px}}
 @supports (-webkit-touch-callout:none){.meal-picker-filters input,.meal-picker-filters select{font-size:16px!important}}
+
+/* V27 : modification d'un achat manuel directement depuis sa ligne Courses. */
+.manual-edit-btn{display:inline-flex;align-items:center;justify-content:center;gap:5px;min-height:34px;padding:7px 9px;border:1px solid #b7d7ba;border-radius:9px;background:#e9f5e9;color:#315d40;font-size:11px;font-weight:800;line-height:1.25;white-space:nowrap;cursor:pointer}
+.manual-edit-btn:active{background:#d7ead9}
+.manual-edit-fields{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:9px;margin:12px 0 3px}
+.manual-edit-fields .field{min-width:0}
+.manual-edit-fields input,.manual-edit-fields select{min-height:44px;width:100%}
+.manual-linked-name{background:#f3f7ef;border:1px solid #e0ebdc;border-radius:12px;padding:11px 12px;margin:10px 0}
+.manual-linked-name strong{font-size:14px}
+.manual-linked-name .helper{margin:4px 0 0}
+.manual-delete-extra{margin:9px 0 0}
+.manual-extra-choice{display:flex;align-items:center;gap:10px;border:1px solid #e2eadd;background:#fff;border-radius:11px;padding:11px 10px;margin:8px 0;font-size:12px}
+.manual-extra-choice .grow{min-width:0;flex:1;overflow-wrap:anywhere}
+.course-house-actions{display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.course-house-actions .btn{font-size:10px;padding:7px 8px;white-space:normal;text-align:center}
+@media(max-width:380px){.shopping-controls .manual-edit-btn{flex-basis:100%}.manual-edit-btn{font-size:11px}}
+@supports (-webkit-touch-callout:none){.manual-edit-fields input,.manual-edit-fields select{font-size:16px!important}}

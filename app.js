@@ -83,7 +83,7 @@ function renderMenus(){const w=getWeek(),count=w.meals.filter(Boolean).length, l
   for(let day=0;day<7;day++){const d=offsetDate(currentWeek,day);out+='<section class="day-card"><div class="day-title">'+days[day]+' <small>'+niceDate(d)+'</small></div><div class="day-meals">'+mealCard(w.meals[day*2],day*2)+mealCard(w.meals[day*2+1],day*2+1)+'</div></section>'}
   out+='</div><div class="toolbar"><button class="btn secondary" data-action="generate-week">✦ Générer les 14 repas</button><button class="btn secondary" data-action="repeat-week">↻ Reprendre la semaine passée</button></div>';
   out+='<button class="btn wide" data-action="go-courses">Voir ma liste de courses →</button>';
-  out+='<p class="helper">Tu peux garder certains repas manuels et compléter uniquement les cases vides. « Restes » ne crée pas d’ingrédients supplémentaires : prévois davantage de portions lors de la cuisson précédente.</p>';
+  out+='<p class="helper">Le générateur favorise les plats peu servis récemment et varie les catégories, dans la limite de ton catalogue. Tu peux garder certains repas manuels et compléter uniquement les cases vides. « Restes » ne crée pas d’ingrédients supplémentaires : prévois davantage de portions lors de la cuisson précédente.</p>';
   return out
 }
 function recipeImg(r){return '<div class="recipe-img">'+(r.image?'<img src="'+html(r.image)+'" alt="">':html(icons[r.category]||'🍽️'))+'</div>'}
@@ -213,11 +213,32 @@ async function refreshBackupList(){
  }catch(e){box.textContent='Impossible de lire les versions locales.'}
 }
 function peopleInput(){return Math.min(30,Math.max(1,Number($('#mealPeople')?.value)||2))}
-function populate(mode){if(!state.recipes.length){toast('Ajoute d’abord quelques plats à ton catalogue.');currentTab='plats';render();return}const w=getWeek();if(mode==='generate'&&w.meals.some(Boolean)&&!confirm('Remplacer les 14 repas de cette semaine ?'))return;
-  if(mode==='generate')w.meals=Array(14).fill(null);
-  const recipes=state.recipes.slice().sort(()=>Math.random()-.5),counts={};w.meals.forEach(m=>{if(m?.recipeId)counts[m.recipeId]=(counts[m.recipeId]||0)+1});
-  w.meals=w.meals.map((m,i)=>{if(m)return m;const pool=recipes.slice().sort((a,b)=>(counts[a.id]||0)-(counts[b.id]||0));const chosen=pool[0];counts[chosen.id]=(counts[chosen.id]||0)+1;return {type:'recipe',recipeId:chosen.id,people:state.settings.people||2}});
-  persist();render();toast(mode==='generate'?'Nouvelle semaine générée !':'Les repas manquants sont complétés !')
+function populate(mode){
+ if(!state.recipes.length){toast('Ajoute d’abord quelques plats à ton catalogue.');currentTab='plats';render();return}
+ const w=getWeek();
+ if(mode==='generate'&&w.meals.some(Boolean)&&!confirm('Remplacer les 14 repas de cette semaine ?'))return;
+ if(mode==='generate')w.meals=Array(14).fill(null);
+ const counts={},types={},history={};
+ // Le générateur évite les plats récents, sans dépendance à une API ni aux données externes.
+ [1,2,3].forEach((weeksAgo)=>{
+  const old=state.weeks[offsetDate(currentWeek,-7*weeksAgo)];
+  if(!old||!Array.isArray(old.meals))return;
+  old.meals.forEach(m=>{if(m?.type==='recipe'&&recipeById(m.recipeId))history[m.recipeId]=(history[m.recipeId]||0)+(weeksAgo===1?36:weeksAgo===2?16:7)})
+ });
+ w.meals.forEach(m=>{if(m?.type!=='recipe')return;const r=recipeById(m.recipeId);if(!r)return;counts[r.id]=(counts[r.id]||0)+1;types[r.category||'Autre']=(types[r.category||'Autre']||0)+1});
+ const chosenByDay=day=>[w.meals[day*2],w.meals[day*2+1]].filter(m=>m?.type==='recipe').map(m=>m.recipeId);
+ w.meals=w.meals.map((meal,i)=>{
+  if(meal)return meal;
+  const day=Math.floor(i/2),previous=i>0?w.meals[i-1]:null;
+  const scored=state.recipes.map(r=>{
+   const count=counts[r.id]||0,cat=r.category||'Autre',nearby=chosenByDay(day).includes(r.id),sameCategory=previous?.recipeId&&recipeById(previous.recipeId)?.category===cat;
+   return {r,score:count*100+(history[r.id]||0)+(types[cat]||0)*5+(nearby?180:0)+(sameCategory?18:0)+Math.random()*7}
+  }).sort((a,b)=>a.score-b.score);
+  const selected=scored[0].r;counts[selected.id]=(counts[selected.id]||0)+1;const cat=selected.category||'Autre';types[cat]=(types[cat]||0)+1;
+  // Affectation immédiate pour que la case du soir évite le repas du midi.
+  const result={type:'recipe',recipeId:selected.id,people:state.settings.people||2};w.meals[i]=result;return result
+ });
+ persist();render();toast(mode==='generate'?'Semaine variée générée !':'Les repas manquants sont complétés !')
 }
 async function compressImage(file){if(!file)return null;if(file.size>12*1024*1024)throw Error('Photo trop volumineuse (12 Mo maximum).');return new Promise((resolve,reject)=>{const reader=new FileReader();reader.onerror=()=>reject(Error('Impossible de lire la photo.'));reader.onload=()=>{const img=new Image();img.onerror=()=>reject(Error('Photo non reconnue.'));img.onload=()=>{const max=640,scale=Math.min(1,max/Math.max(img.width,img.height)),can=document.createElement('canvas');can.width=Math.round(img.width*scale);can.height=Math.round(img.height*scale);can.getContext('2d').drawImage(img,0,0,can.width,can.height);resolve(can.toDataURL('image/jpeg',.76))};img.src=reader.result};reader.readAsDataURL(file)})}
 async function saveRecipe(e){e.preventDefault();const form=e.target,name=$('#recipeName').value.trim(),people=Number($('#recipePeople').value),category=$('#recipeCategory').value;const ingredients=[...$('#ingredientRows').children].map(row=>({name:$('.ingredient-name',row).value.trim(),qty:Number($('.ingredient-qty',row).value),unit:$('.ingredient-unit',row).value,productId:$('.ingredient-product',row).value||null}));

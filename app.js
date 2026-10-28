@@ -60,7 +60,7 @@ async function restoreSnapshot(id){
   if(!confirm('Remplacer tes données actuelles par cette sauvegarde locale ?'))return;
   await checkpoint('Avant restauration');
   state={...baseState(),...selected.data,products:Array.isArray(selected.data.products)?selected.data.products:[]};
-  persist();await saveQueue;closeModal();render();toast('Version précédente restaurée !')
+  normalizeIngredientCatalog();persist();await saveQueue;closeModal();render();toast('Version précédente restaurée !')
  }catch(e){toast('Restauration impossible. Exporte ton JSON si nécessaire.')}
 }
 let toastTimer;
@@ -264,9 +264,9 @@ function renderProduits(){
  }
  return out
 }
-function productEditor(id,draft=null){
+function productEditor(id,draft=null,linkedIngredientId=null){
  const p=productById(id)||draft,title=id?'Modifier le produit':draft?'Importer depuis Carrefour':'Ajouter un produit';
- const body='<form id="productForm" data-id="'+html(p?.id||'')+'"><div class="field"><label for="productName">Nom du produit</label><input id="productName" maxlength="100" required placeholder="Ex. Papier toilette" value="'+html(p?.name||'')+'"></div><div class="field"><label for="productBrand">Marque (facultatif)</label><input id="productBrand" maxlength="80" placeholder="Ex. Lotus" value="'+html(p?.brand||'')+'"></div><div class="field"><label for="productPackaging">Conditionnement (facultatif)</label><input id="productPackaging" maxlength="80" placeholder="Ex. Lot de 12 rouleaux" value="'+html(p?.packaging||'')+'"></div><div class="field"><label for="productCategory">Catégorie</label><select id="productCategory">'+selectOptions(productCategories,p?.category||'Autres')+'</select></div><div class="field"><label for="productStore">Magasin habituel</label><select id="productStore"><option value="carrefour" '+((state.storePreferences?.['product:'+p?.id]||p?.store||'carrefour')==='carrefour'?'selected':'')+'>Carrefour Drive</option><option value="grandfrais" '+((state.storePreferences?.['product:'+p?.id]||p?.store)==='grandfrais'?'selected':'')+'>Grand Frais</option></select></div><div class="row" style="align-items:start"><div class="field grow"><label for="productQty">Quantité habituelle à acheter</label><input id="productQty" type="number" min=".01" step="any" required value="'+(p?.qty||1)+'"></div><div class="field grow"><label for="productUnit">Unité</label><select id="productUnit">'+selectOptions(units,p?.unit||'paquet')+'</select></div></div><div class="card soft" style="margin:12px 0"><strong>Contenu d’un emballage (facultatif)</strong><p class="helper">Exemple : un paquet contenant 1 kg de riz, pour calculer le nombre de paquets à acheter.</p><div class="row" style="align-items:start"><div class="field grow"><label for="packAmount">Contenu</label><input id="packAmount" type="number" min=".01" step="any" placeholder="Ex. 1" value="'+html(p?.packAmount??'')+'"></div><div class="field grow"><label for="packUnit">Unité de contenu</label><select id="packUnit">'+selectOptions(contentUnits,p?.packUnit||'g')+'</select></div></div></div><div class="field"><label for="productEan">Code-barres EAN-13 (facultatif)</label><input id="productEan" maxlength="13" inputmode="numeric" pattern="[0-9]{13}" placeholder="13 chiffres" value="'+html(p?.ean||'')+'"><div class="helper">Code de la fiche Carrefour, à vérifier sur l’emballage si nécessaire.</div></div><div class="field"><label for="productUrl">Lien du produit Carrefour (facultatif)</label><input id="productUrl" type="url" maxlength="2000" autocomplete="off" placeholder="https://www.carrefour.fr/p/..." value="'+html(p?.url||'')+'"><div class="helper">Colle le lien exact depuis Carrefour.fr. Aucune connexion à ton compte n’est demandée.</div></div><button class="btn wide" type="submit">✓ Enregistrer le produit</button></form>';
+ const body='<form id="productForm" data-id="'+html(p?.id||'')+'" data-ingredient-id="'+html(linkedIngredientId||'')+'"><div class="field"><label for="productName">Nom du produit</label><input id="productName" maxlength="100" required placeholder="Ex. Papier toilette" value="'+html(p?.name||'')+'"></div><div class="field"><label for="productBrand">Marque (facultatif)</label><input id="productBrand" maxlength="80" placeholder="Ex. Lotus" value="'+html(p?.brand||'')+'"></div><div class="field"><label for="productPackaging">Conditionnement (facultatif)</label><input id="productPackaging" maxlength="80" placeholder="Ex. Lot de 12 rouleaux" value="'+html(p?.packaging||'')+'"></div><div class="field"><label for="productCategory">Catégorie</label><select id="productCategory">'+selectOptions(productCategories,p?.category||'Autres')+'</select></div><div class="field"><label for="productStore">Magasin habituel</label><select id="productStore"><option value="carrefour" '+((state.storePreferences?.['product:'+p?.id]||p?.store||'carrefour')==='carrefour'?'selected':'')+'>Carrefour Drive</option><option value="grandfrais" '+((state.storePreferences?.['product:'+p?.id]||p?.store)==='grandfrais'?'selected':'')+'>Grand Frais</option></select></div><div class="row" style="align-items:start"><div class="field grow"><label for="productQty">Quantité habituelle à acheter</label><input id="productQty" type="number" min=".01" step="any" required value="'+(p?.qty||1)+'"></div><div class="field grow"><label for="productUnit">Unité</label><select id="productUnit">'+selectOptions(units,p?.unit||'paquet')+'</select></div></div><div class="card soft" style="margin:12px 0"><strong>Contenu d’un emballage (facultatif)</strong><p class="helper">Exemple : un paquet contenant 1 kg de riz, pour calculer le nombre de paquets à acheter.</p><div class="row" style="align-items:start"><div class="field grow"><label for="packAmount">Contenu</label><input id="packAmount" type="number" min=".01" step="any" placeholder="Ex. 1" value="'+html(p?.packAmount??'')+'"></div><div class="field grow"><label for="packUnit">Unité de contenu</label><select id="packUnit">'+selectOptions(contentUnits,p?.packUnit||'g')+'</select></div></div></div><div class="field"><label for="productEan">Code-barres EAN-13 (facultatif)</label><input id="productEan" maxlength="13" inputmode="numeric" pattern="[0-9]{13}" placeholder="13 chiffres" value="'+html(p?.ean||'')+'"><div class="helper">Code de la fiche Carrefour, à vérifier sur l’emballage si nécessaire.</div></div><div class="field"><label for="productUrl">Lien du produit Carrefour (facultatif)</label><input id="productUrl" type="url" maxlength="2000" autocomplete="off" placeholder="https://www.carrefour.fr/p/..." value="'+html(p?.url||'')+'"><div class="helper">Colle le lien exact depuis Carrefour.fr. Aucune connexion à ton compte n’est demandée.</div></div><button class="btn wide" type="submit">✓ Enregistrer le produit</button></form>';
  showModal(title,(draft&&!id?'<div class="note" style="margin-bottom:12px"><strong>Import depuis Carrefour.fr</strong><p>Vérifie le nom, la marque, la quantité et le conditionnement avant d’enregistrer. Aucun panier n’est modifié.</p></div>':'')+body+(id?'<button class="btn danger wide" style="margin-top:10px" data-action="delete-product" data-id="'+html(id)+'">Supprimer ce produit</button>':''))
 }
 function saveProduct(e){
@@ -277,7 +277,11 @@ function saveProduct(e){
  const product={id:old?.id||uid(),name,brand,packaging,category,store,qty,unit,url,ean,packAmount,packUnit:packAmount?packUnit:null};
  if(state.storePreferences)delete state.storePreferences['product:'+product.id];
  if(old)state.products=state.products.map(p=>p.id===old.id?product:p);else state.products.push(product);
- persist();closeModal();render();toast(old?'Produit modifié !':'Produit ajouté au catalogue !')
+ const ing=ingredientById(e.target.dataset.ingredientId);
+ if(ing){ing.productId=product.id;ing.store='carrefour';ingredientStoreTab='carrefour';
+  state.recipes.forEach(r=>r.ingredients?.forEach(i=>{if(i.ingredientId===ing.id)i.productId=product.id}))
+ }
+ persist();closeModal();render();toast(ing?'Produit Carrefour associé à '+ing.name+' !':old?'Produit modifié !':'Produit ajouté au catalogue !')
 }
 function addCatalogProduct(id){
  const p=productById(id);if(!p)return;
@@ -826,7 +830,7 @@ async function copyList(){const value=listText();if(!value){toast('Aucun produit
 function exportData(){const blob=new Blob([JSON.stringify({...state,exportedAt:new Date().toISOString()},null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='mes-menus-drive-sauvegarde-'+localDate(new Date())+'.json';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);toast('Sauvegarde créée. Conserve le fichier !')}
 async function importData(file){if(!file)return;try{if(file.size>25*1024*1024)throw Error('Fichier trop volumineux.');const raw=JSON.parse(await file.text());if(raw.schema!==1||!Array.isArray(raw.recipes)||!raw.weeks||typeof raw.weeks!=='object'||!Array.isArray(raw.staples))throw Error('Format de sauvegarde non reconnu.');
   if(!confirm('Remplacer les données actuelles par celles de ce fichier ?'))return;
-  checkpoint('Avant import JSON');state={schema:1,recipes:raw.recipes,products:Array.isArray(raw.products)?raw.products:[],weeks:raw.weeks,staples:raw.staples,storePreferences:raw.storePreferences&&typeof raw.storePreferences==='object'&&!Array.isArray(raw.storePreferences)?raw.storePreferences:{},settings:{people:2,...raw.settings}};persist();closeModal();render();toast('Sauvegarde restaurée !')
+  checkpoint('Avant import JSON');state={schema:1,recipes:raw.recipes,products:Array.isArray(raw.products)?raw.products:[],weeks:raw.weeks,staples:raw.staples,storePreferences:raw.storePreferences&&typeof raw.storePreferences==='object'&&!Array.isArray(raw.storePreferences)?raw.storePreferences:{},ingredientCatalog:Array.isArray(raw.ingredientCatalog)?raw.ingredientCatalog:[],settings:{people:2,...raw.settings}};normalizeIngredientCatalog();persist();closeModal();render();toast('Sauvegarde restaurée !')
 }catch(err){toast(err.message||'Importation impossible.')}}
 document.addEventListener('click',e=>{const tab=e.target.closest('[data-tab]');if(tab){currentTab=tab.dataset.tab;render();return}
   const a=e.target.closest('[data-action]');if(!a){if(e.target.matches('[data-overlay]'))closeModal();return}
@@ -841,13 +845,20 @@ document.addEventListener('click',e=>{const tab=e.target.closest('[data-tab]');i
   else if(mode==='add-recipe')recipeEditor(null);
   else if(mode==='edit-recipe')recipeEditor(id);
   else if(mode==='add-product')productEditor(null);
+  else if(mode==='ingredient-store-tab'){ingredientStoreTab=a.dataset.store==='grandfrais'?'grandfrais':'carrefour';render(true)}
+  else if(mode==='add-catalog-ingredient')ingredientEditor(null);
+  else if(mode==='edit-ingredient')ingredientEditor(id);
+  else if(mode==='new-linked-product'){
+   const ing=ingredientById(id);if(!ing)return;
+   productEditor(null,{name:ing.name,brand:'',packaging:'',category:'Autres',store:'carrefour',qty:1,unit:'paquet',url:'',ean:'',packAmount:null,packUnit:null},ing.id)
+  }
   else if(mode==='open-carrefour-import')carrefourClipboardModal();
   else if(mode==='read-carrefour-clipboard')readCarrefourClipboard();
   else if(mode==='import-pasted-carrefour')importCopiedCarrefourProduct($('#carrefourPaste')?.value);
   else if(mode==='edit-product')productEditor(id);
   else if(mode==='add-catalog-product')addCatalogProduct(id);
   else if(mode==='filter-products'){productCategory=a.dataset.category;render(true)}
-  else if(mode==='delete-product'){if(confirm('Supprimer ce produit du catalogue ? Les courses déjà saisies resteront.')){checkpoint('Avant suppression de produit');state.products=state.products.filter(x=>x.id!==id);state.recipes.forEach(r=>r.ingredients.forEach(i=>{if(i.productId===id)i.productId=null}));persist();closeModal();render();toast('Produit supprimé du catalogue.')}}
+  else if(mode==='delete-product'){if(confirm('Supprimer ce produit du catalogue ? Les courses déjà saisies resteront.')){checkpoint('Avant suppression de produit');state.products=state.products.filter(x=>x.id!==id);state.recipes.forEach(r=>r.ingredients.forEach(i=>{if(i.productId===id)i.productId=null}));state.ingredientCatalog.forEach(i=>{if(i.productId===id)i.productId=null});persist();closeModal();render();toast('Produit supprimé du catalogue.')}}
   else if(mode==='add-ingredient'){
    const rows=$('#ingredientRows');if(!rows)return;
    rows.insertAdjacentHTML('beforeend',ingredientRow());
@@ -912,12 +923,22 @@ document.addEventListener('click',e=>{const tab=e.target.closest('[data-tab]');i
   else if(mode==='restore-backup')restoreSnapshot(id);
   else if(mode==='clear-all'){if(confirm('Effacer toutes les données actuelles ? Une copie locale sera conservée dans les versions précédentes.')){checkpoint('Avant effacement');state=baseState();persist();closeModal();render();toast('Données actuelles effacées.')}}
 });
-document.addEventListener('change',e=>{if(e.target.matches('[data-store-item]')){setShoppingStore(e.target.dataset.storeItem,e.target.value)}else if(e.target.matches('[data-check]')){const w=getWeek(),id=e.target.dataset.check;w.checked=e.target.checked?[...new Set([...w.checked,id])]:w.checked.filter(x=>x!==id);persist();render(true)}else if(e.target.id==='importFile')importData(e.target.files?.[0])});
-document.addEventListener('input',e=>{if(e.target.id==='recipeSearch'){search=e.target.value;const result=$('#recipeResults');if(result)result.innerHTML=recipeRows()}else if(e.target.id==='productSearch'){productSearch=e.target.value;const result=$('#productResults');if(result)result.innerHTML=productRows()}});
-document.addEventListener('submit',e=>{if(e.target.id==='recipeForm')saveRecipe(e);if(e.target.id==='extraForm')addExtra(e);if(e.target.id==='productForm')saveProduct(e)});
+document.addEventListener('change',e=>{if(e.target.matches('.ingredient-name')){
+ const match=ingredientByName(e.target.value),row=e.target.closest('.ingredient-line');
+ const store=row?.querySelector('.ingredient-store');
+ if(match&&store)store.value=ingredientStore(match);
+ const linked=row?.querySelector('.ingredient-link-note');
+ if(match&&linked){
+  const p=productById(match.productId);
+  linked.textContent=ingredientStore(match)==='grandfrais'?'Grand Frais : aucune fiche produit nécessaire.':p?'Produit Carrefour lié : '+p.name:'Pas encore de produit Carrefour lié (à associer dans la base).'
+ }
+ }else if(e.target.matches('[data-store-item]')){setShoppingStore(e.target.dataset.storeItem,e.target.value)}else if(e.target.matches('[data-check]')){const w=getWeek(),id=e.target.dataset.check;w.checked=e.target.checked?[...new Set([...w.checked,id])]:w.checked.filter(x=>x!==id);persist();render(true)}else if(e.target.id==='importFile')importData(e.target.files?.[0])});
+document.addEventListener('input',e=>{if(e.target.id==='recipeSearch'){search=e.target.value;const result=$('#recipeResults');if(result)result.innerHTML=recipeRows()}else if(e.target.id==='productSearch'){productSearch=e.target.value;const result=$('#productResults');if(result)result.innerHTML=productRows();const ings=$('#ingredientCatalogResults');if(ings)ings.innerHTML=ingredientRowsCatalogue()}});
+document.addEventListener('submit',e=>{if(e.target.id==='recipeForm')saveRecipe(e);if(e.target.id==='ingredientCatalogForm')saveCatalogIngredient(e);if(e.target.id==='extraForm')addExtra(e);if(e.target.id==='productForm')saveProduct(e)});
 window.addEventListener('hashchange',()=>importCarrefourProductFromHash());
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal()});
 $('#settingsBtn').addEventListener('click',settingsModal);
 (async function boot(){currentWeek=monday(new Date());try{db=await openDatabase();const stored=await readRecord();if(stored?.schema===1)state={...baseState(),...stored,products:Array.isArray(stored.products)?stored.products:[]}}catch(err){usingFallback=true;try{const raw=localStorage.getItem('menus-drive-backup');if(raw){const saved=JSON.parse(raw);state={...baseState(),...saved,products:Array.isArray(saved.products)?saved.products:[]}}}catch(e){}toast('Mode de sauvegarde local de secours activé.')}
+  if(normalizeIngredientCatalog())persist();
   render();importCarrefourProductFromHash();if('serviceWorker' in navigator&&location.protocol==='https:')navigator.serviceWorker.register('./sw.js').catch(()=>{});
 })();

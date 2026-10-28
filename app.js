@@ -70,12 +70,12 @@ function pageHeading(kicker,title,sub){return '<div class="eyebrow">'+kicker+'</
 function recipeById(id){return state.recipes.find(r=>r.id===id)}
 function emptyView(emoji,title,description,button){return '<div class="empty"><div class="illustration">'+emoji+'</div><strong>'+title+'</strong><p>'+description+'</p>'+button+'</div>'}
 function mealCard(meal,i){let label='',classes='',note='';
-  if(meal?.type==='leftovers'){label='Restes';classes=' filled';note='Aucune course supplémentaire'}
-  else if(meal?.type==='recipe'){const r=recipeById(meal.recipeId);label=r?r.name:'Plat supprimé';classes=' filled';note=(meal.people||2)+' pers.'}
+  if(meal?.type==='leftovers'){const linked=meal.recipeId?recipeById(meal.recipeId):null;label=linked?'Restes : '+linked.name:'Restes';classes=' filled';note='2 portions · sans courses supplémentaires'}
+  else if(meal?.type==='recipe'){const r=recipeById(meal.recipeId);label=r?r.name:'Plat supprimé';classes=' filled';note=(meal.people||2)+' portions à cuisiner'}
   return '<button class="meal-tile'+classes+'" data-action="pick-meal" data-index="'+i+'" aria-label="'+html(days[Math.floor(i/2)])+' '+(i%2?'soir':'midi')+', '+html(label||'ajouter un plat')+'"><span class="meal-type">'+(i%2?'Soir':'Midi')+(note?' · '+html(note):'')+'</span>'+(label?'<strong>'+html(label)+'</strong>':'<span class="add">＋ Ajouter un plat</span>')+'</button>';
 }
 function renderMenus(){const w=getWeek(),count=w.meals.filter(Boolean).length, last=offsetDate(currentWeek,6),isThis=currentWeek===monday(new Date());
-  let out='<div class="hero"><div class="eyebrow">Planificateur hebdomadaire</div><h1>Qu’est-ce qu’on mange cette semaine ?</h1><p>Deux repas par jour, zéro prise de tête. Choisis tes plats ou laisse l’application te proposer des idées.</p><button class="btn cream" data-action="complete-week">✦ Compléter ma semaine</button></div>';
+  let out='<div class="hero"><div class="eyebrow">Planificateur hebdomadaire</div><h1>Qu’est-ce qu’on mange cette semaine ?</h1><p>Pour vous deux : cuisine 4 portions, mangez-en 2 et gardez les 2 autres pour le repas suivant.</p><button class="btn cream" data-action="complete-week">✦ Compléter ma semaine</button></div>';
   out+='<div class="section-head"><h2>Votre semaine</h2><span class="pill">'+count+' / 14 repas</span></div>';
   out+='<div class="week-control"><button class="icon-btn" aria-label="Semaine précédente" data-action="week-prev">‹</button><div class="week-label">Du '+niceDate(currentWeek)+' au '+niceDate(last)+(isThis?'<small>Cette semaine</small>':'<small>Planning personnalisé</small>')+'</div><button class="icon-btn" aria-label="Semaine suivante" data-action="week-next">›</button></div>';
   out+='<div class="status-bar"><span style="width:'+(count/14*100)+'%"></span></div>';
@@ -83,11 +83,11 @@ function renderMenus(){const w=getWeek(),count=w.meals.filter(Boolean).length, l
   for(let day=0;day<7;day++){const d=offsetDate(currentWeek,day);out+='<section class="day-card"><div class="day-title">'+days[day]+' <small>'+niceDate(d)+'</small></div><div class="day-meals">'+mealCard(w.meals[day*2],day*2)+mealCard(w.meals[day*2+1],day*2+1)+'</div></section>'}
   out+='</div><div class="toolbar"><button class="btn secondary" data-action="generate-week">✦ Générer les 14 repas</button><button class="btn secondary" data-action="repeat-week">↻ Reprendre la semaine passée</button></div>';
   out+='<button class="btn wide" data-action="go-courses">Voir ma liste de courses →</button>';
-  out+='<p class="helper">Le générateur favorise les plats peu servis récemment et varie les catégories, dans la limite de ton catalogue. Tu peux garder certains repas manuels et compléter uniquement les cases vides. « Restes » ne crée pas d’ingrédients supplémentaires : prévois davantage de portions lors de la cuisson précédente.</p>';
+  out+='<p class="helper">Par défaut, un plat prépare 4 portions pour 2 repas de 2 personnes : le repas suivant est automatiquement marqué « Restes » s’il est libre. Les ingrédients ne sont comptés qu’une fois. Le générateur respecte aussi cette organisation sans écraser les repas déjà choisis.</p>';
   return out
 }
 function recipeImg(r){return '<div class="recipe-img">'+(r.image?'<img src="'+html(r.image)+'" alt="">':html(icons[r.category]||'🍽️'))+'</div>'}
-function recipeRows(){let list=state.recipes.filter(r=>r.name.toLocaleLowerCase('fr').includes(search.toLocaleLowerCase('fr'))).sort((a,b)=>a.name.localeCompare(b.name,'fr'));return list.map(r=>'<div class="recipe-card">'+recipeImg(r)+'<div class="grow"><h3>'+html(r.name)+'</h3><p>'+r.ingredients.length+' ingrédient'+(r.ingredients.length>1?'s':'')+' · '+r.people+' personnes</p><span class="pill gray">'+html(r.category||'Autre')+'</span></div><div class="recipe-actions"><button class="icon-btn" data-action="edit-recipe" data-id="'+r.id+'" aria-label="Modifier '+html(r.name)+'">✎</button></div></div>').join('')||emptyView('🍲','Aucun plat trouvé',search?'Essaie un autre nom.':'Commence par ajouter votre premier plat.','<button class="btn" data-action="add-recipe">＋ Ajouter un plat</button>')}
+function recipeRows(){let list=state.recipes.filter(r=>r.name.toLocaleLowerCase('fr').includes(search.toLocaleLowerCase('fr'))).sort((a,b)=>a.name.localeCompare(b.name,'fr'));return list.map(r=>'<div class="recipe-card">'+recipeImg(r)+'<div class="grow"><h3>'+html(r.name)+'</h3><p>'+r.ingredients.length+' ingrédient'+(r.ingredients.length>1?'s':'')+' · recette pour '+r.people+' portions</p><span class="pill gray">'+html(r.category||'Autre')+'</span></div><div class="recipe-actions"><button class="icon-btn" data-action="edit-recipe" data-id="'+r.id+'" aria-label="Modifier '+html(r.name)+'">✎</button></div></div>').join('')||emptyView('🍲','Aucun plat trouvé',search?'Essaie un autre nom.':'Commence par ajouter votre premier plat.','<button class="btn" data-action="add-recipe">＋ Ajouter un plat</button>')}
 function renderPlats(){let out=pageHeading('Votre bibliothèque','Mes plats','Enregistre une seule fois les ingrédients de vos plats habituels.');
   out+='<div class="toolbar"><button class="btn wide" data-action="add-recipe">＋ Ajouter un plat</button></div>';
   out+='<div class="field"><input class="text-input" id="recipeSearch" value="'+html(search)+'" placeholder="⌕ Rechercher un plat…" aria-label="Rechercher un plat"></div>';
@@ -326,12 +326,12 @@ function showModal(title,body){modalRoot.innerHTML='<div class="modal-overlay" d
 function closeModal(){modalRoot.innerHTML=''}
 function selectOptions(values,value){return values.map(x=>'<option value="'+html(x)+'" '+(x===value?'selected':'')+'>'+html(x)+'</option>').join('')}
 function ingredientRow(item={name:'',qty:'',unit:'g'}){const choices='<option value="">Aucune référence liée</option>'+state.products.map(p=>'<option value="'+html(p.id)+'" '+(item.productId===p.id?'selected':'')+'>'+html([p.name,p.brand,p.packaging].filter(Boolean).join(' · '))+'</option>').join('');return '<div class="ingredient-line"><div class="ingredient-edit-row"><input class="ingredient-name" placeholder="Ingrédient" aria-label="Ingrédient" value="'+html(item.name)+'"><input class="ingredient-qty" type="number" min=".01" step="any" placeholder="Qté" aria-label="Quantité" value="'+html(item.qty)+'"><select class="ingredient-unit" aria-label="Unité">'+selectOptions(units,item.unit)+'</select><button type="button" class="icon-btn" aria-label="Retirer cet ingrédient" data-action="remove-ingredient">×</button></div><select class="ingredient-product" aria-label="Produit Carrefour associé">'+choices+'</select></div>'}
-function recipeEditor(id){const r=recipeById(id),title=r?'Modifier le plat':'Ajouter un plat',ingredients=r?.ingredients?.length?r.ingredients:[{name:'',qty:'',unit:'g'}];let body='<form id="recipeForm" data-id="'+(r?.id||'')+'"><div class="field"><label for="recipeName">Nom du plat</label><input required maxlength="90" id="recipeName" placeholder="Ex. Poulet au curry" value="'+html(r?.name||'')+'"></div><div class="row" style="align-items:start;gap:11px"><div class="field grow"><label for="recipeCategory">Type de plat</label><select id="recipeCategory">'+selectOptions(Object.keys(icons),r?.category||'Autre')+'</select></div><div class="field" style="width:115px"><label for="recipePeople">Pour combien ?</label><input id="recipePeople" type="number" min="1" max="30" required value="'+(r?.people||2)+'"></div></div><div class="field"><label for="recipePhoto">Photo (facultatif)</label><div class="image-input"><input id="recipePhoto" type="file" accept="image/*"><div class="helper">Photo conservée sur ce téléphone. Format allégé automatiquement.</div></div></div><div class="row between" style="margin:15px 0 8px"><h3>Ingrédients</h3><button type="button" class="btn secondary tiny" data-action="add-ingredient">＋ Ingrédient</button></div><div id="ingredientRows">'+ingredients.map(ingredientRow).join('')+'</div><div class="divider"></div><button class="btn wide" type="submit">✓ Enregistrer le plat</button></form>';
+function recipeEditor(id){const r=recipeById(id),title=r?'Modifier le plat':'Ajouter un plat',ingredients=r?.ingredients?.length?r.ingredients:[{name:'',qty:'',unit:'g'}];let body='<form id="recipeForm" data-id="'+(r?.id||'')+'"><div class="field"><label for="recipeName">Nom du plat</label><input required maxlength="90" id="recipeName" placeholder="Ex. Poulet au curry" value="'+html(r?.name||'')+'"></div><div class="row" style="align-items:start;gap:11px"><div class="field grow"><label for="recipeCategory">Type de plat</label><select id="recipeCategory">'+selectOptions(Object.keys(icons),r?.category||'Autre')+'</select></div><div class="field" style="width:115px"><label for="recipePeople">Portions de base</label><input id="recipePeople" type="number" min="1" max="30" required value="'+(r?.people||4)+'"></div></div><div class="field"><label for="recipePhoto">Photo (facultatif)</label><div class="image-input"><input id="recipePhoto" type="file" accept="image/*"><div class="helper">Photo conservée sur ce téléphone. Format allégé automatiquement.</div></div></div><div class="row between" style="margin:15px 0 8px"><h3>Ingrédients</h3><button type="button" class="btn secondary tiny" data-action="add-ingredient">＋ Ingrédient</button></div><div id="ingredientRows">'+ingredients.map(ingredientRow).join('')+'</div><div class="divider"></div><button class="btn wide" type="submit">✓ Enregistrer le plat</button></form>';
   if(r)body+='<button class="btn danger wide" style="margin-top:10px" data-action="delete-recipe" data-id="'+r.id+'">Supprimer ce plat</button>';
   showModal(title,body)
 }
-function pickMeal(index){const w=getWeek(),meal=w.meals[index],existing=meal?.type==='recipe'?recipeById(meal.recipeId):null,people=meal?.people||2;
-  let out='<div class="field"><label for="mealPeople">Nombre de personnes</label><input type="number" id="mealPeople" min="1" max="30" value="'+people+'"></div>';
+function pickMeal(index){const w=getWeek(),meal=w.meals[index],existing=meal?.type==='recipe'?recipeById(meal.recipeId):null,people=meal?.people||4;
+  let out='<div class="field"><label for="mealPeople">Portions à cuisiner (4 = 2 personnes × 2 repas)</label><input type="number" id="mealPeople" min="1" max="30" value="'+people+'"><div class="helper">Le repas suivant devient automatiquement « Restes » s’il est vide. Tu peux choisir 2 portions pour cuisiner une seule fois.</div></div>';
   if(existing)out+='<div class="card soft" style="margin-bottom:12px"><strong>'+html(existing.name)+'</strong><p class="subtext">Recette sélectionnée</p><button class="btn secondary tiny" data-action="update-people" data-index="'+index+'">Mettre à jour les portions</button></div>';
   out+='<div class="recipe-picker"><button class="picker-item" data-action="choose-leftovers" data-index="'+index+'"><span class="emoji">🍱</span><span class="grow"><strong>Restes d’un autre repas</strong><small>Ne rajoute aucun ingrédient aux courses</small></span><span class="end">＋</span></button>';
   state.recipes.slice().sort((a,b)=>a.name.localeCompare(b.name,'fr')).forEach(r=>{out+='<button class="picker-item" data-action="choose-recipe" data-id="'+r.id+'" data-index="'+index+'"><span class="emoji">'+html(icons[r.category]||'🍽️')+'</span><span class="grow"><strong>'+html(r.name)+'</strong><small>'+r.ingredients.length+' ingrédients · base '+r.people+' pers.</small></span><span class="end">＋</span></button>'});
@@ -357,7 +357,22 @@ async function refreshBackupList(){
   $('#snapshotList').innerHTML=rows.length?rows.map(s=>'<div class="shopping-row"><div class="grow"><strong style="font-size:12px">'+html(s.label)+'</strong><div class="shopping-meta">'+new Date(s.time).toLocaleString('fr-FR')+'</div></div><button class="btn tiny secondary" data-action="restore-backup" data-id="'+s.id+'">Restaurer</button></div>').join(''):'Aucune version précédente pour le moment. Elles apparaissent au fil des modifications.';
  }catch(e){box.textContent='Impossible de lire les versions locales.'}
 }
-function peopleInput(){return Math.min(30,Math.max(1,Number($('#mealPeople')?.value)||2))}
+function peopleInput(){return Math.min(30,Math.max(1,Number($('#mealPeople')?.value)||4))}
+// Les « restes » liés à un repas suivent sa suppression ou son remplacement.
+// Les restes ajoutés manuellement restent indépendants.
+function clearMealWithPair(w,index){
+ const meal=w.meals[index];
+ if(meal?.type==='recipe'&&w.meals[index+1]?.type==='leftovers'&&w.meals[index+1].fromIndex===index)
+   w.meals[index+1]=null;
+ w.meals[index]=null
+}
+function selectRecipeForMeal(w,index,recipeId,portions){
+ clearMealWithPair(w,index);
+ w.meals[index]={type:'recipe',recipeId,people:portions};
+ if(portions>=4&&index+1<w.meals.length&&!w.meals[index+1])
+   w.meals[index+1]={type:'leftovers',recipeId,fromIndex:index};
+}
+
 function populate(mode){
  if(!state.recipes.length){toast('Ajoute d’abord quelques plats à ton catalogue.');currentTab='plats';render();return}
  const w=getWeek();
@@ -372,17 +387,20 @@ function populate(mode){
  });
  w.meals.forEach(m=>{if(m?.type!=='recipe')return;const r=recipeById(m.recipeId);if(!r)return;counts[r.id]=(counts[r.id]||0)+1;types[r.category||'Autre']=(types[r.category||'Autre']||0)+1});
  const chosenByDay=day=>[w.meals[day*2],w.meals[day*2+1]].filter(m=>m?.type==='recipe').map(m=>m.recipeId);
- w.meals=w.meals.map((meal,i)=>{
-  if(meal)return meal;
+ for(let i=0;i<w.meals.length;i++){
+  if(w.meals[i])continue;
   const day=Math.floor(i/2),previous=i>0?w.meals[i-1]:null;
   const scored=state.recipes.map(r=>{
    const count=counts[r.id]||0,cat=r.category||'Autre',nearby=chosenByDay(day).includes(r.id),sameCategory=previous?.recipeId&&recipeById(previous.recipeId)?.category===cat;
    return {r,score:count*100+(history[r.id]||0)+(types[cat]||0)*5+(nearby?180:0)+(sameCategory?18:0)+Math.random()*7}
   }).sort((a,b)=>a.score-b.score);
-  const selected=scored[0].r;counts[selected.id]=(counts[selected.id]||0)+1;const cat=selected.category||'Autre';types[cat]=(types[cat]||0)+1;
-  // Affectation immédiate pour que la case du soir évite le repas du midi.
-  const result={type:'recipe',recipeId:selected.id,people:state.settings.people||2};w.meals[i]=result;return result
- });
+  const selected=scored[0].r;
+  counts[selected.id]=(counts[selected.id]||0)+1;
+  types[selected.category||'Autre']=(types[selected.category||'Autre']||0)+1;
+  // Si le prochain repas est réservé, ne pas l'écraser : cuire 2 portions ici.
+  const canPair=i+1<w.meals.length&&!w.meals[i+1];
+  selectRecipeForMeal(w,i,selected.id,canPair?4:2);
+ }
  persist();render();toast(mode==='generate'?'Semaine variée générée !':'Les repas manquants sont complétés !')
 }
 async function compressImage(file){if(!file)return null;if(file.size>12*1024*1024)throw Error('Photo trop volumineuse (12 Mo maximum).');return new Promise((resolve,reject)=>{const reader=new FileReader();reader.onerror=()=>reject(Error('Impossible de lire la photo.'));reader.onload=()=>{const img=new Image();img.onerror=()=>reject(Error('Photo non reconnue.'));img.onload=()=>{const max=640,scale=Math.min(1,max/Math.max(img.width,img.height)),can=document.createElement('canvas');can.width=Math.round(img.width*scale);can.height=Math.round(img.height*scale);can.getContext('2d').drawImage(img,0,0,can.width,can.height);resolve(can.toDataURL('image/jpeg',.76))};img.src=reader.result};reader.readAsDataURL(file)})}
@@ -429,10 +447,10 @@ document.addEventListener('click',e=>{const tab=e.target.closest('[data-tab]');i
   else if(mode==='delete-product'){if(confirm('Supprimer ce produit du catalogue ? Les courses déjà saisies resteront.')){checkpoint('Avant suppression de produit');state.products=state.products.filter(x=>x.id!==id);state.recipes.forEach(r=>r.ingredients.forEach(i=>{if(i.productId===id)i.productId=null}));persist();closeModal();render();toast('Produit supprimé du catalogue.')}}
   else if(mode==='add-ingredient')$('#ingredientRows').insertAdjacentHTML('beforeend',ingredientRow());
   else if(mode==='remove-ingredient')a.closest('.ingredient-line')?.remove();
-  else if(mode==='choose-recipe'){w.meals[index]={type:'recipe',recipeId:id,people:peopleInput()};persist();closeModal();render()}
-  else if(mode==='choose-leftovers'){w.meals[index]={type:'leftovers'};persist();closeModal();render()}
-  else if(mode==='update-people'){if(w.meals[index]?.type==='recipe'){w.meals[index].people=peopleInput();persist();closeModal();render();toast('Portions mises à jour !')}}
-  else if(mode==='remove-meal'){w.meals[index]=null;persist();closeModal();render()}
+  else if(mode==='choose-recipe'){selectRecipeForMeal(w,index,id,peopleInput());persist();closeModal();render()}
+  else if(mode==='choose-leftovers'){clearMealWithPair(w,index);w.meals[index]={type:'leftovers'};persist();closeModal();render()}
+  else if(mode==='update-people'){if(w.meals[index]?.type==='recipe'){const recipeId=w.meals[index].recipeId;selectRecipeForMeal(w,index,recipeId,peopleInput());persist();closeModal();render();toast('Portions mises à jour !')}}
+  else if(mode==='remove-meal'){clearMealWithPair(w,index);persist();closeModal();render()}
   else if(mode==='generate-week')populate('generate');
   else if(mode==='complete-week')populate('complete');
   else if(mode==='repeat-week'){const prev=state.weeks[offsetDate(currentWeek,-7)];if(!prev?.meals?.some(Boolean)){toast('Aucun menu trouvé la semaine précédente.');return}if(w.meals.some(Boolean)&&!confirm('Remplacer les repas de cette semaine ?'))return;w.meals=JSON.parse(JSON.stringify(prev.meals));persist();render();toast('Menus de la semaine précédente repris !')}

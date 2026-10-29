@@ -120,7 +120,7 @@ export function setupCloudV34({readLocalState,installCloudState,onStatus}={}) {
     throw Error("Lecteur local ou installation cloud manquant.");
   appOptions={readLocalState,installCloudState,onStatus};
   report({phase:"loading"});
-  for(const type of ["click","submit","change"]) {
+  for(const type of ["click","submit","change","input"]) {
     document.addEventListener(type,guardEditing,true);
   }
   window.addEventListener("focus",onFocus);
@@ -132,7 +132,7 @@ export function setupCloudV34({readLocalState,installCloudState,onStatus}={}) {
   return () => {
     authGeneration++;
     stopAuth?.();
-    for(const type of ["click","submit","change"]) {
+    for(const type of ["click","submit","change","input"]) {
       document.removeEventListener(type,guardEditing,true);
     }
     window.removeEventListener("focus",onFocus);

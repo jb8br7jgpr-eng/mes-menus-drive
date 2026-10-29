@@ -69,6 +69,16 @@ async function restoreSnapshot(id){
 let toastTimer;
 function toast(message){const el=$('#toast');el.textContent=message;el.classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>el.classList.remove('show'),2800)}
 function render(preserveScroll=false){const scrollY=window.scrollY;document.querySelectorAll('.nav-item').forEach(b=>{const active=b.dataset.tab===currentTab;b.classList.toggle('active',active);if(active)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current')});app.innerHTML=({menus:renderMenus,plats:renderPlats,produits:renderProduits,courses:renderCourses,drive:renderDrive}[currentTab])();window.scrollTo({top:preserveScroll?scrollY:0,behavior:'auto'})}
+function renderMealContext(index){
+ render(true);
+ // Retourne au jour modifié sans perturber la position si la carte est déjà visible.
+ if(currentTab!=='menus'||!Number.isInteger(index)||index<0||index>13)return;
+ requestAnimationFrame(()=>{
+  const card=document.querySelector('[data-meal-day="'+Math.floor(index/2)+'"]');if(!card)return;
+  const rect=card.getBoundingClientRect(),view=window.innerHeight||document.documentElement.clientHeight;
+  if(rect.bottom<65||rect.top>view-105)card.scrollIntoView({behavior:'auto',block:'nearest'});
+ });
+}
 function pageHeading(kicker,title,sub){return '<div class="eyebrow">'+kicker+'</div><h1>'+title+'</h1><p class="muted" style="font-size:13px">'+sub+'</p>'}
 function recipeById(id){return state.recipes.find(r=>r.id===id)}
 function emptyView(emoji,title,description,button){return '<div class="empty"><div class="illustration">'+emoji+'</div><strong>'+title+'</strong><p>'+description+'</p>'+button+'</div>'}
@@ -102,18 +112,20 @@ function mealCard(meal,i){
  (names.length?names.map(n=>'<strong>'+html(n)+'</strong>').join(''):'<span class="add">＋ Ajouter un plat</span>')+'</button>';
 }
 function renderMenus(){const w=getWeek(),count=w.meals.filter(Boolean).length, last=offsetDate(currentWeek,6),isThis=currentWeek===monday(new Date());
-  let out='<div class="hero"><div class="eyebrow">Planificateur hebdomadaire</div><h1>Qu’est-ce qu’on mange cette semaine ?</h1><p>Pour vous deux : cuisine 4 portions, puis choisis librement quand manger les restes. Tu peux aussi faire deux plats différents au même repas !</p>'+
+  let out='<div class="hero"><div class="eyebrow">Planificateur hebdomadaire</div><h1>Qu’est-ce qu’on mange cette semaine ?</h1><p>Planifie tes repas, cuisine pour deux ou plus et place les restes quand tu veux.</p>'+
   '<div class="hero-menu-actions">'+
   (count<14?'<button class="btn cream" data-action="complete-week">✦ Générer les repas</button>':'<div class="week-complete-note">✓ Les 14 repas sont renseignés</div>')+
   '<button class="btn hero-repeat-btn" data-action="repeat-week">↻ Reprendre la semaine passée</button></div></div>';
-  out+='<div class="section-head"><h2>Votre semaine</h2><span class="pill">'+count+' / 14 repas</span></div>';
+  out+='<div class="section-head week-v32-heading"><h2>Votre semaine</h2><div class="week-v32-heading-actions">'+
+  (isThis?'<button class="week-v32-today-link" data-action="jump-today">Aujourd’hui ↓</button>':'')+
+  '<span class="pill">'+count+' / 14 repas</span></div></div>';
   out+='<div class="week-control"><button class="icon-btn" aria-label="Semaine précédente" data-action="week-prev">‹</button><div class="week-label">Du '+niceDate(currentWeek)+' au '+niceDate(last)+(isThis?'<small>Cette semaine</small>':'<small>Planning personnalisé</small>')+'</div><button class="icon-btn" aria-label="Semaine suivante" data-action="week-next">›</button></div>';
   out+='<div class="status-bar"><span style="width:'+(count/14*100)+'%"></span></div>';
   out+=courseGenerationBanner(w,'menus');
   out+='<div class="meal-list">';
   for(let day=0;day<7;day++){
-   const d=offsetDate(currentWeek,day),hasMeals=Boolean(w.meals[day*2]||w.meals[day*2+1]);
-   out+='<section class="day-card"><div class="day-card-head"><div class="day-title">'+days[day]+' <small>'+niceDate(d)+'</small></div>'+
+   const d=offsetDate(currentWeek,day),isToday=d===localDate(new Date()),hasMeals=Boolean(w.meals[day*2]||w.meals[day*2+1]);
+   out+='<section class="day-card'+(isToday?' day-card-today':'')+'" data-meal-day="'+day+'"><div class="day-card-head"><div class="day-title">'+days[day]+' <small>'+niceDate(d)+'</small>'+(isToday?'<span class="day-today-label">Aujourd’hui</span>':'')+'</div>'+
    '<button class="day-clear-btn" data-action="clear-day" data-day="'+day+'" aria-label="Vider les repas du '+html(days[day])+'" '+(!hasMeals?'disabled':'')+'>✕ Vider le jour</button></div>'+
    '<div class="day-meals">'+mealCard(w.meals[day*2],day*2)+mealCard(w.meals[day*2+1],day*2+1)+'</div></section>'
   }
@@ -1527,6 +1539,11 @@ document.addEventListener('click',e=>{
    checkpoint('Avant suppression des repas de toute la semaine');
    clearCalendarWeek(w);persist();render();toast('Calendrier de la semaine vidé !')
   }
+  else if(mode==='jump-today'){
+   if(currentTab!=='menus'||currentWeek!==monday(new Date()))return;
+   const day=(new Date().getDay()+6)%7;
+   document.querySelector('[data-meal-day="'+day+'"]')?.scrollIntoView({behavior:'smooth',block:'start'});
+  }
   else if(mode==='pick-meal')pickMeal(index);
   else if(mode==='move-copy-meal')moveCopyMealModal(index,a.dataset.mode);
   else if(mode==='apply-meal-transfer'){
@@ -1538,7 +1555,7 @@ document.addEventListener('click',e=>{
     if(earlier&&!confirm('Des restes étaient prévus avant le nouveau jour de cuisson. Ils seront retirés du planning. Continuer ?'))return
    }
    if(!moveCopyMeal(w,index,target,action)){toast('Impossible de déplacer ou copier ce repas.');return}
-   persist();closeModal();render();toast(action==='move'?'Repas déplacé !':'Repas copié !')
+   persist();closeModal();renderMealContext(target);toast(action==='move'?'Repas déplacé !':'Repas copié !')
   }
   else if(mode==='add-recipe')recipeEditor(null);
   else if(mode==='edit-recipe')recipeEditor(id);
@@ -1636,13 +1653,13 @@ document.addEventListener('click',e=>{
    row.querySelector('.ingredient-unit').value=preferredIngredientUnit(ing);
    refreshIngredientEntry(row);row.querySelector('.ingredient-qty')?.focus()
   }
-  else if(mode==='choose-recipe'){if(!addRecipeToMeal(w,index,id,peopleInput())){toast('Ce plat est déjà présent dans ce repas. Modifie plutôt ses portions.');return}persist();closeModal();render()}
+  else if(mode==='choose-recipe'){if(!addRecipeToMeal(w,index,id,peopleInput())){toast('Ce plat est déjà présent dans ce repas. Modifie plutôt ses portions.');return}persist();closeModal();renderMealContext(index)}
   else if(mode==='choose-leftovers')pickLeftoverSource(index);
   else if(mode==='apply-leftovers'){
    const source=Number(a.dataset.source),qty=Number($('#leftoverPeople')?.value);
    if(!Number.isInteger(qty)||qty<1||qty>30){toast('Choisis entre 1 et 30 portions de restes.');return}
    if(!addLeftoversToMeal(w,index,source,id,qty)){toast('Cette quantité de restes n’est plus disponible.');pickLeftoverSource(index);return}
-   persist();closeModal();render();toast('Restes placés au repas choisi !')
+   persist();closeModal();renderMealContext(index);toast('Restes placés au repas choisi !')
   }
   else if(mode==='remove-leftover'){
    const li=Number(a.dataset.leftover),parts=mealParts(w.meals[index]),left=mealLeftovers(w.meals[index]);
@@ -1650,19 +1667,19 @@ document.addEventListener('click',e=>{
    const removed=left[li];
    const at=parts.findIndex(p=>p.type==='leftovers'&&p.recipeId===removed.recipeId&&p.fromIndex===removed.fromIndex);
    if(at>=0)parts.splice(at,1);
-   storeMealParts(w,index,parts);persist();closeModal();render();toast('Restes retirés de ce repas.')
+   storeMealParts(w,index,parts);persist();closeModal();renderMealContext(index);toast('Restes retirés de ce repas.')
   }
   else if(mode==='save-dish-portions'){
    const dishIndex=Number(a.dataset.dish),dishes=mealDishes(w.meals[index]),portions=portionInputForDish(dishIndex);
    if(!Number.isInteger(dishIndex)||!dishes[dishIndex]||portions===null){toast('Choisis entre 1 et 30 portions.');return}
-   dishes[dishIndex].people=portions;setMealDishes(w,index,dishes);persist();closeModal();render();toast('Portions du plat enregistrées !')
+   dishes[dishIndex].people=portions;setMealDishes(w,index,dishes);persist();closeModal();renderMealContext(index);toast('Portions du plat enregistrées !')
   }
   else if(mode==='remove-dish'){
    const dishIndex=Number(a.dataset.dish),dishes=mealDishes(w.meals[index]);
    if(!Number.isInteger(dishIndex)||!dishes[dishIndex])return;
-   dishes.splice(dishIndex,1);setMealDishes(w,index,dishes);persist();closeModal();render();toast('Plat retiré de ce repas.')
+   dishes.splice(dishIndex,1);setMealDishes(w,index,dishes);persist();closeModal();renderMealContext(index);toast('Plat retiré de ce repas.')
   }
-  else if(mode==='remove-meal'){clearMealWithPair(w,index);persist();closeModal();render()}
+  else if(mode==='remove-meal'){clearMealWithPair(w,index);persist();closeModal();renderMealContext(index)}
   else if(mode==='complete-week')populate();
   else if(mode==='repeat-week'){const prev=state.weeks[offsetDate(currentWeek,-7)];if(!prev?.meals?.some(Boolean)){toast('Aucun menu trouvé la semaine précédente.');return}if(w.meals.some(Boolean)&&!confirm('Remplacer les repas de cette semaine ?'))return;w.meals=JSON.parse(JSON.stringify(prev.meals));persist();render();toast('Menus de la semaine précédente repris !')}
   else if(mode==='add-extra')extraModal();

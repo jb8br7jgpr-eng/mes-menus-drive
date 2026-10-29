@@ -49,11 +49,16 @@ async function main() {
       photos[id]=found.data().data;
     }));
   }
+  if(!Number.isSafeInteger(snap.data().createdAt?.toMillis?.()))
+    throw Error("Date de photographie absente : nettoyage sécurisé impossible.");
   const bundle={
     format:"speedrive-firestore-bundle-v1",
     projectId:"speedrive-7e77c",uid,
     head:{revision:reference.revision,snapshotId:sid},
-    snapshot:{hash:snap.data().hash,count:snap.data().count},
+    snapshot:{
+      hash:snap.data().hash,count:snap.data().count,
+      createdAtMillis:snap.data().createdAt?.toMillis?.()
+    },
     chunks,photos
   };
   const archive=encryptOffsiteBackup(bundle,aesKey);

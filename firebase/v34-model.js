@@ -81,6 +81,10 @@ export function previewLocalMigration(oldState) {
     for (const [key, value] of Object.entries(pantryUnits || {})) add(records, "weekPantryUnit", weekId + ":" + key, { weekId, key, value });
   }
   add(records, "settings", "general", oldState.settings || { people: 2 });
+  add(records, "settings", "v33-flags", {
+    favoritesUnifiedV29: Boolean(oldState.favoritesUnifiedV29),
+    coursesExplicitGenerationV1: Boolean(oldState.coursesExplicitGenerationV1)
+  });
   for (const [key, value] of Object.entries(oldState.storePreferences || {})) {
     add(records, "preference", key, { key, value });
   }

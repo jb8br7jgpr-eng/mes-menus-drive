@@ -29,6 +29,40 @@ function duplicateNames(items,label,field="name") {
   }
   return warnings;
 }
+function structuralWarnings(state, errors, warnings) {
+  for(const [key,label] of [["products","Produits"],["ingredientCatalog","Ingrédients"]]) {
+    const entries=state[key];
+    if(entries!==undefined && !Array.isArray(entries)) {
+      errors.push(label+" : liste invalide.");
+      continue;
+    }
+    for(const item of entries||[]) {
+      if(!item || typeof item.id!=="string" || !item.id.trim())
+        errors.push(label+" : élément sans identifiant stable.");
+    }
+  }
+  if(state.staples!==undefined && !Array.isArray(state.staples))
+    errors.push("Achats habituels : liste invalide.");
+  const products=new Set((state.products||[]).map(item=>item?.id).filter(Boolean));
+  for(const ingredient of Array.isArray(state.ingredientCatalog)?state.ingredientCatalog:[]) {
+    if(ingredient?.productId && !products.has(ingredient.productId))
+      warnings.push("Ingrédient « "+String(ingredient.name||ingredient.id).slice(0,45)+" » : référence produit manquante.");
+  }
+  for(const [weekId,week] of Object.entries(state.weeks)) {
+    if(!/^\\d{4}-\\d{2}-\\d{2}$/.test(weekId) || !week ||
+      typeof week!=="object" || Array.isArray(week)) {
+      errors.push("Semaine invalide : "+weekId.slice(0,30));
+      continue;
+    }
+    if(week.meals!==undefined &&
+       (!Array.isArray(week.meals) || week.meals.length>14))
+      errors.push("Semaine "+weekId+" : le planning dépasse 14 repas ou est illisible.");
+    for(const prop of ["extras","checked","excluded"]) {
+      if(week[prop]!==undefined && !Array.isArray(week[prop]))
+        errors.push("Semaine "+weekId+" : champ "+prop+" invalide.");
+    }
+  }
+}
 function countWeekMeals(weeks) {
   return Object.values(weeks||{}).reduce((total,week)=>
     total+(Array.isArray(week?.meals)?week.meals.filter(Boolean).length:0),0);
@@ -46,6 +80,7 @@ export async function inspectFirstCloudImport(state) {
   errors.push(...duplicatedIds(state.staples||[],"Produits habituels"));
   warnings.push(...duplicateNames(state.recipes,"Recettes"));
   warnings.push(...duplicateNames(state.products,"Produits"));
+  structuralWarnings(state,errors,warnings);
   let packed=null;
   try{packed=await packState(state);}
   catch(error){

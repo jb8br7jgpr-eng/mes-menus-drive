@@ -12,6 +12,7 @@ const baseState=()=>({schema:1,recipes:[],products:[],weeks:{},staples:[],storeP
 let state=baseState(), currentTab='menus', currentWeek='', search='', recipeSort='az', recipeTypeFilter='all', productSearch='', productCategory='Toutes', ingredientStoreTab='carrefour', catalogueTypeFilter='all', catalogueStoreFilter='all', db=null, usingFallback=false;
 let pendingRecipeDraftImage='',pendingIngredientLinkId=null;
 let independentProductsOpen=false;const courseOpenSections=new Set();
+const tabScrollV33={menus:0,plats:0,produits:0,courses:0,drive:0};
 const app=$('#app'), modalRoot=$('#modalRoot');
 const uid=()=>Math.random().toString(36).slice(2,10)+Date.now().toString(36);
 function localDate(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}
@@ -103,6 +104,18 @@ function undoWeekAction(){
 }
 
 function render(preserveScroll=false){const scrollY=window.scrollY;document.querySelectorAll('.nav-item').forEach(b=>{const active=b.dataset.tab===currentTab;b.classList.toggle('active',active);if(active)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current')});app.innerHTML=({menus:renderMenus,plats:renderPlats,produits:renderProduits,courses:renderCourses,drive:renderDrive}[currentTab])();window.scrollTo({top:preserveScroll?scrollY:0,behavior:'auto'})}
+function switchTabV33(destination){
+ if(!Object.prototype.hasOwnProperty.call(tabScrollV33,destination))return;
+ if(destination===currentTab)return;
+ tabScrollV33[currentTab]=Math.max(0,window.scrollY||0);
+ currentTab=destination;render();
+ requestAnimationFrame(()=>window.scrollTo({top:tabScrollV33[destination]||0,behavior:'auto'}));
+}
+function returnToCurrentWeekV33(){
+ currentWeek=monday(new Date());
+ tabScrollV33.menus=0;tabScrollV33.courses=0;tabScrollV33.drive=0;
+ render();
+}
 function renderMealContext(index){
  render(true);
  // Retourne au jour modifié sans perturber la position si la carte est déjà visible.
@@ -153,7 +166,8 @@ function renderMenus(){const w=getWeek(),count=w.meals.filter(Boolean).length, l
   out+='<div class="section-head week-v32-heading"><h2>Votre semaine</h2><div class="week-v32-heading-actions">'+
   (isThis?'<button class="week-v32-today-link" data-action="jump-today">Aujourd’hui ↓</button>':'')+
   '<span class="pill">'+count+' / 14 repas</span></div></div>';
-  out+='<div class="week-control"><button class="icon-btn" aria-label="Semaine précédente" data-action="week-prev">‹</button><div class="week-label">Du '+niceDate(currentWeek)+' au '+niceDate(last)+(isThis?'<small>Cette semaine</small>':'<small>Planning personnalisé</small>')+'</div><button class="icon-btn" aria-label="Semaine suivante" data-action="week-next">›</button></div>';
+  out+='<div class="week-control"><button class="icon-btn" aria-label="Semaine précédente" data-action="week-prev">‹</button><div class="week-label">Du '+niceDate(currentWeek)+' au '+niceDate(last)+(isThis?'<small>Cette semaine</small>':'<small>Planning personnalisé</small>')+'</div><button class="icon-btn" aria-label="Semaine suivante" data-action="week-next">›</button></div>'+
+  (!isThis?'<div class="week-v33-return"><button class="week-v33-return-btn" data-action="week-current">↩ Revenir à la semaine actuelle</button></div>':'');
   out+='<div class="status-bar"><span style="width:'+(count/14*100)+'%"></span></div>';
   out+=courseGenerationBanner(w,'menus');
   out+='<div class="meal-list">';
@@ -185,13 +199,31 @@ function visibleRecipes(){
 }
 function recipeRows(){
  const list=visibleRecipes();
- return list.map(r=>'<div class="recipe-card">'+recipeImg(r)+'<div class="grow"><h3>'+html(r.name)+'</h3><p>'+
-  r.ingredients.length+' ingrédient'+(r.ingredients.length>1?'s':'')+' · recette pour '+r.people+' portions</p>'+
-  '<span class="pill gray">'+html(normalRecipeType(r.category)==='legacy'?(r.category||'Autre'):normalRecipeType(r.category))+'</span></div>'+
-  '<div class="recipe-actions"><button class="icon-btn" data-action="edit-recipe" data-id="'+r.id+'" aria-label="Modifier '+html(r.name)+'">✎</button>'+
-  '<button class="btn tiny secondary" data-action="duplicate-recipe" data-id="'+r.id+'">Dupliquer</button></div></div>').join('')||
+ return list.map(r=>'<div class="recipe-card"><button class="recipe-preview-trigger" data-action="view-recipe" data-id="'+html(r.id)+'" aria-label="Consulter le plat '+html(r.name)+'">'+recipeImg(r)+'<span class="recipe-preview-copy"><strong class="recipe-preview-name">'+html(r.name)+'</strong><span class="recipe-preview-meta">'+
+  r.ingredients.length+' ingrédient'+(r.ingredients.length>1?'s':'')+' · '+r.people+' portions</span>'+
+  '<span class="pill gray">'+html(normalRecipeType(r.category)==='legacy'?(r.category||'Autre'):normalRecipeType(r.category))+'</span></span></button>'+
+  '<div class="recipe-actions"><button class="icon-btn" data-action="edit-recipe" data-id="'+html(r.id)+'" aria-label="Modifier '+html(r.name)+'">✎</button>'+
+  '<button class="btn tiny secondary" data-action="duplicate-recipe" data-id="'+html(r.id)+'">Dupliquer</button></div></div>').join('')||
   emptyView('🍲','Aucun plat trouvé',search||recipeTypeFilter!=='all'?'Essaie un autre nom ou un autre type.':'Commence par ajouter votre premier plat.',
    '<button class="btn" data-action="add-recipe">＋ Ajouter un plat</button>')
+}
+function viewRecipeV33(id){
+ const r=recipeById(id);if(!r)return;
+ const type=normalRecipeType(r.category),category=type==='legacy'?(r.category||'Autre'):type;
+ const photo=r.image?'<img class="recipe-v33-cover" src="'+html(r.image)+'" alt="Photo du plat '+html(r.name)+'">':
+  '<div class="recipe-v33-no-photo">'+html(icons[r.category]||'🍽️')+'</div>';
+ const ingredients=(r.ingredients||[]).map(i=>{
+  const linked=i.ingredientId?ingredientById(i.ingredientId):null;
+  return '<li class="recipe-v33-ingredient"><span>'+html(linked?.name||i.name||'Ingrédient')+'</span><strong>'+
+    html(quantity(i.qty,i.unit))+'</strong></li>';
+ }).join('')||'<li class="recipe-v33-ingredient">Aucun ingrédient enregistré.</li>';
+ const body='<div class="recipe-v33-preview">'+photo+
+  '<div class="recipe-v33-facts"><span class="pill gray">'+html(category)+'</span><span class="pill">'+
+  html(r.people)+' portion'+(r.people>1?'s':'')+'</span></div>'+
+  '<h3>Ingrédients</h3><ul class="recipe-v33-ingredients">'+ingredients+'</ul>'+
+  '<p class="helper">Quantités enregistrées pour la recette. La consultation ne modifie ni les menus ni les courses.</p>'+
+  '<button class="btn secondary wide" data-action="edit-recipe" data-id="'+html(r.id)+'">✎ Modifier ce plat</button></div>';
+ showModal(html(r.name),body);
 }
 function renderPlats(){
  const legacy=state.recipes.some(r=>normalRecipeType(r.category)==='legacy');
@@ -703,7 +735,8 @@ function weekSwitcher(){
  const end=offsetDate(currentWeek,6);
  return '<div class="week-control"><button class="icon-btn" aria-label="Semaine précédente" data-action="week-prev">‹</button>'+
  '<div class="week-label">Du '+niceDate(currentWeek)+' au '+niceDate(end)+'</div>'+
- '<button class="icon-btn" aria-label="Semaine suivante" data-action="week-next">›</button></div>'
+ '<button class="icon-btn" aria-label="Semaine suivante" data-action="week-next">›</button></div>'+
+ (currentWeek!==monday(new Date())?'<div class="week-v33-return"><button class="week-v33-return-btn" data-action="week-current">↩ Revenir à la semaine actuelle</button></div>':'')
 }
 function courseGenerationBanner(w=getWeek(),where='courses'){
  const status=coursesStatus(w),hasMenus=hasCookedMeals(w);
@@ -918,6 +951,12 @@ function renderCourses(){
  const order=['Fruits et légumes','Viandes et poissons','Produits frais','Épicerie et divers','Hygiène et maison'];
  let out=pageHeading('Achats de la semaine','Mes courses','Les ingrédients arrivent ici quand tu génères les courses depuis les menus de la semaine choisie.');
  out+=weekSwitcher()+courseGenerationBanner(w,'courses');
+ const progressTotal=active.length+checked.length,progressPct=progressTotal?Math.round(checked.length/progressTotal*100):0;
+ out+='<div class="course-v33-progress" role="group" aria-label="Progression des courses"><div class="course-v33-progress-head"><strong>Avancement des courses</strong><span>'+
+  checked.length+' / '+progressTotal+' acheté'+(checked.length>1?'s':'')+'</span></div>'+
+  '<div class="course-v33-progress-track" role="progressbar" aria-valuemin="0" aria-valuemax="'+progressTotal+'" aria-valuenow="'+checked.length+'" aria-label="Articles achetés"><span style="width:'+progressPct+'%"></span></div>'+
+  '<p>'+(progressTotal===0?'Aucun article à acheter pour le moment.':progressPct===100?'✓ Tous les achats prévus sont cochés.':
+   active.length+' article'+(active.length>1?'s':'')+' restant'+(active.length>1?'s':'')+' à acheter.')+'</p></div>';
  out+='<div class="course-summary"><div class="course-shop-count carrefour"><strong>'+carrefour.length+'</strong><span>🛒 Carrefour Drive</span></div>'+
  '<div class="course-shop-count grand"><strong>'+grand.length+'</strong><span>🥬 Grand Frais</span></div></div>';
  out+='<button class="btn wide course-add-btn" data-action="add-extra">＋ Ajouter un article à cette semaine</button>';
@@ -1519,14 +1558,14 @@ document.addEventListener('click',e=>{
    if(name){if(parent.open)courseOpenSections.delete(name);else courseOpenSections.add(name)}
   }
  }
- const tab=e.target.closest('[data-tab]');if(tab){currentTab=tab.dataset.tab;render();return}
+ const tab=e.target.closest('[data-tab]');if(tab){switchTabV33(tab.dataset.tab);return}
   const a=e.target.closest('[data-action]');if(!a){if(e.target.matches('[data-overlay]'))closeModal();return}
   const mode=a.dataset.action,index=Number(a.dataset.index),w=getWeek(),id=a.dataset.id;
   if(mode==='close-modal')closeModal();
-  else if(mode==='go-courses'){currentTab='courses';render()}
-  else if(mode==='go-drive'){currentTab='drive';render()}
-  else if(mode==='go-menus'){currentTab='menus';render()}
-  else if(mode==='go-products'){currentTab='produits';render()}
+  else if(mode==='go-courses')switchTabV33('courses');
+  else if(mode==='go-drive')switchTabV33('drive');
+  else if(mode==='go-menus')switchTabV33('menus');
+  else if(mode==='go-products')switchTabV33('produits')
   else if(mode==='fix-drive-item'){
    const x=shopping().find(i=>i.id===id);
    if(!x)return;
@@ -1552,13 +1591,17 @@ document.addEventListener('click',e=>{
    persist();closeModal();render(true);toast('Stock maison déduit des achats !')
   }
   else if(mode==='undo-week')undoWeekAction();
-  else if(mode==='week-prev'||mode==='week-next'){currentWeek=offsetDate(currentWeek,mode==='week-prev'?-7:7);render()}
+  else if(mode==='week-prev'||mode==='week-next'){
+   currentWeek=offsetDate(currentWeek,mode==='week-prev'?-7:7);
+   tabScrollV33.menus=0;tabScrollV33.courses=0;tabScrollV33.drive=0;render()
+  }
+  else if(mode==='week-current')returnToCurrentWeekV33()
   else if(mode==='generate-week-courses'){
    const w=getWeek(),status=coursesStatus(w);
    if(!hasCookedMeals(w)){toast('Ajoute d’abord un plat aux menus de cette semaine.');return}
    if(status!=='not-generated'&&!confirm('Régénérer les ingrédients des recettes pour cette semaine ? Les nouveaux menus remplaceront les anciens besoins de recettes dans Courses. Les ajouts manuels, le stock maison, les articles cochés et les exclusions seront conservés.'))return;
    checkpoint('Avant génération des courses de la semaine');
-   generateWeekCourses(w);persist();currentTab='courses';render();
+   generateWeekCourses(w);persist();switchTabV33('courses');
    toast('Courses de la semaine générées : Carrefour et Grand Frais sont prêts !')
   }
   else if(mode==='clear-day'){
@@ -1593,6 +1636,7 @@ document.addEventListener('click',e=>{
    if(!moveCopyMeal(w,index,target,action)){toast('Impossible de déplacer ou copier ce repas.');return}
    persist();closeModal();renderMealContext(target);toast(action==='move'?'Repas déplacé !':'Repas copié !')
   }
+  else if(mode==='view-recipe')viewRecipeV33(id);
   else if(mode==='add-recipe')recipeEditor(null);
   else if(mode==='edit-recipe')recipeEditor(id);
   else if(mode==='duplicate-recipe'){const r=recipeById(id);if(r)recipeEditor(null,{...r,id:null,name:r.name+' (variante)',ingredients:r.ingredients.map(x=>({...x}))})}

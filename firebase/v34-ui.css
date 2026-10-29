@@ -33,3 +33,10 @@
 .v34-alert.v34-error{background:#fff0ed;color:#a84235}
 .v34-foot{border-top:1px solid #dce5da;margin-top:20px;padding-top:12px;color:#6f8074;font-size:11px;text-align:center}
 @media (min-width:700px){.v34-overlay{align-items:center}.v34-panel{border-radius:25px;max-height:86vh}}
+
+/* Cloud-first safety veil — only visible when the V34 developer gate is enabled */
+#v34CloudStatus[hidden],#v34CloudGuard[hidden]{display:none!important}
+#v34CloudStatus{position:fixed;top:calc(4px + env(safe-area-inset-top));left:50%;transform:translateX(-50%);z-index:100;font-size:10px;line-height:1.25;border-radius:999px;padding:5px 9px;background:#fff2dc;border:1px solid #e7d4ab;color:#805c27;white-space:nowrap;max-width:75vw;overflow:hidden;text-overflow:ellipsis}
+#v34CloudStatus[data-phase="ready"]{background:#e4f4e9;color:#22593d;border-color:#c9e4d2}
+#v34CloudGuard{position:fixed;inset:0;z-index:125;background:rgba(16,31,23,.18);display:flex;justify-content:center;align-items:center;padding:22px}
+.v34-guard-card{background:#fffdf8;padding:22px;box-shadow:0 8px 30px #142a2033;border-radius:19px;width:min(380px,100%);display:grid;gap:12px;text-align:center;color:#244735;line-height:1.5}

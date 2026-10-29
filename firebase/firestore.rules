@@ -30,12 +30,15 @@ service cloud.firestore {
     }
     function validRecordCreate(hid, rid) {
       let d = request.resource.data;
-      return d.keys().hasOnly(['id','kind','payload','uniqueKey','version','deleted','createdAt','createdBy','updatedAt','updatedBy'])
-        && d.keys().hasAll(['id','kind','payload','uniqueKey','version','deleted','createdAt','createdBy','updatedAt','updatedBy'])
+      return d.keys().hasOnly(['id','kind','payload','uniqueKey','version','deleted','createdAt','createdBy','updatedAt','updatedBy','lastMutationId'])
+        && d.keys().hasAll(['id','kind','payload','uniqueKey','version','deleted','createdAt','createdBy','updatedAt','updatedBy','lastMutationId'])
         && d.id == rid
         && d.kind in ['recipe','recipePhoto','product','ingredient','staple','weekMeta','weekMeal','weekExtra','weekChecked','weekExcluded','weekPantry','weekPantryUnit','settings','preference']
         && d.payload is map
         && recordedKeyCreate(hid, rid, d)
+        && d.lastMutationId is string
+        && d.lastMutationId.size() > 0
+        && d.lastMutationId.size() <= 100
         && d.version == 1
         && d.deleted == false
         && d.createdAt == request.time
@@ -45,8 +48,8 @@ service cloud.firestore {
     }
     function validRecordUpdate(rid) {
       let d = request.resource.data;
-      return d.keys().hasOnly(['id','kind','payload','uniqueKey','version','deleted','createdAt','createdBy','updatedAt','updatedBy'])
-        && d.keys().hasAll(['id','kind','payload','uniqueKey','version','deleted','createdAt','createdBy','updatedAt','updatedBy'])
+      return d.keys().hasOnly(['id','kind','payload','uniqueKey','version','deleted','createdAt','createdBy','updatedAt','updatedBy','lastMutationId'])
+        && d.keys().hasAll(['id','kind','payload','uniqueKey','version','deleted','createdAt','createdBy','updatedAt','updatedBy','lastMutationId'])
         && d.id == rid
         && d.id == resource.data.id
         && d.kind == resource.data.kind
@@ -55,6 +58,10 @@ service cloud.firestore {
         && d.createdBy == resource.data.createdBy
         && d.payload is map
         && d.deleted is bool
+        && d.lastMutationId is string
+        && d.lastMutationId.size() > 0
+        && d.lastMutationId.size() <= 100
+        && d.lastMutationId != resource.data.lastMutationId
         && d.version == resource.data.version + 1
         && d.updatedAt == request.time
         && d.updatedBy == request.auth.uid;

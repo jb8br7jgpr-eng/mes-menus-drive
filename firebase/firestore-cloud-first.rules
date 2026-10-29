@@ -1,0 +1,86 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // V34 CLOUD FIRST : candidate rules ONLY.
+    // ONE SHARED Firebase Auth account on both trusted iPhones.
+    function account(uid) {
+      return request.auth != null &&
+             request.auth.uid == uid &&
+             request.auth.token.email_verified == true;
+    }
+    function snapshotPath(uid, sid) {
+      return /databases/$(database)/documents/vaults/$(uid)/snapshots/$(sid);
+    }
+    function validHead(uid, d) {
+      return d.keys().hasOnly(['ownerUid','revision','snapshotId','updatedAt'])
+        && d.keys().hasAll(['ownerUid','revision','snapshotId','updatedAt'])
+        && d.ownerUid == uid
+        && d.revision is int
+        && d.snapshotId is string
+        && d.snapshotId.size() <= 100
+        && d.updatedAt == request.time
+        && exists(snapshotPath(uid, d.snapshotId))
+        && get(snapshotPath(uid, d.snapshotId)).data.ownerUid == uid;
+    }
+    match /vaults/{uid}/head/{key} {
+      allow get: if account(uid) && key == 'current';
+      allow list: if false;
+      allow create: if account(uid) && key == 'current'
+        && validHead(uid,request.resource.data)
+        && request.resource.data.revision == 1;
+      allow update: if account(uid) && key == 'current'
+        && validHead(uid,request.resource.data)
+        && request.resource.data.revision == resource.data.revision + 1
+        && request.resource.data.ownerUid == resource.data.ownerUid
+        && request.resource.data.snapshotId != resource.data.snapshotId;
+      allow delete: if false;
+    }
+    match /vaults/{uid}/snapshots/{sid} {
+      allow get, list: if account(uid);
+      allow create: if account(uid)
+        && request.resource.data.keys().hasOnly(['hash','count','bytes','createdAt','ownerUid'])
+        && request.resource.data.keys().hasAll(['hash','count','bytes','createdAt','ownerUid'])
+        && request.resource.data.ownerUid == uid
+        && request.resource.data.hash is string
+        && request.resource.data.hash.size() == 64
+        && request.resource.data.count is int
+        && request.resource.data.count >= 1
+        && request.resource.data.count <= 25
+        && request.resource.data.bytes is int
+        && request.resource.data.bytes >= 1
+        && request.resource.data.bytes <= 8000000
+        && request.resource.data.createdAt == request.time;
+      allow update, delete: if false;
+    }
+    match /vaults/{uid}/snapshots/{sid}/chunks/{index} {
+      allow get, list: if account(uid);
+      allow create: if account(uid)
+        && request.resource.data.keys().hasOnly(['index','part','createdAt'])
+        && request.resource.data.keys().hasAll(['index','part','createdAt'])
+        && request.resource.data.index is int
+        && request.resource.data.index >= 0
+        && request.resource.data.index < 25
+        && request.resource.data.part is string
+        && request.resource.data.part.size() <= 400000
+        && request.resource.data.createdAt == request.time;
+      allow update, delete: if false;
+    }
+    match /vaults/{uid}/photos/{hash} {
+      allow get: if account(uid);
+      allow list: if false;
+      allow create: if account(uid)
+        && request.resource.data.keys().hasOnly(['hash','data','createdAt'])
+        && request.resource.data.keys().hasAll(['hash','data','createdAt'])
+        && request.resource.data.hash == hash
+        && request.resource.data.hash is string
+        && request.resource.data.hash.size() == 64
+        && request.resource.data.data is string
+        && request.resource.data.data.size() <= 750000
+        && request.resource.data.createdAt == request.time;
+      allow update, delete: if false;
+    }
+    match /{path=**} {
+      allow read, write: if false;
+    }
+  }
+}

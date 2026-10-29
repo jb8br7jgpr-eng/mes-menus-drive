@@ -23,6 +23,18 @@ jobs:
           java-version: '21'
       - name: Install test-only dependencies
         run: npm install --prefix firebase --no-audit --no-fund
+      - name: V33 visual parity and production safety switches
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --depth=1 origin developpement-v1:refs/remotes/origin/developpement-v1
+          for file in styles.css sw.js manifest.webmanifest speedrive-icon-v2.PNG speedrive-logo-v2.PNG; do
+            git show "origin/developpement-v1:$file" | cmp - "$file"
+          done
+          grep -Fqx 'const V34_CLOUD_ACTIVE = false;' <(grep -F 'const V34_CLOUD_ACTIVE = false;' app.js)
+          grep -Fq 'const ENABLE_ACCOUNT_SETUP = false;' firebase/v34-ui.js
+          grep -Fq 'async function showV34ReadOnlyAudit()' app.js
+          echo "V33 visuals identical; V34 production gates still off."
       - name: Browser-module syntax (no execution or deployment)
         run: |
           node --check app.js

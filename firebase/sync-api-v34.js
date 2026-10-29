@@ -8,7 +8,9 @@ import {
   signOut,
   onAuthStateChanged,
   setPersistence,
-  browserLocalPersistence
+  browserLocalPersistence,
+  reload,
+  getIdToken
 } from "https://www.gstatic.com/firebasejs/13.1.0/firebase-auth.js";
 import {
   collection, doc, getDoc, onSnapshot, runTransaction,
@@ -60,12 +62,38 @@ export async function resendVerification() {
 export const signOutAccount = () => signOut(firebaseAuth);
 export const ownAccountCode = () => verifiedUser().uid;
 
+export async function findMyHousehold() {
+  verifiedUser();
+  const profile = await getDoc(doc(firebaseDb, "userProfiles", firebaseAuth.currentUser.uid));
+  if (!profile.exists() || !profile.data()?.householdId) return null;
+  return fetchHousehold(profile.data().householdId);
+}
+export async function connectHousehold(hid) {
+  verifiedUser();
+  if (!validId(hid)) throw Error("Code d'espace invalide.");
+  const household = await fetchHousehold(hid);
+  if (!household) throw Error("Espace familial introuvable.");
+  await setDoc(doc(firebaseDb, "userProfiles", firebaseAuth.currentUser.uid), {
+    householdId: hid, updatedAt: serverTimestamp()
+  });
+  return household;
+}
+export async function refreshVerifiedAccount() {
+  const user = firebaseAuth.currentUser;
+  if (!user) throw Error("Compte non connecté.");
+  await reload(user);
+  if (user.emailVerified) await getIdToken(user, true);
+  return user.emailVerified;
+}
+
 export async function createHousehold(name = "Speedrive") {
   const uid = verifiedUser().uid;
   const hid = crypto.randomUUID();
   await setDoc(doc(firebaseDb, "households", hid), {
     ownerUid: uid, name: String(name).slice(0, 80), createdAt: serverTimestamp()
   });
+  // Persist association server-side, not only in the phone's storage.
+  await connectHousehold(hid);
   return hid;
 }
 export async function addSecondPhone(hid, accountUid) {

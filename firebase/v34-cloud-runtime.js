@@ -93,7 +93,8 @@ async function onUser(user) {
   }
 }
 async function resume() {
-  if (refreshing || !session || !userId || viewBlocked()) return;
+  if (refreshing || !session || !userId ||
+      ["saving","loading","recovery","needs-import"].includes(previousStatus.phase)) return;
   refreshing=true;
   try { await session.open(userId); }
   finally { refreshing=false; }
@@ -102,6 +103,10 @@ function onVisible() {
   if (document.visibilityState === "visible") void resume();
 }
 function onFocus() { void resume(); }
+function onReconnect() { void resume(); }
+function refreshRequest(event) {
+  if (event.target.closest("[data-v34-refresh]")) void resume();
+}
 
 export function setupCloudV34({readLocalState,installCloudState,onStatus}={}) {
   if (appOptions) throw Error("La connexion cloud est déjà préparée.");
@@ -113,6 +118,8 @@ export function setupCloudV34({readLocalState,installCloudState,onStatus}={}) {
     document.addEventListener(type,guardEditing,true);
   }
   window.addEventListener("focus",onFocus);
+  window.addEventListener("online",onReconnect);
+  document.addEventListener("click",refreshRequest);
   document.addEventListener("visibilitychange",onVisible);
   stopAuth=observeLogin(user => {void onUser(user);},
     err=>report({phase:"readonly",error:String(err?.message||err)}));
@@ -123,6 +130,8 @@ export function setupCloudV34({readLocalState,installCloudState,onStatus}={}) {
       document.removeEventListener(type,guardEditing,true);
     }
     window.removeEventListener("focus",onFocus);
+    window.removeEventListener("online",onReconnect);
+    document.removeEventListener("click",refreshRequest);
     document.removeEventListener("visibilitychange",onVisible);
     appOptions=null;session=null;userId=null;
   };

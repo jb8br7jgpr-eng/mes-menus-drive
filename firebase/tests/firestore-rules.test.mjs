@@ -2,7 +2,8 @@
 import { before, beforeEach, after, test } from "node:test";
 import { readFileSync } from "node:fs";
 import { initializeTestEnvironment, assertFails, assertSucceeds } from "@firebase/rules-unit-testing";
-import { doc, getDoc, setDoc, updateDoc, deleteDoc, serverTimestamp } from "firebase/firestore";
+import { collection, doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, serverTimestamp } from "firebase/firestore";
+import { packState, unpackState } from "../v34-cloud-codec.js";
 
 let environment;
 const alice = () => environment.authenticatedContext("alice",{email_verified:true}).firestore();
@@ -94,4 +95,59 @@ test("invalid snapshots and photos are rejected",async()=>{
   await assertFails(setDoc(doc(alice(),photo("bad")),{
     hash:"bad",data:"x",createdAt:serverTimestamp()
   }));
+});
+
+test("full V34 snapshot roundtrip keeps 14 meals and images using the actual security rules",async()=>{
+  const photoData="data:image/jpeg;base64,AQIDBA==";
+  const meals=Array.from({length:14},(_,i)=>({
+    recipeId:i%2?"r1":"r2",portions:i%2?2:3
+  }));
+  const source={
+    schema:1,
+    recipes:[
+      {id:"r1",name:"Soupe",image:photoData,ingredients:[{name:"Carotte",qty:2}]},
+      {id:"r2",name:"Pâtes",image:photoData,ingredients:[{name:"Tomate",qty:4}]}
+    ],
+    products:[{id:"p1",name:"Lait",ean:"1234567890123"}],
+    ingredientCatalog:[{id:"i1",name:"Carotte",productId:"p1"}],
+    staples:[],
+    weeks:{"2026-10-26":{meals,checked:["i1"],excluded:[],pantry:{i1:1}}},
+    settings:{people:2}
+  };
+  const pack=await packState(source),sid="complete-test";
+  for(const entry of pack.photos) {
+    await assertSucceeds(setDoc(doc(alice(),photo(entry.id)),{
+      hash:entry.id,data:entry.data,createdAt:serverTimestamp()
+    }));
+  }
+  await assertSucceeds(setDoc(doc(alice(),snap(sid)),{
+    hash:pack.hash,count:pack.count,bytes:pack.bytes,createdAt:serverTimestamp(),ownerUid:"alice"
+  }));
+  for(let i=0;i<pack.count;i++){
+    await assertSucceeds(setDoc(doc(alice(),snap(sid)+"/chunks/"+String(i).padStart(4,"0")),{
+      index:i,part:pack.chunks[i],createdAt:serverTimestamp()
+    }));
+  }
+  await assertSucceeds(setDoc(doc(alice(),head),{
+    ownerUid:"alice",revision:1,snapshotId:sid,updatedAt:serverTimestamp()
+  }));
+  const serverHead=await getDoc(doc(alice(),head));
+  assert.equal(serverHead.data().revision,1);
+  const metadata=await getDoc(doc(alice(),snap(sid)));
+  const serverChunks=await getDocs(collection(alice(),snap(sid)+"/chunks"));
+  const chunks=serverChunks.docs.map(d=>d.data()).sort((a,b)=>a.index-b.index).map(d=>d.part);
+  const photos={};
+  for(const entry of pack.photos){
+    const saved=await getDoc(doc(alice(),photo(entry.id)));
+    photos[entry.id]=saved.data().data;
+  }
+  const restored=await unpackState({
+    hash:metadata.data().hash,
+    count:metadata.data().count,
+    chunks
+  },photos);
+  assert.deepEqual(restored,source);
+  assert.equal(restored.weeks["2026-10-26"].meals.length,14);
+  assert.equal(restored.weeks["2026-10-26"].checked[0],"i1");
+  assert.equal(pack.photos.length,1,"photos de même contenu dédupliquées");
 });

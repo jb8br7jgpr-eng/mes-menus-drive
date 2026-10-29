@@ -126,3 +126,36 @@ inchangée, règles Firebase actuellement `allow read, write: if false;`.
 5. Obtenir l'accord explicite avant d'activer les verrous, fusionner ou
    déployer ; la V33 et les données de l'utilisateur restent intactes.
 
+
+## Contrôles supplémentaires avant mise en service (29 octobre 2026)
+
+- `firebase/tests/firestore-rules.test.mjs` et
+  `firebase/firebase.json` : tests automatisables dans l'émulateur Firestore
+  utilisant `demo-speedrive-v34`, sans appel à la vraie base. Scénarios
+  prévus : accès anonyme interdit, autre compte interdit, e-mail non
+  vérifié interdit, première sauvegarde, révision imposée, immutabilité
+  des blocs et photos. **Il reste à confirmer leur exécution CI réelle.**
+- `.github/workflows/v34-safe-tests.yml` : workflow test-only sur la branche
+  `firebase-v34-cloud-first`, avec droits GitHub `contents:read`.
+  Aucun secret, aucune publication et aucun déploiement Firebase.
+- `firebase/v34-ui.js` : bouton d'import initial explicitement confirmé,
+  uniquement quand le serveur est vide et que l'analyse locale a été faite ;
+  possibilité de reprendre un brouillon non confirmé. Les deux verrous de
+  développement `ENABLE_ACCOUNT_SETUP=false` et `V34_CLOUD_ACTIVE=false`
+  restent en place.
+- La récupération d'une réponse perdue après sauvegarde compare la version
+  intégrale récupérée au brouillon avant de le déclarer confirmé.
+  **8/8 tests de session réussis en simulation**.
+- Prélecture de la révision Firestore avant envoi des nouveaux blocs ; une
+  version manifestement périmée est refusée sans transfert. Les sauvegardes
+  sans changement réel ne créent pas de nouvelle photographie.
+- **BLOQUANT QUOTA** : à chaque vraie modification, l'architecture actuelle
+  ajoute une photographie immuable de l'état, même si les photos sont
+  dédupliquées. Cela provoque une croissance indéfinie et peut dépasser le
+  plafond gratuit Firestore de 1 Gio. Il faut une politique effective de
+  conservation/nettoyage **après une sauvegarde externe vérifiée**, ou une
+  stratégie de blocs dédupliqués, avant toute activation.
+- **BLOQUANT SAUVEGARDE** : une archive AES chiffrée et un collecteur ont été
+  codés, mais pas de dépôt privé de destination, pas de planification, pas de
+  secret configuré et pas de restauration réelle. Ne jamais déclarer les
+  sauvegardes automatiques « opérationnelles » à ce stade.

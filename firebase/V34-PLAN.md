@@ -66,3 +66,18 @@ Firebase Web `speedrive-7e77c`; Firestore édition Standard, règles actuellemen
 - Pas de synchronisation automatique active, pas de comptes créés, pas
   de changements en production. Les tests de sécurité et de concurrence
   sont à réaliser avant intégration UI.
+
+## Écran V34 — état du 29/10/2026
+
+- Panneau `firebase/v34-ui.js` / CSS autonome intégré uniquement à la branche
+  de préparation : bouton « Connexion familiale V34 » dans Paramètres.
+- `ENABLE_ACCOUNT_SETUP = false` : **aucune création de compte ni écriture
+  Firestore possible à partir du prototype**, même si on ouvre le panneau.
+- Interface préparée : création/connexion email, vérification, copie d'UID,
+  création d'espace, autorisation du second UID, rejoint par code.
+- `userProfiles/{uid}` donne au compte un pointeur côté serveur vers son espace ;
+  l'UID seul ne donne aucun droit sur les données (contrôle du membre obligatoire).
+- Auth SDK JS 13.1.0 officiel ; persistance locale configurée lors de la connexion.
+- Aucun changement sur `developpement-v1`, `main`, ou `sw.js`.
+- Tests de parsing JS et tests purs de la prévisualisation effectués en environnement
+  isolé ; tests navigateur iOS et émulateur Firestore **pas encore réalisés**.

@@ -3,7 +3,7 @@
 import {
   observeLogin, signUp, signIn, signOutAccount,
   resendVerification, refreshVerifiedAccount
-} from "./sync-api-v34.js";
+} from "./v34-auth.js";
 import { previewLocalMigration } from "./v34-model.js";
 
 const ENABLE_ACCOUNT_SETUP = false; // DO NOT ENABLE before security tests.

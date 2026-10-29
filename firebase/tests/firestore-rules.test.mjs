@@ -33,7 +33,7 @@ before(async()=>{
   });
 });
 after(async()=>{await environment?.cleanup();});
-beforeEach(async()=>{await environment.clearFirestoreData();});
+beforeEach(async()=>{await environment.clearFirestore();});
 
 test("anonymous visitor cannot see a family backup", async()=>{
   await seed();

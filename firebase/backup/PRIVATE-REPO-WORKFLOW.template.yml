@@ -22,7 +22,7 @@ jobs:
         with:
           repository: jb8br7jgpr-eng/mes-menus-drive
           # SECURITY: PINNED COMMIT, not a moving branch. Review before updates.
-          ref: 23504f0936a0920e338b088953f835c896bb47df
+          ref: 8dba099acfa7d895460d17b74fc0f95f1791adb3
           path: speedrive-source
           persist-credentials: false
       - name: Install Node.js

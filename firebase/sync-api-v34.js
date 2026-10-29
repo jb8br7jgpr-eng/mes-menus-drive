@@ -15,7 +15,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/13.1.0/firebase-auth.js";
 import {
   collection, doc, getDoc, onSnapshot, runTransaction,
-  setDoc, serverTimestamp
+  setDoc, serverTimestamp, writeBatch
 } from "https://www.gstatic.com/firebasejs/13.1.0/firebase-firestore.js";
 
 export class DuplicateRecord extends Error {
@@ -105,11 +105,16 @@ export async function refreshVerifiedAccount() {
 export async function createHousehold(name = "Speedrive") {
   const uid = verifiedUser().uid;
   const hid = crypto.randomUUID();
-  await setDoc(doc(firebaseDb, "households", hid), {
+  // Create the space AND its owner pointer atomically. No orphan space if
+  // the phone loses its connection between the two writes.
+  const batch = writeBatch(firebaseDb);
+  batch.set(doc(firebaseDb, "households", hid), {
     ownerUid: uid, name: String(name).slice(0, 80), createdAt: serverTimestamp()
   });
-  // Persist association server-side, not only in the phone's storage.
-  await connectHousehold(hid);
+  batch.set(doc(firebaseDb, "userProfiles", uid), {
+    householdId: hid, updatedAt: serverTimestamp()
+  });
+  await batch.commit();
   return hid;
 }
 export async function addSecondPhone(hid, accountUid) {

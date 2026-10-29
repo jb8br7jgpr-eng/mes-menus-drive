@@ -181,3 +181,27 @@ inchangée, règles Firebase actuellement `allow read, write: if false;`.
   Aucun effacement réel n'a été implémenté/autorisé.
 - Le risque de saturation Firestore à long terme subsiste tant que
   la sauvegarde indépendante et le nettoyage sûr ne sont pas en service.
+
+
+## Contrôle de premier import et stockage iOS — 29 octobre 2026
+
+- **Compte familial :** l'adresse e-mail a été confirmée par l'utilisateur
+  dans le parcours de vérification Firebase. Cela ne signifie PAS que des
+  données sont déjà importées ou que les règles cloud sont publiées.
+- **Important iPhone :** le stockage IndexedDB de Speedrive ouvert comme
+  application ajoutée à l'écran d'accueil peut être différent de celui de
+  Safari. Ne jamais déduire qu'une bibliothèque est vide à partir d'une
+  page de diagnostic ouverte dans Safari. Premier import uniquement depuis
+  **la même instance PWA** qui contient la bibliothèque V33 à sauvegarder.
+- `firebase/v34-import-preflight.js` analyse **localement** le nombre de
+  recettes, produits, photos, repas, leur taille, les identifiants dupliqués
+  et les limitations Firestore. Il ne transmet pas les contenus.
+- Le panneau V34 prépare cette analyse sans activation de la synchronisation.
+  `confirmFirstCloudImport()` **refait impérativement** le contrôle sur
+  l'état réellement présent au moment de l'écriture, sans se fier à une
+  ancienne prévisualisation, et bloque les bibliothèques vides.
+- Les tests de régression correspondants sont inclus dans le workflow manuel
+  du dépôt privé `speedrive-backup-crypto-check.yml`.
+- **Interdiction de publier la V34, publier ses règles, importer des
+  recettes ou activer des sauvegardes réelles sans une validation adaptée.**
+  Le statut actuel reste préparation, aucune donnée personnelle envoyée.

@@ -4,8 +4,9 @@
 // stored in a CI secret and a private encrypted backup destination.
 import { writeFile, mkdir } from "node:fs/promises";
 import { resolve, join } from "node:path";
-import { initializeApp, cert } from "firebase-admin/app";
-import { getFirestore } from "firebase-admin/firestore";
+// Official Google Cloud Firestore client supports external Workload Identity
+// Federation credentials via Application Default Credentials (ADC).
+import { Firestore } from "@google-cloud/firestore";
 import { encryptOffsiteBackup, decryptOffsiteBackup } from "./v34-backup-archive.mjs";
 
 const required = name => {
@@ -18,12 +19,15 @@ function sanitizeName(s) {
   return s;
 }
 async function main() {
-  const credentials=JSON.parse(required("FIREBASE_SERVICE_ACCOUNT_JSON"));
   const uid=sanitizeName(required("SPEEDRIVE_ACCOUNT_UID"));
   const aesKey=required("SPEEDRIVE_BACKUP_KEY_B64");
   const directory=resolve(required("SPEEDRIVE_BACKUP_OUTPUT_DIR"));
-  initializeApp({credential:cert(credentials),projectId:"speedrive-7e77c"});
-  const db=getFirestore();
+  // Credentials are short-lived and generated from GitHub OIDC.
+  // NO long-lived service-account JSON key is loaded or accepted.
+  if (!process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+    throw Error("Identité fédérée Google Cloud non configurée.");
+  }
+  const db=new Firestore({projectId:"speedrive-7e77c"});
   const prefix="vaults/"+uid;
   const head=(await db.doc(prefix+"/head/current").get());
   if(!head.exists)throw Error("Speedrive non initialisé : pas de base à sauvegarder.");

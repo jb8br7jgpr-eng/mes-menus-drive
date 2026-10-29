@@ -95,7 +95,7 @@ function render() {
       <div class="v34-head"><div><span class="v34-eyebrow">SPEEDRIVE • V34</span>
         <h2 id="v34Title">Sauvegarde et partage</h2></div>
         <button type="button" class="v34-close" data-v34-close aria-label="Fermer">×</button></div>
-      <div class="v34-note"><strong>Préparation, non activée</strong>
+      <div class="v34-note"><strong>Compte familial et synchronisation sécurisée</strong>
         <p>La base officielle sera sur Firebase. Une seule session sera utilisée à la fois.
         Les modifications seront autorisées uniquement avec une connexion fonctionnelle,
         et affichées comme sauvegardées après confirmation du serveur.</p>
@@ -107,7 +107,7 @@ function render() {
       ${error ? '<div class="v34-alert v34-error" role="alert">'+escapeHtml(error)+'</div>' : ''}
       ${info ? '<div class="v34-alert" role="status">'+escapeHtml(info)+'</div>' : ''}
       <div class="v34-body"><h3>Compte commun aux deux iPhone</h3>${accountArea}${cloudArea}</div>
-      <div class="v34-foot">Les données et sauvegardes locales de la V33 restent inchangées</div>
+      <div class="v34-foot">Une copie locale est conservée avant le premier transfert vers Firebase</div>
     </section>
   </div>`;
 }

@@ -1,7 +1,7 @@
 // RESTORE TEST ONLY. This CLI refuses any real Firestore project.
 // Example:
 // FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 SPEEDRIVE_ALLOW_TEST_RESTORE=YES \
-// SPEEDRIVE_BACKUP_KEY_B64=... node backup/restore-emulator.mjs /private/archive.sdrive test-uid
+// SPEEDRIVE_BACKUP_PASSPHRASE=... node backup/restore-emulator.mjs /private/archive.sdrive test-uid
 import { readFile } from "node:fs/promises";
 import { initializeApp } from "firebase-admin/app";
 import { getFirestore, FieldValue } from "firebase-admin/firestore";
@@ -15,10 +15,10 @@ async function main() {
   }
   const [archivePath,targetUid]=process.argv.slice(2);
   if(!archivePath||!targetUid)throw Error("Archive et UID cible de test requis.");
-  const key=process.env.SPEEDRIVE_BACKUP_KEY_B64;
-  if(!key)throw Error("Clé de sauvegarde absente.");
+  const passphrase=process.env.SPEEDRIVE_BACKUP_PASSPHRASE;
+  if(!passphrase)throw Error("Phrase secrète de sauvegarde absente.");
   const bytes=await readFile(archivePath);
-  const plan=buildRestorePlan(bytes,key,targetUid);
+  const plan=buildRestorePlan(bytes,{passphrase},targetUid);
   console.log("Archive vérifiée : recettes",plan.summary.recipes,"produits",
     plan.summary.products,"photos",plan.summary.photos,"semaines",plan.summary.weeks);
   const app=initializeApp({projectId:"demo-speedrive-v34-restore"});

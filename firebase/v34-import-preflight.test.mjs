@@ -63,3 +63,26 @@ test("just-in-time gate refuses empty phone library",async()=>{
   const state=basic();state.recipes=[];state.products=[];
   await assert.rejects(()=>assertFirstCloudImportReady(state),/bibliothèque vide/);
 });
+
+test("un produit sans identifiant bloque le premier transfert sans l'effacer",async()=>{
+  const state=basic();
+  state.products.push({name:"Produit sans identifiant"});
+  const inspection=await inspectFirstCloudImport(state);
+  assert.equal(inspection.canImport,false);
+  assert.match(inspection.errors.join(" "),/sans identifiant stable/);
+  assert.equal(state.products.length,2);
+});
+test("un planning de plus de 14 repas est refuse avant transfert",async()=>{
+  const state=basic();
+  state.weeks["2026-10-26"].meals=Array(15).fill(null);
+  const inspection=await inspectFirstCloudImport(state);
+  assert.equal(inspection.canImport,false);
+  assert.match(inspection.errors.join(" "),/14 repas/);
+});
+test("une reference ingredient absente est signalee sans modifier les donnees",async()=>{
+  const state=basic();state.ingredientCatalog[0].productId="produit-supprime";
+  const inspection=await inspectFirstCloudImport(state);
+  assert.equal(inspection.canImport,true);
+  assert.ok(inspection.warnings.some(x=>/référence produit manquante/.test(x)));
+  assert.equal(state.ingredientCatalog[0].productId,"produit-supprime");
+});

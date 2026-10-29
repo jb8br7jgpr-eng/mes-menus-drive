@@ -5,6 +5,7 @@ import { observeLogin } from "./v34-auth.js";
 import { cloudRecoveryStore } from "./v34-cloud-recovery-store.js";
 import { createCloudSession } from "./v34-session-core.js";
 import { assertFirstCloudImportReady } from "./v34-import-preflight.js";
+import { isReadOnlySafeAction } from "./v34-readonly-actions.js";
 import { loadAuthoritativeState, saveAuthoritativeState } from "./v34-cloud-first.js";
 
 const message = {
@@ -47,6 +48,8 @@ function guardEditing(event) {
   const target = event.target;
   if (!(target instanceof Element)) return;
   if (target.closest("#v34SyncRoot, #v34CloudGuard")) return;
+  // No cloud connection must NEVER prevent an independent iCloud JSON export.
+  if (isReadOnlySafeAction(target.closest("[data-action]")?.dataset.action)) return;
   if (target.closest(".app-shell, #modalRoot") &&
       !target.closest("[data-tab], [data-v34-open], #settingsBtn")) {
     event.preventDefault();

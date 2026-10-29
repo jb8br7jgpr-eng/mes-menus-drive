@@ -81,3 +81,29 @@ Firebase Web `speedrive-7e77c`; Firestore édition Standard, règles actuellemen
 - Aucun changement sur `developpement-v1`, `main`, ou `sw.js`.
 - Tests de parsing JS et tests purs de la prévisualisation effectués en environnement
   isolé ; tests navigateur iOS et émulateur Firestore **pas encore réalisés**.
+
+## File d'attente et unicité (29/10/2026)
+
+- `firebase/v34-outbox.js` : IndexedDB dédié `speedrive-v34-outbox`,
+  modifications en attente partitionnées par UID Firebase + espace familial.
+- Les modifications en attente du même élément sont regroupées ; une création
+  non encore envoyée peut être annulée localement sans créer de document.
+- Tentatives de transmission uniquement au premier plan (ouverture, visibilité,
+  reconnexion, contrôle périodique si page ouverte). **Aucune promesse de
+  synchronisation iOS lorsque la PWA est fermée.**
+- Révision `version` et `lastMutationId` sur chaque enregistrement ; une
+  requête rejouée après perte de réponse reste idempotente.
+- Une seconde modification concurrente produit un conflit et reste conservée
+  dans la file ; jamais de remplacement silencieux.
+- Clés `uniqueKeys` créées atomiquement avec les produits et ingrédients.
+  Ces réservations ne sont pas automatiquement libérées à la suppression
+  logique : récupération et renommage nécessitent des opérations contrôlées.
+- Limite de la version préparatoire : l'empreinte principale privilégie l'EAN
+  pour les produits qui en possèdent un ; les ressemblances EAN/nom ou les
+  variantes de noms doivent être détectées par la revue des doublons.
+- Création d'espace familial + pointeur de compte dans un batch atomique.
+- Tests exécutés en **simulateur mémoire uniquement**, pas dans l'émulateur
+  Firebase : regroupement, synchronisation, conflit, résolution, annulation,
+  isolation du compte. L'émulateur sécurité, deux vrais appareils, la
+  restauration et la migration intégrale restent impérativement à tester.
+- **Règles toujours non publiées** ; la V33 n'importe aucun de ces modules.

@@ -36,6 +36,7 @@ function report(event) {
     shield.querySelector("[data-v34-guard-text]").textContent =
       message[event.phase] || "Modifications bloquées";
   }
+  window.dispatchEvent(new CustomEvent("speedrive-v34-cloud-status",{detail:event}));
   appOptions?.onStatus?.(event);
 }
 const viewBlocked = () => previousStatus.phase !== "ready";

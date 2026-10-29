@@ -537,3 +537,18 @@ Les deux fichiers graphiques déposés par l'utilisateur se trouvent à la racin
 - Le moteur `app.js`, les fichiers Userscripts, les recettes, la liste des courses, la gestion des stocks, le Drive et les données IndexedDB ne sont pas modifiés.
 - L'icône installée sur l'écran d'accueil iPhone peut rester en cache indépendamment du site : ne pas supprimer l'application sans export préalable d'une sauvegarde JSON.
 - Statut : branche `v31-logo-centre-speedrive` en préparation ; aucune publication sans accord explicite.
+
+
+## V32 — Fluidité du planning et finition iPhone (préparation avant déploiement)
+
+Périmètre validé : **points 1, 2, 3, 4 et 7 seulement**. Les points 5 (masquage de « Vider le jour ») et 6 (indicateur d'enregistrement) restent volontairement inchangés.
+
+- **Retour à la bonne position** : après sélection d'un plat, placement des restes, modification des portions, retrait d'un plat ou déplacement/copie d'un repas, Speedrive conserve la position dans le calendrier et remet le jour modifié à l'écran si nécessaire. Le changement d'onglet continue à afficher le haut de l'écran.
+- **Jour actuel** : repère vert discret « Aujourd'hui » sur la carte de la date réelle, et raccourci « Aujourd'hui ↓ » accessible uniquement sur la semaine courante.
+- **Accueil plus compact** : introduction raccourcie, titres et espaces optimisés sans déplacer ni supprimer les deux actions « Générer les repas » et « Reprendre la semaine passée ». Les cases et la logique des menus restent identiques.
+- **Annuler un retrait simple** : toast avec bouton « Annuler » durant 8 secondes pour retrait d'un repas, d'un plat du repas, de restes, d'un jour, d'un achat manuel ou d'un article exclu des courses. La restauration vise exclusivement l'état de la semaine en cours ; elle vérifie que rien n'a changé depuis l'opération pour ne pas écraser une modification ultérieure. Aucun changement au format des sauvegardes ou du stockage.
+- **Navigation inférieure cohérente** : cinq icônes SVG de même taille et même épaisseur de trait, dessinées directement dans l'HTML, avec état actif vert Speedrive. Les identifiants d'onglets sont inchangés.
+
+Sécurité : aucune modification du calcul des recettes, des portions, de la génération volontaire des courses, des stocks, des produits et du moteur de transfert Carrefour ou Userscripts. `manifest.webmanifest` et les images Speedrive v2 ne sont pas modifiés. Les versions de `app.js` et `styles.css` ont été renouvelées dans le cache PWA.
+
+**Statut** : code sur la branche `v32-confort-navigation-undo` uniquement, et non déployé. Les tests de logique en environnement simulé passent, mais le rendu et les gestes tactiles sur un véritable iPhone restent à vérifier après déploiement.

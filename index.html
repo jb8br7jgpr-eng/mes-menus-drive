@@ -13,6 +13,7 @@
   <link rel="icon" type="image/png" href="./speedrive-icon-v2.PNG?v=20261029-31">
   <link rel="apple-touch-icon" href="./speedrive-icon-v2.PNG?v=20261029-31">
   <link rel="stylesheet" href="./styles.css?v=20261029-33">
+  <link rel="stylesheet" href="./firebase/v34-ui.css">
   <style>
     /* Navigation essentielle : 5 cases fixes, même si Safari conserve une ancienne feuille de style. */
     .bottom-nav { display: grid !important; grid-template-columns: repeat(5, minmax(0, 1fr)) !important; }
@@ -20,6 +21,7 @@
     .bottom-nav > .nav-item > span:last-child { display: block; max-width: 100%; white-space: nowrap; }
   </style>
   <script defer src="./app.js?v=20261029-33"></script>
+  <script type="module" src="./firebase/v34-ui.js"></script>
 </head>
 <body>
   <div class="app-shell">
@@ -41,6 +43,7 @@
     </nav>
   </div>
   <div id="modalRoot"></div>
+  <div id="v34SyncRoot" data-open="false"></div>
   <div id="toast" role="status" aria-live="polite"></div>
 </body>
 </html>

@@ -1012,7 +1012,8 @@ function renderCourses(){
  }
  function section(store,title,icon,rows){
   const isDrive=store==='carrefour',storeCount=items.filter(x=>x.store===store).length;
-  let section='<section class="course-store '+(isDrive?'drive':'fresh')+'"><div class="course-store-head"><div><div class="eyebrow">À acheter</div><h2>'+icon+' '+title+'</h2></div><span class="pill">'+rows.length+' article'+(rows.length===1?'':'s')+'</span></div>';
+  let section='<button class="btn tiny secondary wide course-store-clear" data-action="clear-store-courses" data-store="'+store+'" '+(!storeCount?'disabled':'')+'>🗑️ Vider les courses '+title+'</button>'+ 
+   '<section class="course-store '+(isDrive?'drive':'fresh')+'"><div class="course-store-head"><div><div class="eyebrow">À acheter</div><h2>'+icon+' '+title+'</h2></div><span class="pill">'+rows.length+' article'+(rows.length===1?'':'s')+'</span></div>';
   section+='<button class="btn '+(isDrive?'secondary':'')+' wide" data-action="'+(isDrive?'go-drive':'copy-grand-frais')+'" '+(!rows.length?'disabled':'')+'>'+
    (isDrive?'🛒 Préparer mon panier Carrefour':'📋 Copier Grand Frais dans Notes')+'</button>';
   if(rows.length){
@@ -1021,12 +1022,12 @@ function renderCourses(){
     const other=rows.filter(x=>!order.includes(x.category));if(other.length)section+=other.map(shoppingRow).join('')
    }else section+=rows.map(shoppingRow).join('');
   }else section+='<div class="course-empty">Aucun achat prévu dans ce magasin.</div>';
-  section+='<button class="btn tiny secondary wide" data-action="clear-store-courses" data-store="'+store+'" '+(!storeCount?'disabled':'')+'>🗑️ Vider les courses '+title+'</button>';
+  
    return section+'</section>'
  }
  out+=section('carrefour','Carrefour Drive','🛒',carrefour);
  out+=section('grandfrais','Grand Frais','🥬',grand);
-  out+='<button class="btn danger wide" data-action="clear-all-courses" '+(!items.length?'disabled':'')+'>🗑️ Vider toutes les courses de cette semaine</button>';
+  
  if(checked.length)out+='<details class="course-optional" data-section="checked" '+(courseOpenSections.has('checked')?'open':'')+'><summary>✓ Articles cochés <span class="pill gray">'+checked.length+'</span></summary>'+
   '<p class="helper">Décoche un article pour le remettre dans les achats.</p>'+checked.map(shoppingRow).join('')+'</details>';
  if(covered.length||excluded.length){
@@ -1037,6 +1038,7 @@ function renderCourses(){
      excluded.map(x=>'<div class="course-house-row"><span class="grow">'+html(x.name)+'</span><div class="course-house-actions"><button class="btn tiny secondary" data-action="include" data-id="'+html(x.id)+'">Réintégrer</button>'+manualEditControl(x,true)+'</div></div>').join(''):'')+'</details>'
  }
 
+ out+='<button class="btn danger wide course-clear-all" data-action="clear-all-courses" '+(!items.length?'disabled':'')+'>🗑️ Vider toutes les courses de cette semaine</button>';
  return out
 }
 function grandFraisText(){

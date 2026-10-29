@@ -262,7 +262,7 @@ function openImportedCarrefourProduct(data){
   const ean=/^\d{13}$/.test(String(data.ean||''))?String(data.ean):'';
   if(!name)throw Error('Nom du produit introuvable');
   const already=state.products.find(p=>(p.url&&p.url.split(/[?#]/)[0]===url.split(/[?#]/)[0])||(ean&&p.ean===ean));
-  currentTab='produits';render();
+  switchTabV33('produits');
   const linked=ingredientById(pendingIngredientLinkId);
   pendingIngredientLinkId=null;
   if(already){
@@ -1465,7 +1465,7 @@ function pickLeftoverSource(index){
  showModal('🍱 Choisir les restes',body)
 }
 function populate(){
- if(!state.recipes.length){toast('Ajoute d’abord quelques plats à ton catalogue.');currentTab='plats';render();return}
+ if(!state.recipes.length){toast('Ajoute d’abord quelques plats à ton catalogue.');switchTabV33('plats');return}
  const w=getWeek(),missing=w.meals.filter(m=>!m).length;
  if(!missing){toast('Les 14 repas sont déjà renseignés.');return}
  // Aucun repas n'est réservé automatiquement aux restes : le calendrier
@@ -1601,7 +1601,7 @@ document.addEventListener('click',e=>{
    if(!hasCookedMeals(w)){toast('Ajoute d’abord un plat aux menus de cette semaine.');return}
    if(status!=='not-generated'&&!confirm('Régénérer les ingrédients des recettes pour cette semaine ? Les nouveaux menus remplaceront les anciens besoins de recettes dans Courses. Les ajouts manuels, le stock maison, les articles cochés et les exclusions seront conservés.'))return;
    checkpoint('Avant génération des courses de la semaine');
-   generateWeekCourses(w);persist();switchTabV33('courses');
+   generateWeekCourses(w);persist();tabScrollV33.courses=0;switchTabV33('courses');
    toast('Courses de la semaine générées : Carrefour et Grand Frais sont prêts !')
   }
   else if(mode==='clear-day'){
@@ -1688,7 +1688,7 @@ document.addEventListener('click',e=>{
    const ing=ingredientById(id),qty=Number($('#extraIngredientQty')?.value),unit=$('#extraIngredientUnit')?.value;
    if(!ing||!Number.isFinite(qty)||qty<=0||!units.includes(unit)){toast('Vérifie la quantité et l’unité.');return}
    w.extras.push({id:uid(),ingredientId:ing.id,productId:ing.productId||null,name:ing.name,qty,unit});
-   persist();closeModal();currentTab='courses';render();toast(ing.name+' ajouté aux courses !')
+   persist();closeModal();tabScrollV33.courses=0;switchTabV33('courses');toast(ing.name+' ajouté aux courses !')
   }
   else if(mode==='delete-catalog-ingredient'){
    const ing=ingredientById(id);if(!ing)return;

@@ -18,13 +18,24 @@ service cloud.firestore {
         (verified() &&
          exists(/databases/$(database)/documents/households/$(hid)/members/$(request.auth.uid)));
     }
-    function validRecordCreate(rid) {
+    function keyRegistry(hid, key) {
+      return /databases/$(database)/documents/households/$(hid)/uniqueKeys/$(key);
+    }
+    function recordedKeyCreate(hid, rid, d) {
+      return (d.kind in ['product','ingredient'] &&
+        d.uniqueKey is string && d.uniqueKey.size() < 550 &&
+        getAfter(keyRegistry(hid, d.uniqueKey)).data.recordId == rid &&
+        getAfter(keyRegistry(hid, d.uniqueKey)).data.kind == d.kind) ||
+        (!(d.kind in ['product','ingredient']) && d.uniqueKey == null);
+    }
+    function validRecordCreate(hid, rid) {
       let d = request.resource.data;
-      return d.keys().hasOnly(['id','kind','payload','version','deleted','createdAt','createdBy','updatedAt','updatedBy'])
-        && d.keys().hasAll(['id','kind','payload','version','deleted','createdAt','createdBy','updatedAt','updatedBy'])
+      return d.keys().hasOnly(['id','kind','payload','uniqueKey','version','deleted','createdAt','createdBy','updatedAt','updatedBy'])
+        && d.keys().hasAll(['id','kind','payload','uniqueKey','version','deleted','createdAt','createdBy','updatedAt','updatedBy'])
         && d.id == rid
         && d.kind in ['recipe','recipePhoto','product','ingredient','staple','weekMeta','weekMeal','weekExtra','weekChecked','weekExcluded','weekPantry','weekPantryUnit','settings','preference']
         && d.payload is map
+        && recordedKeyCreate(hid, rid, d)
         && d.version == 1
         && d.deleted == false
         && d.createdAt == request.time
@@ -34,11 +45,12 @@ service cloud.firestore {
     }
     function validRecordUpdate(rid) {
       let d = request.resource.data;
-      return d.keys().hasOnly(['id','kind','payload','version','deleted','createdAt','createdBy','updatedAt','updatedBy'])
-        && d.keys().hasAll(['id','kind','payload','version','deleted','createdAt','createdBy','updatedAt','updatedBy'])
+      return d.keys().hasOnly(['id','kind','payload','uniqueKey','version','deleted','createdAt','createdBy','updatedAt','updatedBy'])
+        && d.keys().hasAll(['id','kind','payload','uniqueKey','version','deleted','createdAt','createdBy','updatedAt','updatedBy'])
         && d.id == rid
         && d.id == resource.data.id
         && d.kind == resource.data.kind
+        && d.uniqueKey == resource.data.uniqueKey
         && d.createdAt == resource.data.createdAt
         && d.createdBy == resource.data.createdBy
         && d.payload is map
@@ -93,9 +105,25 @@ service cloud.firestore {
         allow delete: if owner(hid) && uid != request.auth.uid;
       }
 
+      match /uniqueKeys/{key} {
+        allow get: if member(hid);
+        allow list: if false;
+        // A uniqueness reservation is created atomically alongside its record.
+        allow create: if member(hid)
+          && request.resource.data.keys().hasOnly(['key','kind','recordId','createdAt','createdBy'])
+          && request.resource.data.keys().hasAll(['key','kind','recordId','createdAt','createdBy'])
+          && request.resource.data.key == key
+          && request.resource.data.kind in ['product','ingredient']
+          && request.resource.data.recordId is string
+          && request.resource.data.createdAt == request.time
+          && request.resource.data.createdBy == request.auth.uid
+          && getAfter(/databases/$(database)/documents/households/$(hid)/records/$(request.resource.data.recordId)).data.uniqueKey == key;
+        allow update, delete: if false;
+      }
+
       match /records/{rid} {
         allow get, list: if member(hid);
-        allow create: if member(hid) && validRecordCreate(rid);
+        allow create: if member(hid) && validRecordCreate(hid, rid);
         allow update: if member(hid) && validRecordUpdate(rid);
         // Soft deletion preserves a recoverable tombstone/version.
         allow delete: if false;

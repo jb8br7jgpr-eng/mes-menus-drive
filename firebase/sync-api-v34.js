@@ -43,7 +43,7 @@ const verifiedUser = () => {
 export async function persistentLogin() {
   await setPersistence(firebaseAuth, browserLocalPersistence);
 }
-export const observeLogin = callback => onAuthStateChanged(firebaseAuth, callback);
+export const observeLogin = (callback, onError) => onAuthStateChanged(firebaseAuth, callback, onError);
 export async function signUp(email, password) {
   await persistentLogin();
   const result = await createUserWithEmailAndPassword(firebaseAuth, email, password);
@@ -100,9 +100,10 @@ export async function addSecondPhone(hid, accountUid) {
   verifiedUser();
   if (!validId(hid) || !validId(accountUid)) throw Error("Identifiant invalide.");
   if (accountUid === firebaseAuth.currentUser.uid) throw Error("Ce compte est déjà propriétaire.");
-  await setDoc(doc(firebaseDb, "households", hid, "members", accountUid), {
-    uid: accountUid, role: "member", createdAt: serverTimestamp()
-  });
+  const ref = doc(firebaseDb, "households", hid, "members", accountUid);
+  if ((await getDoc(ref)).exists()) return false; // idempotent invitation
+  await setDoc(ref, { uid: accountUid, role: "member", createdAt: serverTimestamp() });
+  return true;
 }
 export async function fetchHousehold(hid) {
   verifiedUser();

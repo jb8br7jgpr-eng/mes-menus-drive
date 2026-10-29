@@ -100,3 +100,20 @@ test("server outage at opening never replaces local state",async()=>{
   assert.equal(f.session.status().phase,"readonly");
   assert.equal(f.installed,null);
 });
+
+test("lost acknowledgement is recovered if server already contains the exact draft",async()=>{
+  const f=fixture();
+  await f.session.open("uid");
+  await f.session.initialImport(f.base);
+  f.cloud.online=false;
+  const edited={...f.base,settings:{people:3}};
+  await assert.rejects(()=>f.session.save(edited),/Connexion indisponible/);
+  f.cloud.online=true;
+  // Another device view of the completed server commit, though the first
+  // device never received the success acknowledgement.
+  f.cloud.latest={status:"ready",revision:2,state:structuredClone(edited)};
+  const result=await f.session.retryDraft();
+  assert.equal(result.recovered,true);
+  assert.equal(f.session.status().phase,"ready");
+  assert.equal(f.db.has("uid:draft"),false);
+});

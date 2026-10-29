@@ -76,7 +76,8 @@ service cloud.firestore {
         && request.resource.data.keys().hasAll(['householdId','updatedAt'])
         && request.resource.data.householdId is string
         && request.resource.data.householdId.size() <= 100
-        && member(request.resource.data.householdId)
+        && (member(request.resource.data.householdId) ||
+          getAfter(householdPath(request.resource.data.householdId)).data.ownerUid == request.auth.uid)
         && request.resource.data.updatedAt == request.time;
       allow delete: if false;
     }

@@ -5,7 +5,8 @@
   "scripts": {
     "test:unit": "node --test v34-session-core.test.mjs backup/v34-backup-archive.test.mjs backup/v34-restore.test.mjs",
     "test:rules": "firebase emulators:exec --only firestore --project demo-speedrive-v34 \"node --test tests/firestore-rules.test.mjs\"",
-    "test:backup": "node --test backup/v34-backup-archive.test.mjs backup/v34-restore.test.mjs"
+    "test:backup": "node --test backup/v34-backup-archive.test.mjs backup/v34-restore.test.mjs",
+    "test:restore-emulator": "firebase emulators:exec --only firestore --project demo-speedrive-v34 \"node backup/restore-smoke-emulator.mjs\""
   },
   "devDependencies": {
     "firebase": "^13.1.0",

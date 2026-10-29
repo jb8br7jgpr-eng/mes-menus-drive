@@ -20,7 +20,7 @@ function sanitizeName(s) {
 }
 async function main() {
   const uid=sanitizeName(required("SPEEDRIVE_ACCOUNT_UID"));
-  const aesKey=required("SPEEDRIVE_BACKUP_KEY_B64");
+  const encryptionSecret={passphrase:required("SPEEDRIVE_BACKUP_PASSPHRASE")};
   const directory=resolve(required("SPEEDRIVE_BACKUP_OUTPUT_DIR"));
   // Credentials are short-lived and generated from GitHub OIDC.
   // NO long-lived service-account JSON key is loaded or accepted.
@@ -65,9 +65,9 @@ async function main() {
     },
     chunks,photos
   };
-  const archive=encryptOffsiteBackup(bundle,aesKey);
+  const archive=encryptOffsiteBackup(bundle,encryptionSecret);
   // Verify decryption BEFORE a destination considers the file a backup.
-  decryptOffsiteBackup(archive,aesKey);
+  decryptOffsiteBackup(archive,encryptionSecret);
   await mkdir(directory,{recursive:true,mode:0o700});
   const stamp=new Date().toISOString().replace(/[:.]/g,"-");
   const file=join(directory,"speedrive-"+stamp+"-r"+reference.revision+".sdrive");

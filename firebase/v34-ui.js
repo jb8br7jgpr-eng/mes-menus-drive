@@ -5,11 +5,13 @@ import {
   resendVerification, refreshVerifiedAccount
 } from "./v34-auth.js";
 import { previewLocalMigration } from "./v34-model.js";
+import { currentCloudStatus, confirmFirstCloudImport, retryUnconfirmedSave } from "./v34-cloud-runtime.js";
 
 const ENABLE_ACCOUNT_SETUP = false; // DO NOT ENABLE before security tests.
 const root = document.getElementById("v34SyncRoot");
 let user = null, ready = false, mode = "login", loading = false;
 let error = "", info = "", localPreview = null;
+let cloudStatus = {phase:"idle"};
 
 const escapeHtml = value => String(value ?? "").replace(/[&<>"']/g, c =>
   ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[c]));
@@ -36,6 +38,32 @@ function render() {
     <span>${localPreview.weeks} semaines · ${localPreview.records} éléments à transférer</span>
     <span>${localPreview.duplicates} doublon(s) potentiel(s) · ${localPreview.warnings} avertissement(s)</span>
   </div>` : "";
+  let cloudArea = "";
+  if (ready && user?.emailVerified) {
+    const phase=cloudStatus.phase;
+    if(phase==="needs-import") {
+      cloudArea = `<div class="v34-note"><strong>Premier iPhone : transfert initial</strong>
+        <p>Vérifie d'abord le nombre de recettes, produits et photos de cet iPhone.
+        Il deviendra la bibliothèque de référence uniquement après ton accord.
+        Sur le second iPhone, ne fais jamais de transfert initial.</p></div>
+        <button class="v34-button v34-primary" data-v34-action="first-import"
+          ${!ENABLE_ACCOUNT_SETUP||loading||!localPreview||(!localPreview.recipes&&!localPreview.products)?"disabled":""}>
+          Confirmer l'envoi initial vers Firebase
+        </button>`;
+    } else if(phase==="recovery") {
+      cloudArea = `<div class="v34-note"><strong>Modifications locales à récupérer</strong>
+        <p>Une modification n'a pas encore été confirmée sur Firebase.
+        Elle est conservée sur cet iPhone. Réessayer n'écrasera jamais
+        une version plus récente présente sur l'autre iPhone.</p></div>
+        ${button("Réessayer la sauvegarde", "retry-draft", "v34-primary")}
+        <p class="v34-small">Si Firebase a changé entre-temps, le brouillon sera préservé
+        pour une résolution ultérieure, sans suppression automatique.</p>`;
+    } else if(phase==="ready") {
+      cloudArea='<div class="v34-good"><strong>Enregistré sur Firebase</strong><span>Dernière version du serveur confirmée.</span></div>';
+    } else if(phase==="readonly") {
+      cloudArea='<div class="v34-note"><strong>Serveur indisponible</strong><p>Consultation uniquement. Les modifications restent bloquées.</p></div>';
+    }
+  }
   let accountArea = '<p class="v34-muted">Initialisation du compte…</p>';
   if (ready && !user) {
     accountArea = `<p class="v34-muted">Un seul compte familial, utilisé une première fois sur chaque iPhone. La connexion est ensuite mémorisée.</p>
@@ -76,7 +104,7 @@ function render() {
       ${preview}
       ${error ? '<div class="v34-alert v34-error" role="alert">'+escapeHtml(error)+'</div>' : ''}
       ${info ? '<div class="v34-alert" role="status">'+escapeHtml(info)+'</div>' : ''}
-      <div class="v34-body"><h3>Compte commun aux deux iPhone</h3>${accountArea}</div>
+      <div class="v34-body"><h3>Compte commun aux deux iPhone</h3>${accountArea}${cloudArea}</div>
       <div class="v34-foot">Les données et sauvegardes locales de la V33 restent inchangées</div>
     </section>
   </div>`;
@@ -115,6 +143,19 @@ root?.addEventListener("click", e => {
   const modeButton=target.closest("[data-v34-mode]");
   if (modeButton) {mode=modeButton.dataset.v34Mode;render();return;}
   const action=target.closest("[data-v34-action]")?.dataset.v34Action;
+  if (action==="first-import") {
+    if (!ENABLE_ACCOUNT_SETUP || !localPreview || (!localPreview.recipes&&!localPreview.products)) return;
+    if (!confirm("Ce premier iPhone contient-il bien les recettes à conserver ? L'envoi initial sera confirmé sur Firebase avant toute utilisation depuis le second téléphone.")) return;
+    act(async()=>{await confirmFirstCloudImport();info="Bibliothèque initiale enregistrée et confirmée sur Firebase.";});
+    return;
+  }
+  if (action==="retry-draft") {
+    if (!ENABLE_ACCOUNT_SETUP) return;
+    act(async()=>{const result=await retryUnconfirmedSave();info=result?.stale
+      ? "Le serveur possède une version plus récente. Le brouillon est conservé."
+      : "Sauvegarde confirmée sur Firebase.";});
+    return;
+  }
   if (action==="verify") act(async()=>{if(!await refreshVerifiedAccount())throw Error("Adresse e-mail non encore vérifiée.");});
   if (action==="resend") act(async()=>{await resendVerification();info="Courriel renvoyé.";});
   if (action==="logout") act(async()=>{await signOutAccount();info="Compte déconnecté.";});
@@ -135,3 +176,10 @@ document.addEventListener("keydown",e=>{
 },true);
 if(root)observeLogin(account=>{user=account;ready=true;render();},
   e=>{ready=true;error=errorText(e);render();});
+
+window.addEventListener("speedrive-v34-cloud-status",e=>{
+  cloudStatus=e.detail||{phase:"idle"};
+  render();
+});
+// If the panel opens after the sync state was emitted, recover the latest state.
+cloudStatus=currentCloudStatus();

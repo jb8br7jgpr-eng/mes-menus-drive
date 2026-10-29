@@ -1235,7 +1235,7 @@ function refreshMealRecipePicker(){
  if(count)count.textContent=n+' plat'+(n>1?'s':'')+' disponible'+(n>1?'s':'')
 }
 function pickMeal(index){
- const meal=getWeek().meals[index],dishes=mealDishes(meal),leftovers=mealLeftovers(meal),extraDefault=dishes.length?1:4;
+ const meal=getWeek().meals[index],dishes=mealDishes(meal),leftovers=mealLeftovers(meal);
  let out='';
  if(leftovers.length){
   out+='<div class="section-head"><h3>Restes prévus pour ce repas</h3></div>';
@@ -1255,8 +1255,8 @@ function pickMeal(index){
   })
  }
  out+='<div class="field"><label for="mealPeople">'+(dishes.length?'Portions à préparer pour le plat supplémentaire':'Combien de portions veux-tu préparer ?')+'</label>'+
- '<input type="number" id="mealPeople" min="1" max="30" value="'+extraDefault+'">'+
- '<div class="helper">Exemple : 4 portions préparées = 2 mangées à ce repas + 2 restes à placer le jour de ton choix. Pour un repas à deux sans restes, choisis 2. Si vous mangez chacun un plat différent, choisis 1 portion par plat.</div></div>';
+ '<input type="number" id="mealPeople" min="1" max="30" value="" placeholder="Auto : portions de base">'+
+ '<div class="helper">Par défaut, Speedrive utilise les portions de base du plat : 1 ou 2 portions = aucun reste. Saisis 4 pour préparer davantage et prévoir des restes.</div></div>';
  out+='<div class="section-head"><h3>'+ (dishes.length?'Ajouter un autre plat':'Choisir un plat')+'</h3></div>';
  out+='<div class="meal-picker-filters">'+
  '<div class="field"><label for="mealRecipeSearch">Rechercher un plat</label>'+
@@ -1368,7 +1368,7 @@ async function refreshBackupList(){
   $('#snapshotList').innerHTML=rows.length?rows.map(s=>'<div class="shopping-row"><div class="grow"><strong style="font-size:12px">'+html(s.label)+'</strong><div class="shopping-meta">'+new Date(s.time).toLocaleString('fr-FR')+'</div></div><button class="btn tiny secondary" data-action="restore-backup" data-id="'+s.id+'">Restaurer</button></div>').join(''):'Aucune version précédente pour le moment. Elles apparaissent au fil des modifications.';
  }catch(e){box.textContent='Impossible de lire les versions locales.'}
 }
-function peopleInput(){return Math.min(30,Math.max(1,Number($('#mealPeople')?.value)||1))}
+function peopleInput(recipeId){const raw=$('#mealPeople')?.value;const selected=raw===''?Number(recipeById(recipeId)?.people)||2:Number(raw);return Number.isInteger(selected)&&selected>=1&&selected<=30?selected:null}
 function portionInputForDish(dish){
  const n=Number($('[data-dish-qty="'+dish+'"]')?.value);
  return Number.isInteger(n)&&n>0&&n<=30?n:null
@@ -1394,6 +1394,7 @@ function storeMealParts(w,index,parts){
 // Pour un plat de 4 personnes : 2 ici, 2 portions de restes à placer librement.
 function portionsEatenHere(d,dishes){
  const prepared=Math.max(0,Number(d?.people)||0);
+ if(prepared<=2)return prepared; // 1 ou 2 portions préparées : aucun reste, même avec plusieurs plats.
  return Math.min(prepared,prepared>=4?2:(dishes.length===1?2:1))
 }
 function sourceBudget(w,fromIndex,recipeId){
@@ -1806,7 +1807,7 @@ document.addEventListener('click',e=>{
    row.querySelector('.ingredient-unit').value=preferredIngredientUnit(ing);
    refreshIngredientEntry(row);row.querySelector('.ingredient-qty')?.focus()
   }
-  else if(mode==='choose-recipe'){if(!addRecipeToMeal(w,index,id,peopleInput())){toast('Ce plat est déjà présent dans ce repas. Modifie plutôt ses portions.');return}persist();closeModal();renderMealContext(index)}
+  else if(mode==='choose-recipe'){const portions=peopleInput(id);if(portions===null){toast('Choisis entre 1 et 30 portions.');return}if(!addRecipeToMeal(w,index,id,portions)){toast('Ce plat est déjà présent dans ce repas. Modifie plutôt ses portions.');return}persist();closeModal();renderMealContext(index)}
   else if(mode==='choose-leftovers')pickLeftoverSource(index);
   else if(mode==='apply-leftovers'){
    const source=Number(a.dataset.source),qty=Number($('#leftoverPeople')?.value);

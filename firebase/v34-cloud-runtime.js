@@ -19,6 +19,7 @@ const message = {
 };
 let stopAuth = null, session = null, userId = null, refreshing = false;
 let previousStatus = {phase:"idle"};
+let pendingLocalWrite = false;
 let authGeneration = 0;
 let appOptions = null;
 function report(event) {
@@ -54,8 +55,8 @@ function guardEditing(event) {
 async function onUser(user) {
   const generation=++authGeneration;
   if (!appOptions) return;
-  if (!user) { userId=null;session=null;report({phase:"login"});return; }
-  if (!user.emailVerified) { userId=null;session=null;report({phase:"verification"});return; }
+  if (!user) { pendingLocalWrite=false;userId=null;session=null;report({phase:"login"});return; }
+  if (!user.emailVerified) { pendingLocalWrite=false;userId=null;session=null;report({phase:"verification"});return; }
   if (user.uid !== firebaseAuth.currentUser?.uid) return;
   const uid=user.uid;
   userId=uid;
@@ -94,7 +95,7 @@ async function onUser(user) {
   }
 }
 async function resume() {
-  if (refreshing || !session || !userId ||
+  if (refreshing || pendingLocalWrite || !session || !userId ||
       ["saving","loading","recovery","needs-import"].includes(previousStatus.phase)) return;
   refreshing=true;
   try { await session.open(userId); }
@@ -138,10 +139,31 @@ export function setupCloudV34({readLocalState,installCloudState,onStatus}={}) {
   };
 }
 export function currentCloudStatus() { return {...previousStatus}; }
+export function noteLocalWritePending() {
+  if (!session || !userId || pendingLocalWrite || viewBlocked() ||
+      session.status().phase !== "ready")
+    throw Error("Le serveur n'est pas prêt à enregistrer.");
+  // Synchronous: prevents a foreground refresh from replacing the new local
+  // edit while IndexedDB is still persisting the snapshot.
+  pendingLocalWrite = true;
+  report({phase:"saving",localPending:true});
+}
 export async function commitLocalModification(snapshot) {
-  if (!session || !userId) throw Error("Connexion familiale absente.");
-  if (viewBlocked()) throw Error("Le serveur doit être prêt avant toute modification.");
-  return session.save(snapshot);
+  if (!session || !userId || !pendingLocalWrite ||
+      session.status().phase !== "ready")
+    throw Error("Enregistrement non autorisé.");
+  try {
+    return await session.save(snapshot);
+  } finally {
+    pendingLocalWrite = false;
+    // Session emits its own 'ready' or 'recovery' result.
+  }
+}
+export function abortLocalWrite(error) {
+  if (!pendingLocalWrite) return;
+  pendingLocalWrite = false;
+  report({phase:"recovery",error:String(error?.message || error ||
+    "Enregistrement interrompu : reprise nécessaire.")});
 }
 export async function confirmFirstCloudImport() {
   if (!session || previousStatus.phase !== "needs-import")

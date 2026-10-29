@@ -139,7 +139,11 @@ root?.addEventListener("click", event => {
   if (t.closest("[data-v34-toggle-join]")) { showJoin = !showJoin; render(); return; }
   const copyBtn = t.closest("[data-v34-copy]");
   if (copyBtn) {
-    navigator.clipboard?.writeText(copyBtn.dataset.v34Copy).then(
+    if (!navigator.clipboard?.writeText) {
+      setFeedback("Copie manuellement le code affiché.", true);
+      return;
+    }
+    navigator.clipboard.writeText(copyBtn.dataset.v34Copy).then(
       () => setFeedback("Code copié."),
       () => setFeedback("Copie manuellement le code affiché.", true)
     );

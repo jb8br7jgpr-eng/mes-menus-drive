@@ -552,3 +552,19 @@ Périmètre validé : **points 1, 2, 3, 4 et 7 seulement**. Les points 5 (masqua
 Sécurité : aucune modification du calcul des recettes, des portions, de la génération volontaire des courses, des stocks, des produits et du moteur de transfert Carrefour ou Userscripts. `manifest.webmanifest` et les images Speedrive v2 ne sont pas modifiés. Les versions de `app.js` et `styles.css` ont été renouvelées dans le cache PWA.
 
 **Statut** : code sur la branche `v32-confort-navigation-undo` uniquement, et non déployé. Les tests de logique en environnement simulé passent, mais le rendu et les gestes tactiles sur un véritable iPhone restent à vérifier après déploiement.
+
+
+## V33 — Fiches des plats, progression des courses, retour à cette semaine et mémoire des onglets
+
+**Branche de test :** v33-fiches-plats-progression-navigation. Ne pas déployer sans autorisation explicite.
+
+Points approuvés :
+
+1. **Consultation des recettes** : touche la photo ou le nom d'un plat dans le catalogue pour ouvrir une fiche non éditable indiquant la photo (si disponible), le type, le nombre de portions et tous les ingrédients avec leurs quantités, avec accès volontaire à l'éditeur via « Modifier ce plat ». Les boutons Modifier et Dupliquer existants restent disponibles sur les cartes.
+2. **Avancement des courses** : compteur et barre de progression affichant les articles cochés parmi les articles restant dans les courses et ceux déjà cochés. Les articles explicitement exclus et entièrement couverts par le stock maison sont hors dénominateur. Les deux magasins restent séparés dans le résumé existant ; rien n'est coché automatiquement.
+3. **« Revenir à la semaine actuelle »** : raccourci affiché uniquement lorsque la semaine consultée n'est pas celle de la date locale, dans Menus, Courses et Drive, en conservant le bouton « Aujourd'hui » de V32 pour accéder au jour en cours. Aucun changement aux calendriers enregistrés.
+4. **Mémoire de navigation** : mémorisation en mémoire volatile de la position verticale de chacun des cinq onglets, en préservant les variables de recherches et de filtres existantes. La navigation depuis les raccourcis internes est harmonisée ; après génération de la liste, l'écran Courses s'affiche en haut. La mémoire de position des écrans hebdomadaires est réinitialisée lors d'un changement de semaine.
+
+**Sauvegarde iCloud :** l'automatisation silencieuse dans iCloud Drive n'est pas implémentée, la PWA iPhone n'ayant pas d'accès libre au dossier iCloud. Les sauvegardes locales, les points de restauration et l'export JSON existants sont inchangés. L'option d'un rappel discret 30 jours reste à confirmer avec l'utilisateur avant développement.
+
+**Invariant :** aucune modification de la structure des données IndexedDB, de la logique des repas/restes/portions, de la génération volontaire des courses, des magasins, des stocks, du transfert Carrefour, des scripts Safari, des deux fichiers d'identité visuelle V2 ou des dimensions des écrans métiers. La clé du cache PWA a été changée pour charger seulement les nouveaux scripts et styles.

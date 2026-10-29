@@ -66,8 +66,42 @@ async function restoreSnapshot(id){
   normalizeIngredientCatalog();migrateFrequentProducts();migrateLegacyGeneratedCourses();persist();await saveQueue;closeModal();render();toast('Version précédente restaurée !')
  }catch(e){toast('Restauration impossible. Exporte ton JSON si nécessaire.')}
 }
-let toastTimer;
-function toast(message){const el=$('#toast');el.textContent=message;el.classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>el.classList.remove('show'),2800)}
+let toastTimer,pendingWeekUndo=null;
+function toast(message){
+ pendingWeekUndo=null;
+ const el=$('#toast');if(!el)return;
+ el.textContent=message;el.classList.remove('undo-available');el.classList.add('show');
+ clearTimeout(toastTimer);toastTimer=setTimeout(()=>el.classList.remove('show'),2800)
+}
+// Annulation courte et strictement locale : un seul état de semaine en mémoire.
+// N'écrase jamais une action plus récente : comparaison de l'état avant restauration.
+function weekBeforeUndo(){return JSON.parse(JSON.stringify(getWeek()))}
+function toastWeekUndo(message,before,mealIndex=null){
+ const week=currentWeek,after=JSON.stringify(getWeek());
+ pendingWeekUndo={week,before,after,mealIndex,deadline:Date.now()+8000};
+ const el=$('#toast');if(!el)return;
+ el.textContent='';el.classList.add('show','undo-available');
+ const label=document.createElement('span');label.textContent=message;
+ const button=document.createElement('button');button.type='button';button.dataset.action='undo-week';
+ button.className='toast-undo-btn';button.textContent='Annuler';
+ el.append(label,button);
+ clearTimeout(toastTimer);toastTimer=setTimeout(()=>{
+  el.classList.remove('show','undo-available');pendingWeekUndo=null
+ },8000)
+}
+function undoWeekAction(){
+ const u=pendingWeekUndo;pendingWeekUndo=null;
+ if(!u||Date.now()>u.deadline||u.week!==currentWeek||JSON.stringify(getWeek())!==u.after){
+  toast('Annulation indisponible après une autre modification.');return
+ }
+ // Le reste de l'état, dont le catalogue et les recettes, reste intact.
+ state.weeks[u.week]=u.before;
+ persist();closeModal();
+ if(currentTab==='menus'&&Number.isInteger(u.mealIndex))renderMealContext(u.mealIndex);
+ else render(true);
+ toast('Action annulée !')
+}
+
 function render(preserveScroll=false){const scrollY=window.scrollY;document.querySelectorAll('.nav-item').forEach(b=>{const active=b.dataset.tab===currentTab;b.classList.toggle('active',active);if(active)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current')});app.innerHTML=({menus:renderMenus,plats:renderPlats,produits:renderProduits,courses:renderCourses,drive:renderDrive}[currentTab])();window.scrollTo({top:preserveScroll?scrollY:0,behavior:'auto'})}
 function renderMealContext(index){
  render(true);
@@ -1517,6 +1551,7 @@ document.addEventListener('click',e=>{
    w.pantryUnits[x.stockKey]=unit;
    persist();closeModal();render(true);toast('Stock maison déduit des achats !')
   }
+  else if(mode==='undo-week')undoWeekAction();
   else if(mode==='week-prev'||mode==='week-next'){currentWeek=offsetDate(currentWeek,mode==='week-prev'?-7:7);render()}
   else if(mode==='generate-week-courses'){
    const w=getWeek(),status=coursesStatus(w);
@@ -1531,7 +1566,8 @@ document.addEventListener('click',e=>{
    if(!Number.isInteger(day)||day<0||day>6||!w.meals[day*2]&&!w.meals[day*2+1])return;
    if(!confirm('Vider les repas du '+days[day]+' (midi et soir) ? Les éventuels restes liés à ces plats seront aussi retirés. Les recettes et les produits resteront enregistrés.'))return;
    checkpoint('Avant suppression des repas du '+days[day]);
-   clearCalendarDay(w,day);persist();render(true);toast('Repas du '+days[day]+' retirés !')
+   const before=weekBeforeUndo();clearCalendarDay(w,day);persist();render(true);
+   toastWeekUndo('Repas du '+days[day]+' retirés.',before,day*2)
   }
   else if(mode==='clear-week'){
    if(!w.meals.some(Boolean))return;
@@ -1667,7 +1703,8 @@ document.addEventListener('click',e=>{
    const removed=left[li];
    const at=parts.findIndex(p=>p.type==='leftovers'&&p.recipeId===removed.recipeId&&p.fromIndex===removed.fromIndex);
    if(at>=0)parts.splice(at,1);
-   storeMealParts(w,index,parts);persist();closeModal();renderMealContext(index);toast('Restes retirés de ce repas.')
+   const before=weekBeforeUndo();storeMealParts(w,index,parts);persist();closeModal();renderMealContext(index);
+   toastWeekUndo('Restes retirés.',before,index)
   }
   else if(mode==='save-dish-portions'){
    const dishIndex=Number(a.dataset.dish),dishes=mealDishes(w.meals[index]),portions=portionInputForDish(dishIndex);
@@ -1677,9 +1714,14 @@ document.addEventListener('click',e=>{
   else if(mode==='remove-dish'){
    const dishIndex=Number(a.dataset.dish),dishes=mealDishes(w.meals[index]);
    if(!Number.isInteger(dishIndex)||!dishes[dishIndex])return;
-   dishes.splice(dishIndex,1);setMealDishes(w,index,dishes);persist();closeModal();renderMealContext(index);toast('Plat retiré de ce repas.')
+   const before=weekBeforeUndo();dishes.splice(dishIndex,1);setMealDishes(w,index,dishes);persist();closeModal();renderMealContext(index);
+   toastWeekUndo('Plat retiré.',before,index)
   }
-  else if(mode==='remove-meal'){clearMealWithPair(w,index);persist();closeModal();renderMealContext(index)}
+  else if(mode==='remove-meal'){
+   if(!w.meals[index])return;
+   const before=weekBeforeUndo();clearMealWithPair(w,index);persist();closeModal();renderMealContext(index);
+   toastWeekUndo('Repas retiré.',before,index)
+  }
   else if(mode==='complete-week')populate();
   else if(mode==='repeat-week'){const prev=state.weeks[offsetDate(currentWeek,-7)];if(!prev?.meals?.some(Boolean)){toast('Aucun menu trouvé la semaine précédente.');return}if(w.meals.some(Boolean)&&!confirm('Remplacer les repas de cette semaine ?'))return;w.meals=JSON.parse(JSON.stringify(prev.meals));persist();render();toast('Menus de la semaine précédente repris !')}
   else if(mode==='add-extra')extraModal();
@@ -1701,10 +1743,15 @@ document.addEventListener('click',e=>{
   else if(mode==='remove-manual-extra'){
    const entry=w.extras.find(x=>x.id===id);if(!entry)return;
    if(!confirm('Supprimer « '+entry.name+' » des achats manuels de cette semaine ?'))return;
-   w.extras=w.extras.filter(x=>x.id!==id);persist();closeModal();render(true);toast('Ajout manuel retiré de cette semaine.')
+   const before=weekBeforeUndo();w.extras=w.extras.filter(x=>x.id!==id);persist();closeModal();render(true);
+   toastWeekUndo('Article manuel retiré.',before)
   }
   else if(mode==='delete-extra'){w.extras=w.extras.filter(x=>x.id!==id);persist();render()}
-  else if(mode==='exclude'){if(!w.excluded.includes(id))w.excluded.push(id);persist();closeModal();render(true)}
+  else if(mode==='exclude'){
+   if(w.excluded.includes(id))return;
+   const before=weekBeforeUndo();w.excluded.push(id);persist();closeModal();render(true);
+   toastWeekUndo('Article retiré des courses.',before)
+  }
   else if(mode==='include'){w.excluded=w.excluded.filter(x=>x!==id);persist();render(true)}
   else if(mode==='copy-list')copyList();
   else if(mode==='copy-grand-frais')copyGrandFrais();

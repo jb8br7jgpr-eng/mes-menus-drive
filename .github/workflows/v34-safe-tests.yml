@@ -1,0 +1,29 @@
+name: V34 — safe tests only (no deploy)
+on:
+  push:
+    branches: [firebase-v34-cloud-first]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  no-production-access:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout feature branch
+        uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Setup Java for Firestore emulator
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Install test-only dependencies
+        run: npm install --prefix firebase --no-audit --no-fund
+      - name: Unit tests (no network access to Firebase production)
+        run: npm run test:unit --prefix firebase
+      - name: Firestore rules tests (local emulator, fake demo project)
+        run: npm run test:rules --prefix firebase

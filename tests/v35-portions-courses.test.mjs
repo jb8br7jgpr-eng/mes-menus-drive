@@ -104,3 +104,14 @@ test('Vider Grand Frais conserve Carrefour', () => {
   assert.equal(week.generatedIngredients.length,1);
   assert.equal(week.extras[0].id,'extra-lait');
 });
+
+test('Les boutons de magasin précèdent leurs encarts et le bouton global termine Courses', () => {
+  const render=code('renderCourses','grandFraisText');
+  const beforeStore=render.indexOf('data-action="clear-store-courses"');
+  const storeCard=render.indexOf('<section class="course-store');
+  const checked=render.indexOf("if(checked.length)");
+  const global=render.indexOf('data-action="clear-all-courses"');
+  const lastReturn=render.lastIndexOf('return out');
+  assert.ok(beforeStore>=0 && storeCard>beforeStore,'Le bouton magasin doit être hors et au-dessus du cadre.');
+  assert.ok(global>checked && lastReturn>global,'Le bouton global doit se trouver après les listes de courses.');
+});

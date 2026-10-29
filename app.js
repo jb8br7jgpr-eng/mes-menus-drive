@@ -1288,7 +1288,8 @@ function extraOneOffModal(){
  showModal('Article ponctuel',out);
 }
 function settingsModal(){
- let out='<div class="card soft"><strong>Sauvegarde automatique activée</strong><p class="subtext">Chaque modification est enregistrée immédiatement sur cet iPhone. Jusqu’à 10 points de restauration locaux sont conservés automatiquement (espacés d’environ 10 min).</p></div>';
+ let out='<div class="card soft"><strong>Connexion familiale V34</strong><p class="subtext">Préparation de la synchronisation entre deux iPhone. Encore désactivée : tes données restent locales.</p><button type="button" class="btn wide secondary" data-v34-open>Voir la connexion familiale (prototype)</button></div>';
+ out+='<div class="card soft"><strong>Sauvegarde automatique activée</strong><p class="subtext">Chaque modification est enregistrée immédiatement sur cet iPhone. Jusqu’à 10 points de restauration locaux sont conservés automatiquement (espacés d’environ 10 min).</p></div>';
  out+='<div class="section-head"><h3>Versions locales précédentes</h3><button class="btn tiny secondary" data-action="refresh-backups">Actualiser</button></div><div id="snapshotList" class="subtext">Chargement…</div>';
  out+='<div class="note" style="margin:13px 0">Important : ces sauvegardes restent sur ce téléphone. Effacer les données Safari ou perdre l’iPhone peut supprimer l’original et ses copies. Seul un export dans iCloud Drive protège contre cela.</div>';
  out+='<div class="section-head"><h3>Sauvegarde hors du téléphone</h3></div><p class="helper">Exporte régulièrement le JSON dans Fichiers → iCloud Drive : recettes, photos, produits, liens Carrefour, menus et favoris.</p><button class="btn wide" data-action="export-data">↓ Exporter vers Fichiers / iCloud</button>';

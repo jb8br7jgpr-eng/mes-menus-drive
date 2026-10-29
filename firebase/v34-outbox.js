@@ -2,6 +2,7 @@
 // IMPORTANT : queue -> server ONLY through versioned Firestore transactions.
 // No writes are sent by this module unless flushPendingEdits is called explicitly.
 import { commitSharedRecord, SyncConflict, DuplicateRecord } from "./sync-api-v34.js";
+import { firebaseAuth } from "../firebase-v34.js";
 
 const DB_NAME = "speedrive-v34-outbox";
 const STORE = "edits";
@@ -23,6 +24,10 @@ const requireId = value => {
 };
 const idFor = (userUid, householdId, recordId) =>
   JSON.stringify([requireId(userUid), requireId(householdId), requireId(recordId)]);
+function requireOwnAccount(userUid) {
+  if (!firebaseAuth.currentUser || firebaseAuth.currentUser.uid !== userUid)
+    throw Error("Compte Firebase différent : synchronisation refusée.");
+}
 const announce = () => {
   if (typeof window !== "undefined" && typeof CustomEvent !== "undefined")
     window.dispatchEvent(new CustomEvent("speedrive-v34-queue-change"));
@@ -67,6 +72,7 @@ async function listAll() {
   });
 }
 export async function listQueuedEdits(userUid, householdId) {
+  requireOwnAccount(userUid);
   requireId(userUid); requireId(householdId);
   const records = await listAll();
   return records
@@ -76,6 +82,7 @@ export async function listQueuedEdits(userUid, householdId) {
 export async function queueLocalEdit(userUid, householdId, input, expectedVersion = 0) {
   if (!Number.isSafeInteger(expectedVersion) || expectedVersion < 0)
     throw Error("Version de base invalide.");
+  requireOwnAccount(userUid);
   const key = idFor(userUid, householdId, input?.id);
   const kind = requireId(input?.kind);
   if (!input.payload || typeof input.payload !== "object" || Array.isArray(input.payload))
@@ -89,14 +96,21 @@ export async function queueLocalEdit(userUid, householdId, input, expectedVersio
     store.get(key).onsuccess = event => {
       const previous = event.target.result;
       if (previous?.status === "conflict") {
-        tx.abort();
-        return;
+        done({ conflict: true }); return;
       }
-      if (previous && previous.kind !== kind) { tx.abort(); return; }
+      if (previous && previous.kind !== kind) { done({ conflict: true }); return; }
       if (previous && expectedVersion !== previous.expectedVersion &&
           expectedVersion !== previous.expectedVersion + 1) {
         // The caller has an incompatible known server base.
-        tx.abort(); return;
+        done({ conflict: true }); return;
+      }
+      // Unpublished create immediately cancelled: no server record to delete.
+      if (input.deleted && expectedVersion === 0 && !previous) {
+        done({ cancelled: true }); return;
+      }
+      if (input.deleted && previous?.expectedVersion === 0 &&
+          previous.status === "pending" && previous.attempts === 0) {
+        store.delete(key); done({ cancelled: true }); return;
       }
       const updated = {
         key, userUid, householdId, recordId: input.id, kind, payload,
@@ -110,12 +124,10 @@ export async function queueLocalEdit(userUid, householdId, input, expectedVersio
       store.put(updated);
       done(updated);
     };
-  }).catch(error => {
-    if (error?.name === "AbortError") throw new QueuedEditConflict(
-      "Modification déjà en conflit ou version de base incompatible."
-    );
-    throw error;
   });
+  if (saved.conflict) throw new QueuedEditConflict(
+    "Modification déjà en conflit ou version de base incompatible."
+  );
   announce();
   return clone(saved);
 }
@@ -191,6 +203,7 @@ async function settle(entry, result, error = null) {
   announce();
 }
 export async function flushPendingEdits(userUid, householdId, onProgress = () => {}) {
+  requireOwnAccount(userUid);
   requireId(userUid); requireId(householdId);
   if (active) return { busy: true };
   if (typeof navigator !== "undefined" && navigator.onLine === false)
@@ -231,6 +244,7 @@ export async function flushPendingEdits(userUid, householdId, onProgress = () =>
   }
 }
 export async function resolveQueuedConflict(userUid, householdId, recordId, choice, serverVersion) {
+  requireOwnAccount(userUid);
   const key = idFor(userUid, householdId, recordId);
   if (!["keep-local", "discard-local"].includes(choice)) throw Error("Choix invalide.");
   if (choice === "keep-local" && (!Number.isSafeInteger(serverVersion) || serverVersion < 0))
@@ -246,4 +260,34 @@ export async function resolveQueuedConflict(userUid, householdId, recordId, choi
     };
   });
   announce();
+}
+
+/**
+ * Call only after the family account + rules have been activated.
+ * Foreground/online retry; iOS web apps do NOT guarantee background sync
+ * while Safari/the PWA is closed.
+ */
+export function startForegroundQueueSync(userUid, householdId, callback = () => {}) {
+  requireOwnAccount(userUid);
+  const attempt = async () => {
+    if (typeof document !== "undefined" && document.visibilityState === "hidden") return;
+    try { callback(await flushPendingEdits(userUid, householdId)); }
+    catch (error) { callback({ paused: true, error: String(error.message || error) }); }
+  };
+  const onVisible = () => {
+    if (document.visibilityState === "visible") void attempt();
+  };
+  const onOnline = () => { void attempt(); };
+  window.addEventListener("online", onOnline);
+  window.addEventListener("focus", onOnline);
+  document.addEventListener("visibilitychange", onVisible);
+  // Foreground watchdog also retries after leases left by crashed sessions.
+  const timer = window.setInterval(onVisible, 30000);
+  void attempt();
+  return () => {
+    window.removeEventListener("online", onOnline);
+    window.removeEventListener("focus", onOnline);
+    document.removeEventListener("visibilitychange", onVisible);
+    window.clearInterval(timer);
+  };
 }

@@ -159,3 +159,25 @@ inchangée, règles Firebase actuellement `allow read, write: if false;`.
   codés, mais pas de dépôt privé de destination, pas de planification, pas de
   secret configuré et pas de restauration réelle. Ne jamais déclarer les
   sauvegardes automatiques « opérationnelles » à ce stade.
+
+## Préparation des sauvegardes et règles de conservation
+
+- Le logiciel de sauvegarde dispose désormais d'une déclaration de la
+  dépendance serveur `firebase-admin` et d'un outil de restauration
+  **strictement limité à l'émulateur**.
+- Tests unitaires prévus pour la restauration (photos, produits, menus,
+  archive modifiée, mauvaise clé), plus un test bout à bout dans
+  l'émulateur Firebase avec données fictives.
+- Le workflow de tests CI sur `firebase-v34-cloud-first` est configuré
+  pour vérifier aussi le rétablissement depuis une archive chiffrée.
+  **L'exécution GitHub Actions réelle n'est pas encore confirmée ici.**
+- Le modèle de workflow privé quotidien chiffre les archives, envoie
+  une release privée, re-télécharge la copie et en vérifie le SHA-256.
+  Une copie Actions à durée de rétention limitée est prévue.
+  **Modèle NON installé** en dehors de la branche publique.
+- `v34-retention-plan.mjs` propose en lecture seule les suppressions
+  d'anciennes photographies après validation d'une archive externe,
+  en gardant au moins 60 photographies récentes et 14 jours d'historique.
+  Aucun effacement réel n'a été implémenté/autorisé.
+- Le risque de saturation Firestore à long terme subsiste tant que
+  la sauvegarde indépendante et le nettoyage sûr ne sont pas en service.

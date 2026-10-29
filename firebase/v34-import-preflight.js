@@ -10,7 +10,7 @@ function normalized(value) {
 }
 function duplicatedIds(items,label) {
   const seen=new Set(),dupes=new Set();
-  for(const item of items) {
+  for(const item of Array.isArray(items)?items:[]) {
     const id=item?.id;
     if(typeof id!=="string" || !id) continue;
     if(seen.has(id))dupes.add(id);

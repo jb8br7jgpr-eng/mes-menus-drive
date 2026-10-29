@@ -5,6 +5,7 @@ import {
   resendVerification, refreshVerifiedAccount
 } from "./v34-auth.js";
 import { previewLocalMigration } from "./v34-model.js";
+import { inspectFirstCloudImport } from "./v34-import-preflight.js";
 import { currentCloudStatus, confirmFirstCloudImport, retryUnconfirmedSave } from "./v34-cloud-runtime.js";
 
 const ENABLE_ACCOUNT_SETUP = false; // DO NOT ENABLE before security tests.
@@ -32,11 +33,14 @@ function errorText(e) {
 }
 function render() {
   if (!root || !enabled()) return;
-  const preview = localPreview ? `<div class="v34-good">
-    <strong>Analyse locale, sans envoi</strong>
+  const preview = localPreview ? `<div class="${localPreview.canImport?"v34-good":"v34-note"}">
+    <strong>Contrôle local : ${localPreview.canImport?"aucun blocage détecté":"import bloqué"}</strong>
     <span>${localPreview.recipes} recettes · ${localPreview.products} produits · ${localPreview.photos} photos</span>
-    <span>${localPreview.weeks} semaines · ${localPreview.records} éléments à transférer</span>
-    <span>${localPreview.duplicates} doublon(s) potentiel(s) · ${localPreview.warnings} avertissement(s)</span>
+    <span>${localPreview.weeks} semaines · ${localPreview.meals} repas · ${localPreview.records} éléments</span>
+    <span>${localPreview.snapshotBytes===null?"Taille du contenu inconnue":Math.round(localPreview.snapshotBytes/1024)+" Ko de données"} · ${Math.round(localPreview.photoBytes/1024)} Ko de photos</span>
+    <span>${localPreview.chunkCount??"?"} bloc(s) cloud · ${localPreview.duplicates} doublon(s) potentiel(s) · ${localPreview.warnings} avertissement(s)</span>
+    ${localPreview.errors?.length?"<ul>"+localPreview.errors.map(x=>"<li>"+escapeHtml(x)+"</li>").join("")+"</ul>":""}
+    <span class="v34-small">Données analysées sur cet iPhone uniquement. Rien n'a été envoyé.</span>
   </div>` : "";
   let cloudArea = "";
   if (ready && user?.emailVerified) {
@@ -47,7 +51,7 @@ function render() {
         Il deviendra la bibliothèque de référence uniquement après ton accord.
         Sur le second iPhone, ne fais jamais de transfert initial.</p></div>
         <button class="v34-button v34-primary" data-v34-action="first-import"
-          ${!ENABLE_ACCOUNT_SETUP||loading||!localPreview||(!localPreview.recipes&&!localPreview.products)?"disabled":""}>
+          ${!ENABLE_ACCOUNT_SETUP||loading||!localPreview||!localPreview.canImport||(!localPreview.recipes&&!localPreview.products)?"disabled":""}>
           Confirmer l'envoi initial vers Firebase
         </button>`;
     } else if(phase==="recovery") {
@@ -123,28 +127,34 @@ root?.addEventListener("click", e => {
     closePanel();return;
   }
   if (target.closest("[data-v34-preview]")) {
-    try {
-      const state = window.speedriveV34ReadLocalCopy?.();
-      if (!state) throw Error("Speedrive V33 n'est pas encore chargé.");
-      const report = previewLocalMigration(state);
-      localPreview={
-        recipes:state.recipes.length,
-        products:state.products.length,
-        photos:state.recipes.filter(x=>!!x.image).length,
-        weeks:Object.keys(state.weeks||{}).length,
-        records:report.count,
-        warnings:report.warnings.length,
-        duplicates:Object.values(report.duplicates).reduce((n,arr)=>n+arr.length,0)
-      };
-      error="";info="";
-    } catch(err) { error=errorText(err);localPreview=null; }
-    render();return;
+    // Read-only, safe even with ENABLE_ACCOUNT_SETUP=false.
+    if(loading)return;
+    loading=true;error="";info="";render();
+    void (async()=>{
+      try {
+        const state=window.speedriveV34ReadLocalCopy?.();
+        if(!state)throw Error("Speedrive V33 n'est pas encore chargé.");
+        const [raw,preflight]=await Promise.all([
+          Promise.resolve(previewLocalMigration(state)),
+          inspectFirstCloudImport(state)
+        ]);
+        localPreview={
+          ...preflight,
+          records:raw.count,
+          duplicates:Object.values(raw.duplicates).reduce((n,arr)=>n+arr.length,0),
+          warnings:preflight.warnings.length+raw.warnings.length
+        };
+        if(!preflight.canImport)info="L'analyse a détecté un problème à corriger avant le premier transfert.";
+      } catch(err) {error=errorText(err);localPreview=null;}
+      finally {loading=false;render();}
+    })();
+    return;
   }
   const modeButton=target.closest("[data-v34-mode]");
   if (modeButton) {mode=modeButton.dataset.v34Mode;render();return;}
   const action=target.closest("[data-v34-action]")?.dataset.v34Action;
   if (action==="first-import") {
-    if (!ENABLE_ACCOUNT_SETUP || !localPreview || (!localPreview.recipes&&!localPreview.products)) return;
+    if (!ENABLE_ACCOUNT_SETUP || !localPreview?.canImport || (!localPreview.recipes&&!localPreview.products)) return;
     if (!confirm("Ce premier iPhone contient-il bien les recettes à conserver ? L'envoi initial sera confirmé sur Firebase avant toute utilisation depuis le second téléphone.")) return;
     act(async()=>{await confirmFirstCloudImport();info="Bibliothèque initiale enregistrée et confirmée sur Firebase.";});
     return;

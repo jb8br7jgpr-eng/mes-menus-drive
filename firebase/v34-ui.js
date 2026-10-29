@@ -100,6 +100,8 @@ function render() {
         Les modifications seront autorisées uniquement avec une connexion fonctionnelle,
         et affichées comme sauvegardées après confirmation du serveur.</p>
       </div>
+      <button type="button" class="v34-button" data-v34-export>↓ Exporter mon JSON de secours</button>
+      <p class="v34-small">Enregistre le fichier dans Fichiers → iCloud Drive. Aucune donnée n'est envoyée à Firebase.</p>
       <button type="button" class="v34-button" data-v34-preview>Vérifier mes données locales sans les envoyer</button>
       ${preview}
       ${error ? '<div class="v34-alert v34-error" role="alert">'+escapeHtml(error)+'</div>' : ''}
@@ -174,7 +176,22 @@ root?.addEventListener("submit",e=>{
   if(form.dataset.v34Form!=="login") return;
   act(async()=>{await signIn(email,password);});
 });
-document.addEventListener("click",e=>{if(e.target.closest("[data-v34-open]"))openPanel();});
+document.addEventListener("click",e=>{
+  if(e.target.closest("[data-v34-export]")) {
+    try {
+      if(typeof window.speedriveV34ExportLocalCopy!=="function")
+        throw Error("La bibliothèque Speedrive n'est pas encore chargée.");
+      window.speedriveV34ExportLocalCopy();
+      info="Export demandé. Vérifie que le JSON se trouve bien dans iCloud Drive.";
+      if(enabled())render();
+    } catch(err) {
+      error=errorText(err);
+      if(enabled())render();
+    }
+    return;
+  }
+  if(e.target.closest("[data-v34-open]"))openPanel();
+});
 document.addEventListener("keydown",e=>{
   if(e.key==="Escape"&&enabled()){e.stopImmediatePropagation();closePanel();}
 },true);

@@ -119,6 +119,13 @@ export function createCloudSession({cloud, storage, applyServerState, onStatus =
       const remote = await cloud.loadAuthoritativeState();
       const current = remote.status === "empty" ? 0 : remote.revision;
       if (current !== draft.expectedRevision) {
+        // Lost confirmation: the remote commit already contains this exact draft.
+        // After a verified server download we can safely mark it confirmed.
+        if (remote.status === "ready" &&
+            JSON.stringify(remote.state) === JSON.stringify(draft.state)) {
+          await adoptServer(remote);
+          return { recovered: true, revision: current, status: "saved" };
+        }
         update("recovery", { stale: true, serverRevision: current,
           error: "La version du serveur a changé : résolution manuelle nécessaire." });
         return { stale: true, serverRevision: current };

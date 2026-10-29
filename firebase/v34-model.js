@@ -60,10 +60,11 @@ export function previewLocalMigration(oldState) {
     if (!ing?.id) { warnings.push("Un ingrédient sans identifiant nécessite une vérification."); continue; }
     add(records, "ingredient", ing.id, ing);
   }
-  for (const staple of requireItems(oldState, "staples")) {
-    if (!staple?.id) { warnings.push("Un favori sans identifiant nécessite une vérification."); continue; }
-    add(records, "staple", staple.id, staple);
-  }
+  requireItems(oldState, "staples").forEach((staple, index) => {
+    const legacyId = staple?.id || "legacy:" + index;
+    if (!staple?.id) warnings.push("Favori sans identifiant historique : " + index);
+    add(records, "staple", legacyId, staple);
+  });
   for (const [weekId, week] of Object.entries(oldState.weeks || {})) {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(weekId)) { warnings.push("Semaine non reconnue : " + weekId); continue; }
     const { meals, extras, checked, excluded, pantry, pantryUnits, ...metadata } = week;

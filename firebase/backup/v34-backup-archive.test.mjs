@@ -44,3 +44,27 @@ test("no backup with invalid content checksum",()=>{
   invalid.chunks[0]=invalid.chunks[0].replace("Soupe","Pizza");
   assert.throws(()=>encryptOffsiteBackup(invalid,key),/Somme de contrôle/);
 });
+
+test("strong passphrase can encrypt and decrypt complete archives",()=>{
+  const passphrase={passphrase:"lanterne-ocean-nuage-velours-montagne-epice-cerise-baleine-foret"};
+  const bundle=sample();
+  const encrypted=encryptOffsiteBackup(bundle,passphrase);
+  const header=JSON.parse(encrypted.toString("utf8"));
+  assert.equal(header.kdf,"scrypt-v1");
+  assert.equal(Buffer.from(header.salt,"base64").length,16);
+  assert.deepEqual(decryptOffsiteBackup(encrypted,passphrase),bundle);
+  assert.throws(()=>decryptOffsiteBackup(encrypted,
+    {passphrase:"autre-phrase-longue-aleatoire-invalide-de-plus-de-48-caracteres"}));
+});
+test("new passphrase archives use a fresh salt and IV",()=>{
+  const passphrase={passphrase:"lanterne-ocean-nuage-velours-montagne-epice-cerise-baleine-foret"};
+  const a=JSON.parse(encryptOffsiteBackup(sample(),passphrase).toString("utf8"));
+  const b=JSON.parse(encryptOffsiteBackup(sample(),passphrase).toString("utf8"));
+  assert.notEqual(a.salt,b.salt);
+  assert.notEqual(a.iv,b.iv);
+});
+test("short passphrases are rejected; legacy base64 archives remain readable",()=>{
+  assert.throws(()=>encryptOffsiteBackup(sample(),{passphrase:"123456"}),/insuffisante/);
+  const legacy=encryptOffsiteBackup(sample(),key);
+  assert.deepEqual(decryptOffsiteBackup(legacy,key),sample());
+});

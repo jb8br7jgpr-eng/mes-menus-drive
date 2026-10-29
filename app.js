@@ -13,39 +13,6 @@ let state=baseState(), currentTab='menus', currentWeek='', search='', recipeSort
 let pendingRecipeDraftImage='',pendingIngredientLinkId=null;
 let independentProductsOpen=false;const courseOpenSections=new Set();
 const tabScrollV33={menus:0,plats:0,produits:0,courses:0,drive:0};
-let backupExportAttemptedV33=false;
-const ICLOUD_REMINDER_30_DAYS=30*24*60*60*1000;
-function initIcloudReminderV33(){
- if(!state.settings||typeof state.settings!=='object'||Array.isArray(state.settings))state.settings={people:2};
- const r=state.settings.icloudReminderV33;
- if(r&&typeof r==='object'&&!Array.isArray(r)&&Number.isFinite(Number(r.startedAt))&&Number(r.startedAt)>0)return false;
- // Première activation : on ne prétend pas connaître l'historique des exports antérieurs.
- state.settings.icloudReminderV33={startedAt:Date.now(),lastConfirmedAt:0,snoozedUntil:0};
- return true;
-}
-function icloudReminderDueV33(){
- const r=state.settings?.icloudReminderV33;if(!r)return false;
- const anchor=Number(r.lastConfirmedAt)||Number(r.startedAt);
- return Number.isFinite(anchor)&&anchor>0&&Date.now()-anchor>=ICLOUD_REMINDER_30_DAYS&&
-  Date.now()>=(Number(r.snoozedUntil)||0);
-}
-function icloudReminderBannerV33(){
- if(!icloudReminderDueV33())return '';
- return '<section class="icloud-v33-reminder" aria-label="Rappel de sauvegarde iCloud"><div class="icloud-v33-reminder-copy"><strong>☁️ Une sauvegarde iCloud serait utile</strong>'+
-  '<p>Ton iPhone garde tes données, mais une copie dans iCloud Drive les protège si tu changes d’appareil.</p></div>'+
-  '<div class="icloud-v33-reminder-actions"><button class="btn tiny" data-action="backup-now-v33">Exporter ma sauvegarde</button>'+
-  '<button class="btn tiny secondary" data-action="backup-snooze-v33">Plus tard</button></div></section>';
-}
-function confirmIcloudSavedV33(){
- if(!backupExportAttemptedV33){toast('Commence par exporter le fichier avant de confirmer.');return}
- initIcloudReminderV33();
- state.settings.icloudReminderV33.lastConfirmedAt=Date.now();
- state.settings.icloudReminderV33.snoozedUntil=0;
- backupExportAttemptedV33=false;
- persist();closeModal();render(true);
- toast('Sauvegarde iCloud confirmée. Prochain rappel dans 30 jours.');
-}
-
 const app=$('#app'), modalRoot=$('#modalRoot');
 const uid=()=>Math.random().toString(36).slice(2,10)+Date.now().toString(36);
 function localDate(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}
@@ -97,7 +64,7 @@ async function restoreSnapshot(id){
   if(!confirm('Remplacer tes données actuelles par cette sauvegarde locale ?'))return;
   await checkpoint('Avant restauration');
   state={...baseState(),...selected.data,products:Array.isArray(selected.data.products)?selected.data.products:[]};
-  normalizeIngredientCatalog();migrateFrequentProducts();migrateLegacyGeneratedCourses();initIcloudReminderV33();persist();await saveQueue;closeModal();render();toast('Version précédente restaurée !')
+  normalizeIngredientCatalog();migrateFrequentProducts();migrateLegacyGeneratedCourses();persist();await saveQueue;closeModal();render();toast('Version précédente restaurée !')
  }catch(e){toast('Restauration impossible. Exporte ton JSON si nécessaire.')}
 }
 let toastTimer,pendingWeekUndo=null;
@@ -196,7 +163,6 @@ function renderMenus(){const w=getWeek(),count=w.meals.filter(Boolean).length, l
   '<div class="hero-menu-actions">'+
   (count<14?'<button class="btn cream" data-action="complete-week">✦ Générer les repas</button>':'<div class="week-complete-note">✓ Les 14 repas sont renseignés</div>')+
   '<button class="btn hero-repeat-btn" data-action="repeat-week">↻ Reprendre la semaine passée</button></div></div>';
-  out+=icloudReminderBannerV33();
   out+='<div class="section-head week-v32-heading"><h2>Votre semaine</h2><div class="week-v32-heading-actions">'+
   (isThis?'<button class="week-v32-today-link" data-action="jump-today">Aujourd’hui ↓</button>':'')+
   '<span class="pill">'+count+' / 14 repas</span></div></div>';
@@ -1325,14 +1291,7 @@ function settingsModal(){
  let out='<div class="card soft"><strong>Sauvegarde automatique activée</strong><p class="subtext">Chaque modification est enregistrée immédiatement sur cet iPhone. Jusqu’à 10 points de restauration locaux sont conservés automatiquement (espacés d’environ 10 min).</p></div>';
  out+='<div class="section-head"><h3>Versions locales précédentes</h3><button class="btn tiny secondary" data-action="refresh-backups">Actualiser</button></div><div id="snapshotList" class="subtext">Chargement…</div>';
  out+='<div class="note" style="margin:13px 0">Important : ces sauvegardes restent sur ce téléphone. Effacer les données Safari ou perdre l’iPhone peut supprimer l’original et ses copies. Seul un export dans iCloud Drive protège contre cela.</div>';
- const cloud=state.settings?.icloudReminderV33,lastCloud=Number(cloud?.lastConfirmedAt)||0;
- out+='<div class="section-head"><h3>Sauvegarde hors du téléphone</h3></div>'+
-  '<p class="helper">Exporte régulièrement le JSON dans Fichiers → iCloud Drive : recettes, photos, produits, liens Carrefour, menus et favoris.</p>'+
-  '<div class="icloud-v33-settings"><strong>☁️ Rappel de sauvegarde : tous les 30 jours</strong><p>'+
-  (lastCloud?'Dernier enregistrement iCloud confirmé le '+new Date(lastCloud).toLocaleDateString('fr-FR')+'.':
-   'Aucun enregistrement iCloud encore confirmé dans Speedrive. Le rappel commence 30 jours après son activation.')+
-  '</p><small>Le fichier n’est jamais envoyé automatiquement dans iCloud Drive.</small></div>'+
-  '<button class="btn wide" data-action="export-data">↓ Exporter vers Fichiers / iCloud</button>';
+ out+='<div class="section-head"><h3>Sauvegarde hors du téléphone</h3></div><p class="helper">Exporte régulièrement le JSON dans Fichiers → iCloud Drive : recettes, photos, produits, liens Carrefour, menus et favoris.</p><button class="btn wide" data-action="export-data">↓ Exporter vers Fichiers / iCloud</button>';
  out+='<div class="divider"></div><div class="field"><label for="importFile">Restaurer depuis un fichier JSON</label><input id="importFile" type="file" accept=".json,application/json"></div><div class="note">La restauration depuis un fichier remplace les données actuelles.</div>';
  out+='<div class="divider"></div><button class="btn danger wide" data-action="clear-all">Effacer toutes les données locales</button>';
  showModal('Sauvegardes et paramètres',out);refreshBackupList()
@@ -1584,25 +1543,10 @@ function addExtra(e){e.preventDefault();const name=$('#extraName').value.trim(),
   persist();closeModal();render();toast('Article ponctuel ajouté aux courses !')
 }
 async function copyList(){const value=listText();if(!value){toast('Aucun produit à copier.');return}try{await navigator.clipboard.writeText(value);toast('Liste copiée !')}catch(err){showModal('Liste à copier','<p class="helper">Sélectionne le texte ci-dessous pour le copier :</p><textarea class="text-input" style="height:180px" readonly>'+html(value)+'</textarea>')}}
-function exportData(){
- try{
-  const blob=new Blob([JSON.stringify({...state,exportedAt:new Date().toISOString()},null,2)],{type:'application/json'}),
-   url=URL.createObjectURL(blob),a=document.createElement('a');
-  a.href=url;a.download='speedrive-sauvegarde-'+localDate(new Date())+'.json';
-  document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
-  backupExportAttemptedV33=true;
-  showModal('Sauvegarde iCloud',
-   '<div class="icloud-v33-confirm"><strong>Fichier de sauvegarde préparé</strong>'+
-   '<p>Enregistre le fichier JSON téléchargé dans <b>Fichiers → iCloud Drive</b>. Speedrive ne peut pas vérifier automatiquement son emplacement.</p>'+
-   '<button class="btn wide" data-action="backup-confirm-v33">✓ J’ai enregistré le fichier dans iCloud Drive</button>'+
-   '<button class="btn secondary wide" data-action="backup-later-v33">Pas encore</button></div>');
- }catch(err){
-  backupExportAttemptedV33=false;toast('Export impossible. Réessaie depuis les paramètres.');
- }
-}
+function exportData(){const blob=new Blob([JSON.stringify({...state,exportedAt:new Date().toISOString()},null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='mes-menus-drive-sauvegarde-'+localDate(new Date())+'.json';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);toast('Sauvegarde créée. Conserve le fichier !')}
 async function importData(file){if(!file)return;try{if(file.size>25*1024*1024)throw Error('Fichier trop volumineux.');const raw=JSON.parse(await file.text());if(raw.schema!==1||!Array.isArray(raw.recipes)||!raw.weeks||typeof raw.weeks!=='object'||!Array.isArray(raw.staples))throw Error('Format de sauvegarde non reconnu.');
   if(!confirm('Remplacer les données actuelles par celles de ce fichier ?'))return;
-  checkpoint('Avant import JSON');state={schema:1,recipes:raw.recipes,products:Array.isArray(raw.products)?raw.products:[],weeks:raw.weeks,staples:raw.staples,storePreferences:raw.storePreferences&&typeof raw.storePreferences==='object'&&!Array.isArray(raw.storePreferences)?raw.storePreferences:{},ingredientCatalog:Array.isArray(raw.ingredientCatalog)?raw.ingredientCatalog:[],favoritesUnifiedV29:raw.favoritesUnifiedV29===true,coursesExplicitGenerationV1:raw.coursesExplicitGenerationV1===true,settings:{people:2,...raw.settings}};normalizeIngredientCatalog();migrateFrequentProducts();migrateLegacyGeneratedCourses();initIcloudReminderV33();persist();closeModal();render();toast('Sauvegarde restaurée !')
+  checkpoint('Avant import JSON');state={schema:1,recipes:raw.recipes,products:Array.isArray(raw.products)?raw.products:[],weeks:raw.weeks,staples:raw.staples,storePreferences:raw.storePreferences&&typeof raw.storePreferences==='object'&&!Array.isArray(raw.storePreferences)?raw.storePreferences:{},ingredientCatalog:Array.isArray(raw.ingredientCatalog)?raw.ingredientCatalog:[],favoritesUnifiedV29:raw.favoritesUnifiedV29===true,coursesExplicitGenerationV1:raw.coursesExplicitGenerationV1===true,settings:{people:2,...raw.settings}};normalizeIngredientCatalog();migrateFrequentProducts();migrateLegacyGeneratedCourses();persist();closeModal();render();toast('Sauvegarde restaurée !')
 }catch(err){toast(err.message||'Importation impossible.')}}
 document.addEventListener('click',e=>{
  const summary=e.target.closest('summary');
@@ -1871,13 +1815,6 @@ document.addEventListener('click',e=>{
    }
   }
  });persist();closeModal();render();toast('Plat supprimé.')}}
-  else if(mode==='backup-now-v33')exportData();
-  else if(mode==='backup-confirm-v33')confirmIcloudSavedV33();
-  else if(mode==='backup-later-v33'){backupExportAttemptedV33=false;closeModal();render(true)}
-  else if(mode==='backup-snooze-v33'){
-   initIcloudReminderV33();state.settings.icloudReminderV33.snoozedUntil=Date.now()+7*24*60*60*1000;
-   persist();render(true);toast('Rappel reporté de 7 jours.')
-  }
   else if(mode==='export-data')exportData();
   else if(mode==='refresh-backups')refreshBackupList();
   else if(mode==='restore-backup')restoreSnapshot(id);
@@ -1921,7 +1858,6 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal()});
 $('#settingsBtn').addEventListener('click',settingsModal);
 (async function boot(){currentWeek=monday(new Date());try{db=await openDatabase();const stored=await readRecord();if(stored?.schema===1)state={...baseState(),...stored,products:Array.isArray(stored.products)?stored.products:[]}}catch(err){usingFallback=true;try{const raw=localStorage.getItem('menus-drive-backup');if(raw){const saved=JSON.parse(raw);state={...baseState(),...saved,products:Array.isArray(saved.products)?saved.products:[]}}}catch(e){}toast('Mode de sauvegarde local de secours activé.')}
   const ingredientMigration=normalizeIngredientCatalog(),favoriteMigration=migrateFrequentProducts(),courseMigration=migrateLegacyGeneratedCourses();
-  const backupReminderMigration=initIcloudReminderV33();
-  if(ingredientMigration||favoriteMigration||courseMigration||backupReminderMigration)persist();
+  if(ingredientMigration||favoriteMigration||courseMigration)persist();
   render();importCarrefourProductFromHash();if('serviceWorker' in navigator&&location.protocol==='https:')navigator.serviceWorker.register('./sw.js').catch(()=>{});
 })();

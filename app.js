@@ -1011,7 +1011,7 @@ function renderCourses(){
    favorites.map(x=>'<button class="favorite-chip" data-action="frequent-to-courses" data-kind="'+x.kind+'" data-id="'+html(x.id)+'">＋ '+html(x.name)+'</button>').join('')+'</div></details>'
  }
  function section(store,title,icon,rows){
-  const isDrive=store==='carrefour';
+  const isDrive=store==='carrefour',storeCount=items.filter(x=>x.store===store).length;
   let section='<section class="course-store '+(isDrive?'drive':'fresh')+'"><div class="course-store-head"><div><div class="eyebrow">À acheter</div><h2>'+icon+' '+title+'</h2></div><span class="pill">'+rows.length+' article'+(rows.length===1?'':'s')+'</span></div>';
   section+='<button class="btn '+(isDrive?'secondary':'')+' wide" data-action="'+(isDrive?'go-drive':'copy-grand-frais')+'" '+(!rows.length?'disabled':'')+'>'+
    (isDrive?'🛒 Préparer mon panier Carrefour':'📋 Copier Grand Frais dans Notes')+'</button>';
@@ -1021,10 +1021,12 @@ function renderCourses(){
     const other=rows.filter(x=>!order.includes(x.category));if(other.length)section+=other.map(shoppingRow).join('')
    }else section+=rows.map(shoppingRow).join('');
   }else section+='<div class="course-empty">Aucun achat prévu dans ce magasin.</div>';
-  return section+'</section>'
+  section+='<button class="btn tiny secondary wide" data-action="clear-store-courses" data-store="'+store+'" '+(!storeCount?'disabled':'')+'>🗑️ Vider les courses '+title+'</button>';
+   return section+'</section>'
  }
  out+=section('carrefour','Carrefour Drive','🛒',carrefour);
  out+=section('grandfrais','Grand Frais','🥬',grand);
+  out+='<button class="btn danger wide" data-action="clear-all-courses" '+(!items.length?'disabled':'')+'>🗑️ Vider toutes les courses de cette semaine</button>';
  if(checked.length)out+='<details class="course-optional" data-section="checked" '+(courseOpenSections.has('checked')?'open':'')+'><summary>✓ Articles cochés <span class="pill gray">'+checked.length+'</span></summary>'+
   '<p class="helper">Décoche un article pour le remettre dans les achats.</p>'+checked.map(shoppingRow).join('')+'</details>';
  if(covered.length||excluded.length){
@@ -1687,6 +1689,18 @@ document.addEventListener('click',e=>{
    tabScrollV33.menus=0;tabScrollV33.courses=0;tabScrollV33.drive=0;render()
   }
   else if(mode==='week-current')returnToCurrentWeekV33()
+  else if(mode==='clear-store-courses'||mode==='clear-all-courses'){
+   const target=mode==='clear-all-courses'?'all':a.dataset.store;
+   if(!['carrefour','grandfrais','all'].includes(target))return;
+   const rows=shopping().filter(x=>target==='all'||x.store===target);
+   if(!rows.length)return;
+   const label=target==='all'?'toutes les courses':target==='carrefour'?'les courses Carrefour Drive':'les courses Grand Frais';
+   if(!confirm('Vider '+label+' de la semaine du '+niceDate(currentWeek)+' ('+rows.length+' article'+(rows.length>1?'s':'')+') ? Les recettes, les menus, les produits et le stock maison seront conservés.'))return;
+   checkpoint('Avant suppression des courses : '+label);
+   const before=weekBeforeUndo(),count=clearWeekShopping(w,target,rows);
+   if(!count)return;
+   persist();render(true);toastWeekUndo(count+' article'+(count>1?'s':'')+' retiré'+(count>1?'s':'')+' des courses.',before)
+  }
   else if(mode==='generate-week-courses'){
    const w=getWeek(),status=coursesStatus(w);
    if(!hasCookedMeals(w)){toast('Ajoute d’abord un plat aux menus de cette semaine.');return}

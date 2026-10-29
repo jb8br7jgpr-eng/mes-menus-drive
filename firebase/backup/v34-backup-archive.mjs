@@ -21,6 +21,11 @@ function validatedBundle(bundle) {
   if (typeof snapshot.hash!=="string" || snapshot.hash.length!==64 ||
       !Number.isInteger(snapshot.count) || snapshot.count!==chunks.length)
     throw Error("Métadonnées de sauvegarde invalides.");
+  if(snapshot.createdAtMillis !== undefined &&
+     (!Number.isSafeInteger(snapshot.createdAtMillis) ||
+      snapshot.createdAtMillis <= 0 ||
+      snapshot.createdAtMillis > Date.now() + 300000))
+    throw Error("Date de photographie invalide.");
   const text=chunks.join("");
   if (sha256(text)!==snapshot.hash) throw Error("Somme de contrôle des données incorrecte.");
   const json=JSON.parse(text);

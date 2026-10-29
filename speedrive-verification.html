@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="robots" content="noindex, nofollow, noarchive">
+  <meta name="referrer" content="no-referrer">
+  <meta http-equiv="Cache-Control" content="no-store">
+  <title>Speedrive — vérification du compte familial</title>
+  <style>
+    :root{color-scheme:light dark; font-family:system-ui,-apple-system,sans-serif}
+    *{box-sizing:border-box}
+    body{margin:0;min-height:100dvh;display:grid;place-items:center;padding:24px;background:#eef7f3;color:#163c35}
+    main{width:min(100%,430px);background:white;color:#163c35;border-radius:22px;padding:28px;box-shadow:0 14px 45px #0f3b291a}
+    h1{margin:0 0 10px;font-size:1.6rem;line-height:1.2}
+    p{line-height:1.55}
+    .info{color:#43665e;font-size:.94rem}
+    label{display:block;font-weight:650;margin-top:16px}
+    input{display:block;margin-top:6px;padding:13px;width:100%;font:inherit;border:1px solid #b9d1c9;border-radius:11px}
+    button{display:block;width:100%;padding:13px 15px;margin-top:14px;font:inherit;font-weight:700;border:0;border-radius:11px;background:#176e54;color:white;cursor:pointer;min-height:48px}
+    button.secondary{background:#e1f1eb;color:#185941}
+    button:disabled{opacity:.55;cursor:not-allowed}
+    [hidden]{display:none!important}
+    #status{background:#f3f8f6;border-radius:10px;padding:13px 14px;min-height:44px}
+    #status.error{background:#fce8e8;color:#872121}
+    footer{font-size:.78rem;color:#5a716a;margin-top:22px}
+  </style>
+</head>
+<body>
+<main>
+  <h1>Vérifier ton compte Speedrive</h1>
+  <p class="info">Cette page temporaire sert uniquement à confirmer l'adresse e-mail du compte familial Firebase déjà créé. Elle ne peut pas lire ni modifier tes recettes, menus ou courses.</p>
+  <p id="status" role="status" aria-live="polite">Initialisation sécurisée…</p>
+  <form id="loginForm" hidden>
+    <label for="email">Adresse e-mail du compte familial</label>
+    <input id="email" name="email" type="email" required autocomplete="email" autocapitalize="none" spellcheck="false">
+    <label for="password">Mot de passe</label>
+    <input id="password" name="password" type="password" required autocomplete="current-password">
+    <button id="loginButton" type="submit">Se connecter</button>
+  </form>
+  <section id="verifiedActions" hidden>
+    <p id="accountInfo" class="info"></p>
+    <button type="button" id="sendButton">Envoyer le courriel de vérification</button>
+    <button type="button" id="checkButton" class="secondary">J'ai cliqué sur le lien dans mon e-mail</button>
+    <button type="button" id="logoutButton" class="secondary">Se déconnecter</button>
+  </section>
+  <footer>Sans création de compte, sans accès Firestore, sans migration des données V33. N'utilise cette page qu'à l'adresse GitHub Pages officielle de Speedrive.</footer>
+</main>
+<script type="module">
+  import {initializeApp} from "https://www.gstatic.com/firebasejs/13.1.0/firebase-app.js";
+  import {getAuth,setPersistence,browserSessionPersistence,onAuthStateChanged,signInWithEmailAndPassword,sendEmailVerification,reload,getIdToken,signOut}
+    from "https://www.gstatic.com/firebasejs/13.1.0/firebase-auth.js";
+  const app=initializeApp({
+    apiKey:"AIzaSyDzFyZe88EK9GanlWtnOYng-viN4ov2l_o",
+    authDomain:"speedrive-7e77c.firebaseapp.com",
+    projectId:"speedrive-7e77c",
+    appId:"1:667391645783:web:7687cf271b1b13d05d6b12"
+  },"speedrive-verification");
+  const auth=getAuth(app);
+  auth.languageCode="fr";
+  const el=id=>document.getElementById(id);
+  let account=null,busy=false;
+  function status(message,error=false){
+    el("status").textContent=message;
+    el("status").classList.toggle("error",error);
+  }
+  function repaint(){
+    el("loginForm").hidden=!!account;
+    el("verifiedActions").hidden=!account;
+    if(account){
+      el("accountInfo").textContent=account.emailVerified
+        ?"Adresse vérifiée ✅ Tu peux te déconnecter."
+        :"Adresse non encore vérifiée.";
+    }
+    el("loginButton").disabled=busy;
+    el("sendButton").disabled=busy||!!account?.emailVerified;
+    el("checkButton").disabled=busy||!!account?.emailVerified;
+    el("logoutButton").disabled=busy;
+  }
+  const readable=e=>{
+    const known={
+      "auth/invalid-credential":"Identifiants incorrects : vérifie ton e-mail et ton mot de passe.",
+      "auth/too-many-requests":"Trop de tentatives. Réessaie plus tard.",
+      "auth/network-request-failed":"Connexion Internet indisponible.",
+      "auth/unauthorized-domain":"Domaine non autorisé : il faut autoriser GitHub Pages dans Firebase."
+    };
+    return known[e?.code]||"Une erreur Firebase est survenue. Réessaie après avoir vérifié la connexion.";
+  };
+  async function action(fn){
+    if(busy)return;
+    busy=true;repaint();
+    try{await fn();}
+    catch(e){status(readable(e),true);}
+    finally{busy=false;repaint();}
+  }
+  el("loginForm").addEventListener("submit",event=>{
+    event.preventDefault();
+    action(async()=>{
+      const email=el("email").value.trim();
+      const password=el("password").value;
+      await signInWithEmailAndPassword(auth,email,password);
+      el("password").value="";
+    });
+  });
+  el("sendButton").addEventListener("click",()=>action(async()=>{
+    if(!auth.currentUser)throw Error("Compte absent");
+    await sendEmailVerification(auth.currentUser);
+    status("Courriel envoyé. Ouvre ta messagerie, confirme l'adresse puis reviens ici.");
+  }));
+  el("checkButton").addEventListener("click",()=>action(async()=>{
+    const user=auth.currentUser;
+    if(!user)throw Error("Compte absent");
+    await reload(user);
+    if(user.emailVerified){
+      await getIdToken(user,true);
+      status("Adresse e-mail vérifiée ! Tu peux te déconnecter. ✅");
+    } else status("L'adresse n'est pas encore vérifiée. Vérifie aussi tes courriers indésirables.");
+  }));
+  el("logoutButton").addEventListener("click",()=>action(async()=>{
+    await signOut(auth);
+    status("Déconnecté. Ton compte familial est conservé dans Firebase.");
+  }));
+  setPersistence(auth,browserSessionPersistence).then(()=>{
+    onAuthStateChanged(auth,user=>{
+      account=user;
+      repaint();
+      if(user?.emailVerified)status("Adresse e-mail déjà vérifiée. ✅");
+      else if(user)status("Connecté. Tu peux demander ton e-mail de vérification.");
+      else status("Connecte-toi avec le compte familial déjà créé dans Firebase.");
+    },()=>status("Impossible de vérifier la connexion au compte Firebase.",true));
+  }).catch(()=>status("Le navigateur bloque la session Firebase. Réessaie dans Safari.",true));
+</script>
+</body>
+</html>

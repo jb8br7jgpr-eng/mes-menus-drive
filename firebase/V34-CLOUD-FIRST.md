@@ -86,3 +86,43 @@ Une base Firebase fait foi ; la V33 ne doit jamais être écrasée par accident.
 
 **État réel :** code et tests locaux de protocole seulement. V33 en production
 inchangée, règles Firebase actuellement `allow read, write: if false;`.
+
+## Avancement technique complémentaire — préparation sans déploiement
+
+- `firebase/v34-session-core.js` : contrôle des étapes `loading`, `ready`,
+  `saving`, `needs-import`, `recovery`, `readonly`, avec confirmation
+  serveur obligatoire et résolution de brouillon **uniquement sur action explicite**.
+- `firebase/v34-cloud-recovery-store.js` : IndexedDB de récupération séparée,
+  avec copie V33 avant la toute première adoption cloud, état serveur confirmé
+  et brouillons locaux non confirmés.
+- `firebase/v34-cloud-runtime.js` : rafraîchissement à l'ouverture, au retour
+  de premier plan et d'Internet ; verrou visuel des écritures pendant un
+  chargement ou un enregistrement ; détecte une divergence entre le dernier
+  état confirmé et l'IndexedDB local, sans écraser ce brouillon.
+- `app.js` : branchement à `persist()` et à l'ouverture sur la branche V34,
+  **mais le verrou `V34_CLOUD_ACTIVE = false` empêche toute activation**.
+  L'interface de connexion possède aussi son propre verrou
+  `ENABLE_ACCOUNT_SETUP = false`.
+- Les écrans V33, leurs dimensions et la logique des repas et des courses
+  sont conservés ; aucune migration automatique.
+- `firebase/v34-session-core.test.mjs` : sept scénarios de régression
+  exécutés en simulateur ; **7/7 réussis**.
+- `firebase/backup/` : format AES-256-GCM, lecteur contrôlé de la dernière
+  révision Firestore et tests de restauration de fichier ajoutés. Le
+  collecteur demande une identité en lecture et une destination privée.
+  **Aucune tâche automatique configurée, aucune sauvegarde réelle créée.**
+- Tests de syntaxe sur dix modules JS, réussis. Les tests Firestore en
+  émulateur, iPhone et sauvegardes chiffrées Node ne sont pas encore
+  exécutés dans le véritable environnement cible.
+
+### Ce qui manque toujours pour rendre la V34 utilisable
+
+1. Valider les règles en émulateur et tester leur publication.
+2. Mettre en service le compte familial et tester la PWA sur deux iPhone.
+3. Créer la destination **privée** et activer un vrai export automatique
+   indépendant et chiffré avec restauration complète vérifiée.
+4. Vérifier limites de stockage (photos et historique), duplications,
+   migration initiale et interface de récupération.
+5. Obtenir l'accord explicite avant d'activer les verrous, fusionner ou
+   déployer ; la V33 et les données de l'utilisateur restent intactes.
+

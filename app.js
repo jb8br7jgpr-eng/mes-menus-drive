@@ -47,6 +47,13 @@ let v34CloudRuntime = null;
 let saveQueue=Promise.resolve(),saveError=false;
 function persist(){
  const snapshot=JSON.parse(JSON.stringify(state));
+ let cloudPendingError=null;
+ if(V34_CLOUD_ACTIVE){
+  try{
+   if(!v34CloudRuntime)throw Error('Connexion cloud indisponible.');
+   v34CloudRuntime.noteLocalWritePending();
+  }catch(e){cloudPendingError=e}
+ }
  if(usingFallback){
   try{localStorage.setItem('menus-drive-backup',JSON.stringify(snapshot));
     saveError=V34_CLOUD_ACTIVE;
@@ -58,11 +65,12 @@ function persist(){
   await writeRecord(snapshot);
   try{await writeSnapshot(snapshot)}catch(e){/* Historique local facultatif. */}
   if(V34_CLOUD_ACTIVE){
-   if(!v34CloudRuntime)throw Error('Connexion serveur non initialisée.');
+   if(cloudPendingError)throw cloudPendingError;
    await v34CloudRuntime.commitLocalModification(snapshot);
   }
   saveError=false;
  }).catch(err=>{
+  if(V34_CLOUD_ACTIVE) v34CloudRuntime?.abortLocalWrite(err);
   saveError=true;
   toast(V34_CLOUD_ACTIVE
    ? 'Sauvegarde cloud NON confirmée. Brouillon conservé sur ce téléphone.'

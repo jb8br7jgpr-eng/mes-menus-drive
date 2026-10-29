@@ -1288,13 +1288,51 @@ function extraOneOffModal(){
  showModal('Article ponctuel',out);
 }
 function settingsModal(){
- let out='<div class="card soft"><strong>Sauvegarde automatique activée</strong><p class="subtext">Chaque modification est enregistrée immédiatement sur cet iPhone. Jusqu’à 10 points de restauration locaux sont conservés automatiquement (espacés d’environ 10 min).</p></div>';
+ let out='<div class="card soft"><strong>Préparer Speedrive V34</strong><p class="subtext">Vérifie que les recettes, photos et menus de CET iPhone peuvent être conservés sur Firebase. Analyse entièrement locale, sans connexion ni transfert.</p><button class="btn wide secondary" data-action="v34-audit-local">🔍 Vérifier ma bibliothèque sans rien envoyer</button><p class="helper">V34 non activée : tes données restent sur ce téléphone.</p></div>';
+ out+='<div class="card soft"><strong>Sauvegarde automatique activée</strong><p class="subtext">Chaque modification est enregistrée immédiatement sur cet iPhone. Jusqu’à 10 points de restauration locaux sont conservés automatiquement (espacés d’environ 10 min).</p></div>';
  out+='<div class="section-head"><h3>Versions locales précédentes</h3><button class="btn tiny secondary" data-action="refresh-backups">Actualiser</button></div><div id="snapshotList" class="subtext">Chargement…</div>';
  out+='<div class="note" style="margin:13px 0">Important : ces sauvegardes restent sur ce téléphone. Effacer les données Safari ou perdre l’iPhone peut supprimer l’original et ses copies. Seul un export dans iCloud Drive protège contre cela.</div>';
  out+='<div class="section-head"><h3>Sauvegarde hors du téléphone</h3></div><p class="helper">Exporte régulièrement le JSON dans Fichiers → iCloud Drive : recettes, photos, produits, liens Carrefour, menus et favoris.</p><button class="btn wide" data-action="export-data">↓ Exporter vers Fichiers / iCloud</button>';
  out+='<div class="divider"></div><div class="field"><label for="importFile">Restaurer depuis un fichier JSON</label><input id="importFile" type="file" accept=".json,application/json"></div><div class="note">La restauration depuis un fichier remplace les données actuelles.</div>';
  out+='<div class="divider"></div><button class="btn danger wide" data-action="clear-all">Effacer toutes les données locales</button>';
  showModal('Sauvegardes et paramètres',out);refreshBackupList()
+}
+// V34 preflight stage: strictly READ-ONLY and only on explicit button press.
+// Nothing imported here can read Firebase credentials or call Firestore.
+async function showV34ReadOnlyAudit(){
+ const copy=JSON.parse(JSON.stringify(state)); // do not modify or expose live state
+ showModal('Contrôle local Speedrive V34',
+  '<div class="card soft" id="v34-audit-progress"><strong>Analyse locale en cours…</strong><p class="subtext">Aucune donnée envoyée. Les recettes et les photos restent sur cet iPhone.</p></div>');
+ try {
+  // Dynamic import ensures V33 does not load V34 scripts during normal use.
+  const {inspectFirstCloudImport}=await import('./firebase/v34-import-preflight.js?v=readonly-1');
+  const report=await inspectFirstCloudImport(copy);
+  // If the user has closed the modal in the meantime, do not reopen it.
+  if(!$('#v34-audit-progress'))return;
+  const size=n=>Math.round(n/1024)+' Ko';
+  const line=(label,value)=>'<div class="shopping-row"><span class="grow">'+label+'</span><strong>'+value+'</strong></div>';
+  let body='<div class="card soft"><strong>'+
+    (report.canImport?'✅ Format compatible avec le futur import':'⚠️ Vérification nécessaire avant le futur import')+
+    '</strong><p class="subtext">Ce contrôle porte sur la bibliothèque de cette instance de Speedrive. Aucun fichier créé, aucun téléchargement et aucun envoi Firebase.</p></div>';
+  body+='<div class="card">'+
+    line('Recettes',report.recipes)+line('Produits',report.products)+
+    line('Ingrédients',report.ingredients)+line('Photos',report.photos)+
+    line('Semaines',report.weeks)+line('Repas renseignés',report.meals)+
+    line('Taille des photos',size(report.photoBytes))+
+    line('Données hors photos',report.snapshotBytes===null?'À vérifier':size(report.snapshotBytes))+
+    line('Blocs prévus',report.chunkCount??'—')+
+    line('Avertissements',report.warnings.length)+
+    line('Anomalies bloquantes',report.errors.length)+'</div>';
+  if(report.errors.length)body+='<div class="note">Certains éléments devront être examinés avant de lancer la migration. Aucune donnée n\'a été supprimée. Tu peux me donner les nombres ci-dessus sans communiquer tes recettes ou photos.</div>';
+  body+='<p class="helper">Ce résultat ne confirme pas encore la sauvegarde sur le serveur. L\'application V33 fonctionne toujours uniquement en local.</p>';
+  body+='<button type="button" class="btn wide secondary" data-action="v34-audit-back">← Retour aux paramètres</button>';
+  showModal('Contrôle local Speedrive V34',body);
+ }catch(_error){
+  if(!$('#v34-audit-progress'))return;
+  showModal('Contrôle local Speedrive V34',
+   '<div class="note">Le contrôle est indisponible. Aucun contenu n\'a été modifié ou envoyé. Vérifie la connexion Internet et réessaie.</div>'+
+   '<button type="button" class="btn wide secondary" data-action="v34-audit-back">← Retour aux paramètres</button>');
+ }
 }
 async function refreshBackupList(){
  const box=$('#snapshotList');if(!box)return;
@@ -1560,7 +1598,10 @@ document.addEventListener('click',e=>{
  }
  const tab=e.target.closest('[data-tab]');if(tab){switchTabV33(tab.dataset.tab);return}
   const a=e.target.closest('[data-action]');if(!a){if(e.target.matches('[data-overlay]'))closeModal();return}
-  const mode=a.dataset.action,index=Number(a.dataset.index),w=getWeek(),id=a.dataset.id;
+  const mode=a.dataset.action;
+  if(mode==='v34-audit-local'){void showV34ReadOnlyAudit();return}
+  if(mode==='v34-audit-back'){settingsModal();return}
+  const index=Number(a.dataset.index),w=getWeek(),id=a.dataset.id;
   if(mode==='close-modal')closeModal();
   else if(mode==='go-courses')switchTabV33('courses');
   else if(mode==='go-drive')switchTabV33('drive');

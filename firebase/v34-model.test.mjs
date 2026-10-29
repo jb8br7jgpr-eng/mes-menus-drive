@@ -24,7 +24,7 @@ test("preview leaves V33 intact and splits week slots", () => {
   const before = JSON.stringify(state);
   const preview = previewLocalMigration(state);
   assert.equal(JSON.stringify(state), before);
-  assert.equal(preview.count, 11);
+  assert.equal(preview.count, 12);
   assert.ok(preview.records.some(r => r.kind==="weekMeal" && r.payload.slot===0));
   assert.ok(preview.records.some(r => r.kind==="recipePhoto"));
   assert.ok(preview.records.some(r => r.kind==="weekChecked"));

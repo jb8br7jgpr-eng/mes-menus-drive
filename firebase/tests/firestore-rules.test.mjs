@@ -1,5 +1,6 @@
 // Safe emulator-only tests. Project name "demo-" cannot write to production.
 import { before, beforeEach, after, test } from "node:test";
+import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { initializeTestEnvironment, assertFails, assertSucceeds } from "@firebase/rules-unit-testing";
 import { collection, doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, serverTimestamp } from "firebase/firestore";

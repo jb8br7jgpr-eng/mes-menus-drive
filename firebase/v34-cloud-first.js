@@ -121,6 +121,17 @@ export async function saveAuthoritativeState(nextState, expectedRevision, previo
   const duplicateEntries=detectNewDuplicates(previousState,nextState);
   if (duplicateEntries.length && expectedRevision > 0) throw new CloudDuplicate(duplicateEntries);
 
+  // Reject obviously stale requests BEFORE uploading a multi-document snapshot.
+  // The transaction below is still required to cover concurrent changes.
+  const currentHead=await serverRead(()=>getDocFromServer(path.head));
+  const currentRevision=currentHead.exists()?currentHead.data().revision:0;
+  if (currentRevision!==expectedRevision) throw new CloudStaleVersion(currentRevision);
+  if (expectedRevision>0 && JSON.stringify(previousState)===JSON.stringify(nextState)) {
+    // No state change: don't waste Firestore document writes/storage.
+    return {status:"saved",revision:currentRevision,
+      snapshotId:currentHead.data().snapshotId,unchanged:true};
+  }
+
   const pack=await packState(nextState), snapshotId=crypto.randomUUID();
   if (pack.count > 25) throw Error("Trop de blocs pour une sauvegarde atomique.");
   await uploadPhotos(path,pack.photos,uid);

@@ -66,6 +66,17 @@ export function createCloudSession({cloud, storage, applyServerState, onStatus =
     await storage.saveDraft(owner, draft);
     const result = await cloud.saveAuthoritativeState(clean,base,
       firstImport ? null : confirmed,{ allowInitialImport: firstImport });
+    // First-ever migration is irreversible as the cloud reference. Before
+    // announcing success, download and verify the actual complete server state.
+    // If the acknowledgement or readback is lost, the local draft remains
+    // durable and retryDraft() resolves it without uploading a second copy.
+    if(firstImport){
+      const readback=await cloud.loadAuthoritativeState();
+      if(readback.status!=="ready" ||
+         readback.revision!==result.revision ||
+         JSON.stringify(readback.state)!==JSON.stringify(clean))
+        throw Error("Premier transfert non confirmé : téléchargement serveur différent.");
+    }
     // A confirmed server save can still be followed by a local storage error;
     // keeping the draft ensures the next launch can resolve that case safely.
     await storage.saveConfirmed(owner,clean,result.revision);

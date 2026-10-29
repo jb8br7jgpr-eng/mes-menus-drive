@@ -1,7 +1,7 @@
 // V34 cloud-first : panneau simplifié, non activé tant que les
 // tests Firebase et la sauvegarde indépendante ne sont pas validés.
 import {
-  observeLogin, signUp, signIn, signOutAccount,
+  observeLogin, signIn, signOutAccount,
   resendVerification, refreshVerifiedAccount
 } from "./v34-auth.js";
 import { previewLocalMigration } from "./v34-model.js";
@@ -10,7 +10,7 @@ import { currentCloudStatus, confirmFirstCloudImport, retryUnconfirmedSave } fro
 
 const ENABLE_ACCOUNT_SETUP = false; // DO NOT ENABLE before security tests.
 const root = document.getElementById("v34SyncRoot");
-let user = null, ready = false, mode = "login", loading = false;
+let user = null, ready = false, loading = false;
 let error = "", info = "", localPreview = null;
 let cloudStatus = {phase:"idle"};
 
@@ -70,17 +70,13 @@ function render() {
   }
   let accountArea = '<p class="v34-muted">Initialisation du compte…</p>';
   if (ready && !user) {
-    accountArea = `<p class="v34-muted">Un seul compte familial, utilisé une première fois sur chaque iPhone. La connexion est ensuite mémorisée.</p>
-      <div class="v34-switch">
-        <button type="button" data-v34-mode="login" class="${mode==="login"?"selected":""}">Connexion</button>
-        <button type="button" data-v34-mode="register" class="${mode==="register"?"selected":""}">Première inscription</button>
-      </div>
-      <form class="v34-form" data-v34-form="${mode}">
-        <label>Adresse e-mail<input required type="email" name="email" autocomplete="email"></label>
+    accountArea = `<p class="v34-muted">Un seul compte familial, déjà créé dans Firebase. Connecte ce même compte sur chacun des deux iPhone : la session restera mémorisée.</p>
+      <form class="v34-form" data-v34-form="login">
+        <label>Adresse e-mail<input required type="email" name="email" autocomplete="email" autocapitalize="none" spellcheck="false"></label>
         <label>Mot de passe<input required type="password" name="password" minlength="8"
-          autocomplete="${mode==="register"?"new-password":"current-password"}"></label>
+          autocomplete="current-password"></label>
         <button type="submit" class="v34-button v34-primary"
-          ${!ENABLE_ACCOUNT_SETUP||loading?"disabled":""}>${mode==="register"?"Créer le compte familial":"Se connecter"}</button>
+          ${!ENABLE_ACCOUNT_SETUP||loading?"disabled":""}>Se connecter au compte familial</button>
       </form>`;
   } else if (ready && !user.emailVerified) {
     accountArea = `<p class="v34-muted">Compte : <strong>${escapeHtml(user.email)}</strong></p>
@@ -150,8 +146,6 @@ root?.addEventListener("click", e => {
     })();
     return;
   }
-  const modeButton=target.closest("[data-v34-mode]");
-  if (modeButton) {mode=modeButton.dataset.v34Mode;render();return;}
   const action=target.closest("[data-v34-action]")?.dataset.v34Action;
   if (action==="first-import") {
     if (!ENABLE_ACCOUNT_SETUP || !localPreview?.canImport || (!localPreview.recipes&&!localPreview.products)) return;
@@ -177,8 +171,8 @@ root?.addEventListener("submit",e=>{
   if (!ENABLE_ACCOUNT_SETUP) return;
   const data=new FormData(form);
   const email=String(data.get("email")||"").trim(), password=String(data.get("password")||"");
-  if(form.dataset.v34Form==="login") act(async()=>{await signIn(email,password);});
-  else act(async()=>{await signUp(email,password);info="Vérifie le message de confirmation dans tes e-mails.";});
+  if(form.dataset.v34Form!=="login") return;
+  act(async()=>{await signIn(email,password);});
 });
 document.addEventListener("click",e=>{if(e.target.closest("[data-v34-open]"))openPanel();});
 document.addEventListener("keydown",e=>{

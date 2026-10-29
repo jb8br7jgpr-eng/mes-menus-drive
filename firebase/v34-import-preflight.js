@@ -72,3 +72,17 @@ export async function inspectFirstCloudImport(state) {
   // return that package to any UI or logs: only aggregate measurements.
   return result;
 }
+
+/** Mandatory just-in-time gate before the very first real server write.
+ * A previous UI preview must never substitute for inspecting the actual state.
+ */
+export async function assertFirstCloudImportReady(state) {
+  const report=await inspectFirstCloudImport(state);
+  if(!report.canImport) {
+    throw Error("Premier transfert bloqué : " +
+      (report.errors[0]||"contrôle de sécurité incomplet."));
+  }
+  if(!report.recipes && !report.products)
+    throw Error("Premier transfert bloqué : bibliothèque vide ou appareil incorrect.");
+  return report;
+}

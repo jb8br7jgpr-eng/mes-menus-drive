@@ -1,0 +1,25 @@
+# Diagnostic uniquement. Aucun accès Firestore, aucune sauvegarde créée.
+# Le fournisseur Google Cloud est limité à refs/heads/main et workflow_dispatch.
+# Déploiement de ce seul fichier sur main explicitement autorisé.
+name: Speedrive — test OIDC lecture seule
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+  id-token: write
+jobs:
+  verify-backup-reader:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Authentification Google Cloud sans clé privée
+        id: google-auth
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: projects/667391645783/locations/global/workloadIdentityPools/speedrive-backups/providers/github-private-repo
+          service_account: speedrive-backup-reader@speedrive-7e77c.iam.gserviceaccount.com
+          token_format: access_token
+          access_token_lifetime: 300s
+      - name: Confirmer le succès sans accéder aux données
+        if: ${{ steps.google-auth.outcome == 'success' }}
+        run: echo "OIDC OK — aucune donnée Speedrive consultée, aucun export lancé."

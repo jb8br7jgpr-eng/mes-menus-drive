@@ -1,3 +1,6 @@
+// OBSOLETE: prototype V34 multi-comptes, ne pas publier.
+// La nouvelle architecture utilise firebase/firestore-cloud-first.rules.
+
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {

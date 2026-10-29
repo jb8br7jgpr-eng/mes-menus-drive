@@ -1287,6 +1287,8 @@ function extraOneOffModal(){
  '<button class="btn secondary wide" data-action="add-extra" style="margin-top:9px">← Rechercher un produit</button>';
  showModal('Article ponctuel',out);
 }
+// V34 branch only: read-only copy for migration preview; NEVER uploads any local data.
+window.speedriveV34ReadLocalCopy = () => JSON.parse(JSON.stringify(state));
 function settingsModal(){
  let out='<div class="card soft"><strong>Connexion familiale V34</strong><p class="subtext">Préparation de la synchronisation entre deux iPhone. Encore désactivée : tes données restent locales.</p><button type="button" class="btn wide secondary" data-v34-open>Voir la connexion familiale (prototype)</button></div>';
  out+='<div class="card soft"><strong>Sauvegarde automatique activée</strong><p class="subtext">Chaque modification est enregistrée immédiatement sur cet iPhone. Jusqu’à 10 points de restauration locaux sont conservés automatiquement (espacés d’environ 10 min).</p></div>';

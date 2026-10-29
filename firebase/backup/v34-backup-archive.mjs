@@ -1,7 +1,7 @@
 // Speedrive V34 — encrypted offsite backup format for trusted server-side jobs.
 // Node.js only. This file NEVER runs inside the public GitHub Pages frontend.
 // NO secret keys, Firebase service credentials, or private recipes in the repository.
-import { randomBytes, createCipheriv, createDecipheriv, createHash } from "node:crypto";
+import { randomBytes, createCipheriv, createDecipheriv, createHash, scryptSync } from "node:crypto";
 import { gzipSync, gunzipSync } from "node:zlib";
 
 const FORMAT = "speedrive-offsite-backup-v1";
@@ -12,6 +12,35 @@ const checkKey = key => {
   if (bytes.length!==32) throw Error("Clé de sauvegarde AES-256 invalide (32 octets).");
   return bytes;
 };
+const SCRYPT = {N:32768,r:8,p:1,maxmem:64*1024*1024};
+const minPassphrase = candidate => {
+  if (typeof candidate!=="string" || candidate.length<48 ||
+      candidate.length>1024 || candidate.trim()!==candidate)
+    throw Error("Phrase secrète insuffisante : utilise une phrase aléatoire d'au moins 48 caractères.");
+  return candidate;
+};
+const deriveKey = (passphrase,salt) =>
+  scryptSync(minPassphrase(passphrase),salt,32,SCRYPT);
+function secretForEncryption(secret) {
+  if (secret && typeof secret==="object" && !Buffer.isBuffer(secret) &&
+      typeof secret.passphrase==="string") {
+    const salt=randomBytes(16);
+    return {key:deriveKey(secret.passphrase,salt),
+      header:{kdf:"scrypt-v1",salt:salt.toString("base64")}};
+  }
+  return {key:checkKey(secret),header:{}};
+}
+function secretForDecryption(header,secret) {
+  if (header.kdf==="scrypt-v1") {
+    if (!secret || typeof secret!=="object" || typeof secret.passphrase!=="string")
+      throw Error("Cette archive exige la phrase secrète de sauvegarde.");
+    const salt=Buffer.from(header.salt||"","base64");
+    if(salt.length!==16)throw Error("Sel cryptographique invalide.");
+    return deriveKey(secret.passphrase,salt);
+  }
+  if (header.kdf!==undefined)throw Error("Format cryptographique inconnu.");
+  return checkKey(secret);
+}
 function validatedBundle(bundle) {
   if (!bundle || bundle.format!=="speedrive-firestore-bundle-v1")
     throw Error("Format d'archive Firestore invalide.");
@@ -42,7 +71,7 @@ function validatedBundle(bundle) {
 }
 export function encryptOffsiteBackup(bundle,encodedKey) {
   validatedBundle(bundle);
-  const key=checkKey(encodedKey);
+  const {key,header}=secretForEncryption(encodedKey);
   const data=Buffer.from(JSON.stringify({
     format:FORMAT,createdAt:new Date().toISOString(),bundle
   }),"utf8");
@@ -54,6 +83,7 @@ export function encryptOffsiteBackup(bundle,encodedKey) {
   // Non-secret header, authenticated by AES-GCM associated data.
   return Buffer.from(JSON.stringify({
     format:FORMAT,alg:"AES-256-GCM",compression:"gzip",
+    ...header,
     iv:iv.toString("base64"),tag:tag.toString("base64"),
     data:encrypted.toString("base64")
   }),"utf8");
@@ -62,7 +92,7 @@ export function decryptOffsiteBackup(archiveBytes,encodedKey) {
   const obj=JSON.parse(Buffer.from(archiveBytes).toString("utf8"));
   if(obj.format!==FORMAT || obj.alg!=="AES-256-GCM" ||
      obj.compression!=="gzip")throw Error("Format de sauvegarde chiffrée invalide.");
-  const key=checkKey(encodedKey);
+  const key=secretForDecryption(obj,encodedKey);
   const iv=Buffer.from(obj.iv,"base64"),tag=Buffer.from(obj.tag,"base64");
   if(iv.length!==12 || tag.length!==16)throw Error("En-tête chiffré invalide.");
   const decipher=createDecipheriv("aes-256-gcm",key,iv);

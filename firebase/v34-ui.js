@@ -6,11 +6,12 @@ import {
   refreshVerifiedAccount, findMyHousehold, createHousehold,
   connectHousehold, addSecondPhone
 } from "./sync-api-v34.js";
+import { previewLocalMigration } from "./v34-model.js";
 
 const ENABLE_ACCOUNT_SETUP = false; // NE PAS activer avant validation + règles publiées.
 const root = document.getElementById("v34SyncRoot");
 let account = null, household = null, loading = false, error = "", info = "";
-let authReady = false, view = "login", showJoin = false;
+let authReady = false, view = "login", showJoin = false, previewReport = null;
 
 function esc(value) {
   return String(value ?? "").replace(/[&<>"']/g, char =>
@@ -28,7 +29,14 @@ function btn(label, action, options = "") {
 function render() {
   if (!root || !visible()) return;
   const setupNotice = !ENABLE_ACCOUNT_SETUP
-    ? '<div class="v34-note"><strong>Prototype V34 non activé</strong><p>Les comptes et les échanges ne sont pas encore disponibles. Les règles Firebase restent volontairement verrouillées. Aucune donnée de la V33 ne sera envoyée.</p></div>' : '';
+    ? `<div class="v34-note"><strong>Prototype V34 non activé</strong><p>Les comptes et les échanges ne sont pas encore disponibles. Les règles Firebase restent volontairement verrouillées. Aucune donnée de la V33 ne sera envoyée.</p></div>
+      <button class="v34-button" type="button" data-v34-preview>Analyser mes données locales sans les envoyer</button>
+      ${previewReport ? `<div class="v34-good" role="status"><strong>Contrôle local — aucun envoi</strong>
+        <span>${previewReport.recipes} recettes · ${previewReport.products} produits · ${previewReport.photos} photos</span>
+        <span>${previewReport.weeks} semaines · ${previewReport.records} éléments préparables</span>
+        <span>${previewReport.duplicates} doublon(s) potentiel(s) · ${previewReport.warnings} avertissement(s)</span>
+        <span class="v34-small">Aucune donnée importée, aucune règle Firebase modifiée.</span>
+      </div>` : ""}` : '';
   let body = "";
   if (!authReady) {
     body = '<p class="v34-muted">Chargement de la session…</p>';
@@ -133,6 +141,24 @@ root?.addEventListener("click", event => {
   const t = event.target;
   if (t === root.querySelector("[data-v34-overlay]") || t.closest("[data-v34-close]")) {
     closePanel(); return;
+  }
+  if (t.closest("[data-v34-preview]")) {
+    try {
+      const copy = window.speedriveV34ReadLocalCopy?.();
+      if (!copy) throw Error("Les données V33 ne sont pas encore chargées.");
+      const result = previewLocalMigration(copy);
+      previewReport = {
+        recipes: (copy.recipes || []).length,
+        products: (copy.products || []).length,
+        photos: (copy.recipes || []).filter(x => !!x.image).length,
+        weeks: Object.keys(copy.weeks || {}).length,
+        records: result.count,
+        duplicates: Object.values(result.duplicates).reduce((n, rows) => n + rows.length, 0),
+        warnings: result.warnings.length
+      };
+      error = ""; info = "";
+    } catch (e) { previewReport = null; error = String(e.message || e); }
+    render(); return;
   }
   const viewBtn = t.closest("[data-v34-view]");
   if (viewBtn) { view = viewBtn.dataset.v34View; error = ""; info = ""; render(); return; }

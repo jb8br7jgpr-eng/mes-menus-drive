@@ -181,7 +181,7 @@ function renderMenus(){const w=getWeek(),count=w.meals.filter(Boolean).length, l
   out+='<p class="helper">Choisis librement quand manger les restes : touche le repas souhaité, puis « Placer des restes ici ». La sélection indique les plats cuisinés et les portions encore disponibles. Aucun repas de restes n’est rempli automatiquement.</p>';
   return out
 }
-function recipeImg(r){return '<div class="recipe-img">'+(r.image?'<img src="'+html(r.image)+'" alt="">':html(icons[r.category]||'🍽️'))+'</div>'}
+function recipeImg(r){return '<span class="recipe-img">'+(r.image?'<img src="'+html(r.image)+'" alt="">':html(icons[r.category]||'🍽️'))+'</span>'}
 function normalRecipeType(value){
  if(value==='Salade')return 'Salades';
  return recipeTypes.includes(value)?value:'legacy'
@@ -954,7 +954,7 @@ function renderCourses(){
  const progressTotal=active.length+checked.length,progressPct=progressTotal?Math.round(checked.length/progressTotal*100):0;
  out+='<div class="course-v33-progress" role="group" aria-label="Progression des courses"><div class="course-v33-progress-head"><strong>Avancement des courses</strong><span>'+
   checked.length+' / '+progressTotal+' acheté'+(checked.length>1?'s':'')+'</span></div>'+
-  '<div class="course-v33-progress-track" role="progressbar" aria-valuemin="0" aria-valuemax="'+progressTotal+'" aria-valuenow="'+checked.length+'" aria-label="Articles achetés"><span style="width:'+progressPct+'%"></span></div>'+
+  '<div class="course-v33-progress-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="'+progressPct+'" aria-valuetext="'+checked.length+' articles sur '+progressTotal+'" aria-label="Articles achetés"><span style="width:'+progressPct+'%"></span></div>'+
   '<p>'+(progressTotal===0?'Aucun article à acheter pour le moment.':progressPct===100?'✓ Tous les achats prévus sont cochés.':
    active.length+' article'+(active.length>1?'s':'')+' restant'+(active.length>1?'s':'')+' à acheter.')+'</p></div>';
  out+='<div class="course-summary"><div class="course-shop-count carrefour"><strong>'+carrefour.length+'</strong><span>🛒 Carrefour Drive</span></div>'+

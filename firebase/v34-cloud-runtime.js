@@ -19,6 +19,7 @@ const message = {
 };
 let stopAuth = null, session = null, userId = null, refreshing = false;
 let previousStatus = {phase:"idle"};
+let authGeneration = 0;
 let appOptions = null;
 function report(event) {
   previousStatus = event;
@@ -50,23 +51,46 @@ function guardEditing(event) {
   }
 }
 async function onUser(user) {
+  const generation=++authGeneration;
   if (!appOptions) return;
   if (!user) { userId=null;session=null;report({phase:"login"});return; }
   if (!user.emailVerified) { userId=null;session=null;report({phase:"verification"});return; }
   if (user.uid !== firebaseAuth.currentUser?.uid) return;
   const uid=user.uid;
   userId=uid;
-  session = createCloudSession({
+  report({phase:"loading"});
+  const sessionForUser=createCloudSession({
     cloud:{loadAuthoritativeState,saveAuthoritativeState},
     storage:cloudRecoveryStore,
-    applyServerState:appOptions.installCloudState,
-    onStatus:report
+    applyServerState:async state=>{
+      if (generation!==authGeneration || firebaseAuth.currentUser?.uid!==uid)
+        throw Error("Changement de compte pendant le téléchargement. Installation annulée.");
+      return appOptions.installCloudState(state);
+    },
+    onStatus:event=>{
+      if(generation===authGeneration)report(event);
+    }
   });
+  session=sessionForUser;
   try {
-    // Preserve local V33 data once, before any remote state can be installed.
-    await cloudRecoveryStore.preserveV33Once(uid,appOptions.readLocalState());
-    await session.open(uid);
-  } catch(e) { report({phase:"readonly", error:String(e.message||e)}); }
+    const local=appOptions.readLocalState();
+    // Preserve the complete original V33 state before the first cloud adoption.
+    await cloudRecoveryStore.preserveV33Once(uid,local);
+    // Crash recovery: if V33's locally persisted state differs from the last
+    // confirmed state, preserve it as an unsent draft before ANY server import.
+    const confirmed=await cloudRecoveryStore.readConfirmed(uid);
+    const pending=await cloudRecoveryStore.readDraft(uid);
+    if (!pending && confirmed && JSON.stringify(local)!==JSON.stringify(confirmed.state)) {
+      await cloudRecoveryStore.saveDraft(uid,{
+        state:local, expectedRevision:confirmed.revision, createdAt:Date.now(),
+        detectedBy:"local-state-mismatch"
+      });
+    }
+    if (generation!==authGeneration || firebaseAuth.currentUser?.uid!==uid) return;
+    await sessionForUser.open(uid);
+  } catch(e) {
+    if(generation===authGeneration)report({phase:"readonly",error:String(e.message||e)});
+  }
 }
 async function resume() {
   if (refreshing || !session || !userId || viewBlocked()) return;
@@ -93,6 +117,7 @@ export function setupCloudV34({readLocalState,installCloudState,onStatus}={}) {
   stopAuth=observeLogin(user => {void onUser(user);},
     err=>report({phase:"readonly",error:String(err?.message||err)}));
   return () => {
+    authGeneration++;
     stopAuth?.();
     for(const type of ["click","submit","change"]) {
       document.removeEventListener(type,guardEditing,true);

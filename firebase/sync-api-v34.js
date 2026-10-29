@@ -1,6 +1,7 @@
 // Speedrive V34 — interface Firestore isolée (non importée par la V33).
 // NE PAS raccorder persist() à une écriture globale de l'état local.
 import { firebaseAuth, firebaseDb } from "../firebase-v34.js";
+import { productFingerprint, ingredientFingerprint } from "./v34-model.js";
 import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
@@ -16,6 +17,21 @@ import {
   collection, doc, getDoc, onSnapshot, runTransaction,
   setDoc, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/13.1.0/firebase-firestore.js";
+
+export class DuplicateRecord extends Error {
+  constructor(key, recordId) {
+    super("Doublon détecté dans le catalogue familial.");
+    this.name = "DuplicateRecord";
+    this.uniqueKey = key;
+    this.recordId = recordId;
+  }
+}
+const uniqueKeyFor = (kind, payload) => {
+  if (kind !== "product" && kind !== "ingredient") return null;
+  const raw = kind === "product" ? productFingerprint(payload) : ingredientFingerprint(payload);
+  if (!raw) throw Error("Un produit ou ingrédient doit avoir un nom valide.");
+  return kind + ":" + encodeURIComponent(raw);
+};
 
 export class SyncConflict extends Error {
   constructor(message, serverRecord = null) {
@@ -134,15 +150,26 @@ export async function commitSharedRecord(hid, input, expectedVersion = 0) {
   if (!Number.isSafeInteger(expectedVersion) || expectedVersion < 0) throw Error("Version attendue invalide.");
   const kind = String(input.kind || "");
   const payload = cleanPayload(input.payload);
+  const key = uniqueKeyFor(kind, payload);
   const target = doc(firebaseDb, "households", hid, "records", input.id);
   return runTransaction(firebaseDb, async tx => {
+    // Read all documents BEFORE writing; Firestore transactions require this.
     const snapshot = await tx.get(target);
     const previous = snapshot.exists() ? snapshot.data() : null;
     const version = previous?.version || 0;
+    const lock = !previous && key
+      ? doc(firebaseDb, "households", hid, "uniqueKeys", key) : null;
+    const reserved = lock ? await tx.get(lock) : null;
     if (version !== expectedVersion) throw new SyncConflict(
       "Modifications simultanées : une comparaison est nécessaire.", previous
     );
     if (previous && previous.kind !== kind) throw Error("Type d'élément non modifiable.");
+    if (previous && previous.uniqueKey !== key) {
+      throw Error("Renommage du produit ou de l'ingrédient : réindexation sécurisée à développer.");
+    }
+    if (reserved?.exists()) {
+      throw new DuplicateRecord(key, reserved.data()?.recordId);
+    }
     if (previous) {
       tx.update(target, {
         payload, version: version + 1, updatedAt: serverTimestamp(),
@@ -150,8 +177,14 @@ export async function commitSharedRecord(hid, input, expectedVersion = 0) {
       });
     } else {
       if (input.deleted) throw Error("Impossible de supprimer un élément inexistant.");
+      if (lock) {
+        tx.set(lock, {
+          key, kind, recordId: input.id, createdAt: serverTimestamp(),
+          createdBy: uid
+        });
+      }
       tx.set(target, {
-        id: input.id, kind, payload, version: 1, deleted: false,
+        id: input.id, kind, payload, uniqueKey: key, version: 1, deleted: false,
         createdAt: serverTimestamp(), createdBy: uid,
         updatedAt: serverTimestamp(), updatedBy: uid
       });

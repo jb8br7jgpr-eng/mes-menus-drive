@@ -4,6 +4,7 @@ import { firebaseAuth } from "../firebase-v34.js";
 import { observeLogin } from "./v34-auth.js";
 import { cloudRecoveryStore } from "./v34-cloud-recovery-store.js";
 import { createCloudSession } from "./v34-session-core.js";
+import { assertFirstCloudImportReady } from "./v34-import-preflight.js";
 import { loadAuthoritativeState, saveAuthoritativeState } from "./v34-cloud-first.js";
 
 const message = {
@@ -166,9 +167,13 @@ export function abortLocalWrite(error) {
     "Enregistrement interrompu : reprise nécessaire.")});
 }
 export async function confirmFirstCloudImport() {
-  if (!session || previousStatus.phase !== "needs-import")
+  if (!session || !appOptions || previousStatus.phase !== "needs-import")
     throw Error("Premier import indisponible.");
-  return session.initialImport(appOptions.readLocalState());
+  // Re-check the ACTUAL snapshot, not a possibly stale visual preview.
+  // Any oversized photo, duplicate ID or empty library blocks cloud writes.
+  const current=appOptions.readLocalState();
+  await assertFirstCloudImportReady(current);
+  return session.initialImport(current);
 }
 export async function retryUnconfirmedSave() {
   if (!session || previousStatus.phase !== "recovery")

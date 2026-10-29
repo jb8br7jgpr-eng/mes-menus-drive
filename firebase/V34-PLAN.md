@@ -107,3 +107,17 @@ Firebase Web `speedrive-7e77c`; Firestore édition Standard, règles actuellemen
   isolation du compte. L'émulateur sécurité, deux vrais appareils, la
   restauration et la migration intégrale restent impérativement à tester.
 - **Règles toujours non publiées** ; la V33 n'importe aucun de ces modules.
+
+## Prévisualisation locale de la migration
+
+- Le panneau V34 de test contient « Analyser mes données locales sans les
+  envoyer ». Il lit une copie de la V33 depuis le navigateur et affiche
+  uniquement des compteurs de recettes, produits, photos, semaines, éléments,
+  doublons potentiels et avertissements.
+- Il **ne crée aucun compte, n'envoie aucune photo ni donnée, ne remplace rien**.
+- Ce bouton est sur `firebase-v34-preparation` uniquement, pas sur la V33
+  publiée. Le panneau de connexion est toujours verrouillé.
+- La prévisualisation doit être testée sur le vrai iPhone avant tout import.
+- Ne jamais utiliser le dépôt GitHub Pages public comme destination de
+  sauvegardes de recettes ou photos personnelles. Une sauvegarde indépendante
+  doit rester privée et chiffrée, avec restauration vérifiée.

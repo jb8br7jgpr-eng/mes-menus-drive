@@ -49,7 +49,7 @@ function structuralWarnings(state, errors, warnings) {
       warnings.push("Ingrédient « "+String(ingredient.name||ingredient.id).slice(0,45)+" » : référence produit manquante.");
   }
   for(const [weekId,week] of Object.entries(state.weeks)) {
-    if(!/^\\d{4}-\\d{2}-\\d{2}$/.test(weekId) || !week ||
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(weekId) || !week ||
       typeof week!=="object" || Array.isArray(week)) {
       errors.push("Semaine invalide : "+weekId.slice(0,30));
       continue;

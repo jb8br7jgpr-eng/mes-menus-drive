@@ -565,27 +565,3 @@
  .week-v33-return-btn{font-size:11px}
 }
 @media(prefers-reduced-motion:reduce){.course-v33-progress-track span{transition:none}}
-
-
-/* V33 — Rappel de sauvegarde iCloud : présence discrète uniquement à échéance. */
-.icloud-v33-reminder{
- margin:14px 0 17px;padding:13px 14px;border-radius:16px;
- border:1px solid #dce8d8;background:#f5f9f2;
- box-shadow:0 4px 16px #24594308;color:var(--ink)
-}
-.icloud-v33-reminder-copy strong{font-size:13px;line-height:1.35}
-.icloud-v33-reminder-copy p{margin:5px 0 10px;font-size:11px;line-height:1.45;color:var(--muted)}
-.icloud-v33-reminder-actions{display:flex;gap:8px;flex-wrap:wrap}
-.icloud-v33-reminder-actions .btn{min-height:36px;font-size:11px;padding:8px 10px}
-.icloud-v33-settings{background:#f5f9f2;border:1px solid #dce8d8;padding:12px;border-radius:13px;margin:9px 0 13px}
-.icloud-v33-settings strong{font-size:12px;color:var(--green)}
-.icloud-v33-settings p{margin:6px 0;font-size:11px;line-height:1.45;color:var(--ink)}
-.icloud-v33-settings small{font-size:10px;color:var(--muted);line-height:1.4;display:block}
-.icloud-v33-confirm{display:flex;flex-direction:column;gap:10px}
-.icloud-v33-confirm strong{font-size:15px;color:var(--ink)}
-.icloud-v33-confirm p{font-size:12px;color:var(--muted);line-height:1.55;margin:0 0 5px}
-@media(max-width:370px){
- .icloud-v33-reminder{padding:11px 12px}
- .icloud-v33-reminder-actions{gap:6px}
- .icloud-v33-reminder-actions .btn{font-size:10px;padding:8px}
-}

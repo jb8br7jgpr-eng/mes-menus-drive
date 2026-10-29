@@ -150,6 +150,9 @@ export async function commitSharedRecord(hid, input, expectedVersion = 0) {
   if (!Number.isSafeInteger(expectedVersion) || expectedVersion < 0) throw Error("Version attendue invalide.");
   const kind = String(input.kind || "");
   const payload = cleanPayload(input.payload);
+  // Stable ID supplied by the durable outbox; retries become idempotent.
+  const mutationId = input.mutationId || crypto.randomUUID();
+  if (!validId(mutationId) || mutationId.length > 100) throw Error("Mutation invalide.");
   const key = uniqueKeyFor(kind, payload);
   const target = doc(firebaseDb, "households", hid, "records", input.id);
   return runTransaction(firebaseDb, async tx => {
@@ -157,6 +160,7 @@ export async function commitSharedRecord(hid, input, expectedVersion = 0) {
     const snapshot = await tx.get(target);
     const previous = snapshot.exists() ? snapshot.data() : null;
     const version = previous?.version || 0;
+    if (previous?.lastMutationId === mutationId) return version;
     const lock = !previous && key
       ? doc(firebaseDb, "households", hid, "uniqueKeys", key) : null;
     const reserved = lock ? await tx.get(lock) : null;
@@ -173,7 +177,7 @@ export async function commitSharedRecord(hid, input, expectedVersion = 0) {
     if (previous) {
       tx.update(target, {
         payload, version: version + 1, updatedAt: serverTimestamp(),
-        updatedBy: uid, deleted: Boolean(input.deleted)
+        updatedBy: uid, deleted: Boolean(input.deleted), lastMutationId: mutationId
       });
     } else {
       if (input.deleted) throw Error("Impossible de supprimer un élément inexistant.");
@@ -186,7 +190,7 @@ export async function commitSharedRecord(hid, input, expectedVersion = 0) {
       tx.set(target, {
         id: input.id, kind, payload, uniqueKey: key, version: 1, deleted: false,
         createdAt: serverTimestamp(), createdBy: uid,
-        updatedAt: serverTimestamp(), updatedBy: uid
+        updatedAt: serverTimestamp(), updatedBy: uid, lastMutationId: mutationId
       });
     }
     return version + 1;

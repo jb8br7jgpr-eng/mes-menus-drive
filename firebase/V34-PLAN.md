@@ -1,3 +1,5 @@
+> **ARCHIVE :** ancien plan à deux comptes. Le plan retenu est [V34-CLOUD-FIRST.md](./V34-CLOUD-FIRST.md).
+
 # Speedrive V34 — Plan de synchronisation (brouillon technique)
 
 **Statut : non déployé.** Branche `firebase-v34-preparation`, application V33 inchangée.

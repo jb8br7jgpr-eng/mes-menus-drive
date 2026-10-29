@@ -51,3 +51,15 @@ test("too-large photo blocks import before any cloud call",async()=>{
 test("invalid local library cannot be imported",async()=>{
   await assert.rejects(()=>inspectFirstCloudImport({schema:1,recipes:[],products:[]}),/incompatible/);
 });
+
+import {assertFirstCloudImportReady} from "./v34-import-preflight.js";
+test("just-in-time gate refuses state changed after an earlier preview",async()=>{
+  const state=basic();
+  assert.equal((await inspectFirstCloudImport(state)).canImport,true);
+  state.products.push({id:"p1",name:"Deuxieme produit avec meme ID"});
+  await assert.rejects(()=>assertFirstCloudImportReady(state),/identifiant répété/);
+});
+test("just-in-time gate refuses empty phone library",async()=>{
+  const state=basic();state.recipes=[];state.products=[];
+  await assert.rejects(()=>assertFirstCloudImportReady(state),/bibliothèque vide/);
+});

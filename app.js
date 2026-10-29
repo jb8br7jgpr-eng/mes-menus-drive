@@ -744,7 +744,7 @@ function coursesStatus(w=getWeek()){
 function generateWeekCourses(w=getWeek()){
  w.generatedIngredients=collectRecipeIngredients(w);
  w.generatedSignature=menuGenerationSignature(w);
- w.generatedAt=new Date().toISOString()
+ w.generatedAt=new Date().toISOString();w.coursesManuallyCleared=false
 }
 // Une migration unique conserve la liste des semaines déjà préparées avant V22.
 // Le drapeau racine empêche de régénérer des semaines laissées volontairement
@@ -778,44 +778,44 @@ function courseGenerationBanner(w=getWeek(),where='courses'){
   description='La liste déjà générée est conservée telle quelle. Actualise-la seulement quand tu le souhaites ; ton stock et tes ajouts manuels resteront enregistrés.';
   button='<button class="btn secondary wide" data-action="generate-week-courses">↻ Actualiser les courses de cette semaine</button>'
  }else{
-  title='Liste de courses générée pour cette semaine';
-  description='Les quantités des recettes sont enregistrées. Tu peux modifier tes menus sans changer cette liste tant que tu ne la régénères pas.';
+  title=w.coursesManuallyCleared?'Courses vidées ou ajustées pour cette semaine':'Liste de courses générée pour cette semaine';
+  description=w.coursesManuallyCleared?'Tu peux régénérer les ingrédients des recettes quand tu le souhaites. Les menus et les fiches produits sont conservés.':'Les quantités des recettes sont enregistrées. Tu peux modifier tes menus sans changer cette liste tant que tu ne la régénères pas.';
   if(where==='menus')button='<button class="btn secondary" data-action="go-courses">Voir la liste</button>'+
     '<button class="btn ghost" data-action="generate-week-courses">↻ Régénérer</button>';
-  else button='<button class="btn secondary" data-action="go-menus">Voir les menus</button>'
+  else button=w.coursesManuallyCleared?'<button class="btn secondary wide" data-action="generate-week-courses">↻ Régénérer les courses des recettes</button>':'<button class="btn secondary" data-action="go-menus">Voir les menus</button>'
  }
  return '<div class="course-generation '+status+'"><strong>'+title+'</strong><p>'+description+'</p>'+
  '<div class="course-generation-actions">'+button+'</div></div>'
 }
 function shopping(){
  const w=getWeek(),map=new Map(),packs=new Map();
- function plain(name,qty,unit,source,productId,ingredientId,store,extraId=null){
+ function plain(name,qty,unit,source,productId,ingredientId,store,extraId=null,generatedIndex=null){
   const clean=String(name||'').trim();if(!clean)return;
   const [v,u]=converted(qty,unit);if(!(v>0))return;
   const p=productById(productId),ing=ingredientById(ingredientId);
   const key=(ing?'ingredient:'+ing.id:(p?'produit:'+p.id:norm(clean)))+'|'+u;
-  if(!map.has(key))map.set(key,{id:key,name:ing?.name||clean,qty:0,unit:u,source:[],productId:p?.id||null,ingredientId:ing?.id||null,forcedStore:store||null,manualExtraIds:[]});
-  const x=map.get(key);x.qty+=v;if(extraId)x.manualExtraIds.push(extraId);if(!x.source.includes(source))x.source.push(source)
+  if(!map.has(key))map.set(key,{id:key,name:ing?.name||clean,qty:0,unit:u,source:[],productId:p?.id||null,ingredientId:ing?.id||null,forcedStore:store||null,manualExtraIds:[],generatedIndexes:[]});
+  const x=map.get(key);x.qty+=v;if(extraId)x.manualExtraIds.push(extraId);if(generatedIndex!==null)x.generatedIndexes.push(generatedIndex);if(!x.source.includes(source))x.source.push(source)
  }
- function add(name,qty,unit,source,productId,fromCatalogue=false,ingredientId=null,extraId=null){
+ function add(name,qty,unit,source,productId,fromCatalogue=false,ingredientId=null,extraId=null,generatedIndex=null){
   const ing=ingredientById(ingredientId),store=ing?ingredientStore(ing):null;
   const selectedProductId=ing?(ing.productId||null):productId;
   const p=productById(selectedProductId);
   const [val,u]=converted(qty,unit),[size,packUnit]=p&&p.packAmount>0?converted(p.packAmount,p.packUnit):[0,''];
   const compatible=p&&size>0&&packUnit===u,catalogue=p&&fromCatalogue&&unit===p.unit;
   if((compatible||catalogue)&&(!ing||store==='carrefour')){
-   if(!packs.has(p.id))packs.set(p.id,{p,needed:0,needUnit:packUnit||u,size,manualPacks:0,source:[],ingredientId:ing?.id||null,manualExtraIds:[]});
+   if(!packs.has(p.id))packs.set(p.id,{p,needed:0,needUnit:packUnit||u,size,manualPacks:0,source:[],ingredientId:ing?.id||null,manualExtraIds:[],generatedIndexes:[]});
    const item=packs.get(p.id);
    if(catalogue)item.manualPacks+=Number(qty);else item.needed+=val;
-   if(extraId)item.manualExtraIds.push(extraId);
+   if(extraId)item.manualExtraIds.push(extraId);if(generatedIndex!==null)item.generatedIndexes.push(generatedIndex);
    if(ing&&!item.ingredientId)item.ingredientId=ing.id;
    if(!item.source.includes(source))item.source.push(source);
    return
   }
-  plain(ing?.name||name,qty,unit,source,(store==='grandfrais')?null:p?.id,ing?.id||null,store,extraId)
+  plain(ing?.name||name,qty,unit,source,(store==='grandfrais')?null:p?.id,ing?.id||null,store,extraId,generatedIndex)
  }
- (Array.isArray(w.generatedIngredients)?w.generatedIngredients:[]).forEach(x=>
-  add(x.name,Number(x.qty),x.unit,'Recettes',x.productId,false,x.ingredientId)
+ (Array.isArray(w.generatedIngredients)?w.generatedIngredients:[]).forEach((x,index)=>
+  add(x.name,Number(x.qty),x.unit,'Recettes',x.productId,false,x.ingredientId,null,index)
  );
  w.extras.forEach(x=>add(x.name,x.qty,x.unit,'Ajout manuel',x.productId,Boolean(x.fromCatalogue),x.ingredientId,x.id));
  for(const [productId,item] of packs){
@@ -826,7 +826,7 @@ function shopping(){
   const netNeed=Math.max(0,grossNeed-stockAmount);
   const count=item.needed>0&&item.size>0?Math.ceil(netNeed/item.size-1e-9):netNeed;
   const id='produit:'+productId+'|achat';
-  map.set(id,{id,name:p.name,qty:count,unit:p.unit||'paquet',source:item.source,productId,ingredientId:item.ingredientId,manualExtraIds:item.manualExtraIds,
+  map.set(id,{id,name:p.name,qty:count,unit:p.unit||'paquet',source:item.source,productId,ingredientId:item.ingredientId,manualExtraIds:item.manualExtraIds,generatedIndexes:item.generatedIndexes,
    needed:netNeed>0?quantity(netNeed,stockUnit):'',grossNeeded:grossNeed>0?quantity(grossNeed,stockUnit):'',
    totalNeedAmount:grossNeed,totalNeedUnit:stockUnit,
    stockKey:pantryKey,stockAmount,stockUnit,covered:count<=0,
@@ -843,7 +843,24 @@ function shopping(){
   return {...item,store:shoppingStore(item)}
  })
 }
-function stockUnitChoices(x){
+// Retire uniquement les achats de ce magasin pour la semaine affichée.
+ // Les lignes générées sont suivies individuellement, même si plusieurs recettes
+ // ou ajouts manuels ont été regroupés sur une seule ligne de courses.
+ function clearWeekShopping(w,store,items){
+  if(!['carrefour','grandfrais','all'].includes(store))return 0;
+  const selected=items.filter(x=>store==='all'||x.store===store);
+  if(!selected.length)return 0;
+  const generated=new Set(selected.flatMap(x=>x.generatedIndexes||[]));
+  const manual=new Set(selected.flatMap(x=>x.manualExtraIds||[]));
+  const ids=new Set(selected.map(x=>x.id));
+  if(Array.isArray(w.generatedIngredients))w.generatedIngredients=w.generatedIngredients.filter((_,i)=>!generated.has(i));
+  w.extras=w.extras.filter(x=>!manual.has(x.id));
+  w.checked=w.checked.filter(id=>!ids.has(id));
+  w.excluded=w.excluded.filter(id=>!ids.has(id));
+  w.coursesManuallyCleared=true;
+  return selected.length
+ }
+ function stockUnitChoices(x){
  const unit=x.stockUnit,p=productById(x.productId);
  const arr=[unit];if(unit==='g')arr.push('kg');
  if(unit==='ml')arr.push('cl','l');
@@ -994,8 +1011,9 @@ function renderCourses(){
    favorites.map(x=>'<button class="favorite-chip" data-action="frequent-to-courses" data-kind="'+x.kind+'" data-id="'+html(x.id)+'">＋ '+html(x.name)+'</button>').join('')+'</div></details>'
  }
  function section(store,title,icon,rows){
-  const isDrive=store==='carrefour';
-  let section='<section class="course-store '+(isDrive?'drive':'fresh')+'"><div class="course-store-head"><div><div class="eyebrow">À acheter</div><h2>'+icon+' '+title+'</h2></div><span class="pill">'+rows.length+' article'+(rows.length===1?'':'s')+'</span></div>';
+  const isDrive=store==='carrefour',storeCount=items.filter(x=>x.store===store).length;
+  let section='<button class="btn tiny secondary wide course-store-clear" data-action="clear-store-courses" data-store="'+store+'" '+(!storeCount?'disabled':'')+'>🗑️ Vider les courses '+title+'</button>'+ 
+   '<section class="course-store '+(isDrive?'drive':'fresh')+'"><div class="course-store-head"><div><div class="eyebrow">À acheter</div><h2>'+icon+' '+title+'</h2></div><span class="pill">'+rows.length+' article'+(rows.length===1?'':'s')+'</span></div>';
   section+='<button class="btn '+(isDrive?'secondary':'')+' wide" data-action="'+(isDrive?'go-drive':'copy-grand-frais')+'" '+(!rows.length?'disabled':'')+'>'+
    (isDrive?'🛒 Préparer mon panier Carrefour':'📋 Copier Grand Frais dans Notes')+'</button>';
   if(rows.length){
@@ -1004,10 +1022,12 @@ function renderCourses(){
     const other=rows.filter(x=>!order.includes(x.category));if(other.length)section+=other.map(shoppingRow).join('')
    }else section+=rows.map(shoppingRow).join('');
   }else section+='<div class="course-empty">Aucun achat prévu dans ce magasin.</div>';
-  return section+'</section>'
+  
+   return section+'</section>'
  }
  out+=section('carrefour','Carrefour Drive','🛒',carrefour);
  out+=section('grandfrais','Grand Frais','🥬',grand);
+  
  if(checked.length)out+='<details class="course-optional" data-section="checked" '+(courseOpenSections.has('checked')?'open':'')+'><summary>✓ Articles cochés <span class="pill gray">'+checked.length+'</span></summary>'+
   '<p class="helper">Décoche un article pour le remettre dans les achats.</p>'+checked.map(shoppingRow).join('')+'</details>';
  if(covered.length||excluded.length){
@@ -1018,6 +1038,7 @@ function renderCourses(){
      excluded.map(x=>'<div class="course-house-row"><span class="grow">'+html(x.name)+'</span><div class="course-house-actions"><button class="btn tiny secondary" data-action="include" data-id="'+html(x.id)+'">Réintégrer</button>'+manualEditControl(x,true)+'</div></div>').join(''):'')+'</details>'
  }
 
+ out+='<button class="btn danger wide course-clear-all" data-action="clear-all-courses" '+(!items.length?'disabled':'')+'>🗑️ Vider toutes les courses de cette semaine</button>';
  return out
 }
 function grandFraisText(){
@@ -1235,7 +1256,7 @@ function refreshMealRecipePicker(){
  if(count)count.textContent=n+' plat'+(n>1?'s':'')+' disponible'+(n>1?'s':'')
 }
 function pickMeal(index){
- const meal=getWeek().meals[index],dishes=mealDishes(meal),leftovers=mealLeftovers(meal),extraDefault=dishes.length?1:4;
+ const meal=getWeek().meals[index],dishes=mealDishes(meal),leftovers=mealLeftovers(meal);
  let out='';
  if(leftovers.length){
   out+='<div class="section-head"><h3>Restes prévus pour ce repas</h3></div>';
@@ -1255,8 +1276,8 @@ function pickMeal(index){
   })
  }
  out+='<div class="field"><label for="mealPeople">'+(dishes.length?'Portions à préparer pour le plat supplémentaire':'Combien de portions veux-tu préparer ?')+'</label>'+
- '<input type="number" id="mealPeople" min="1" max="30" value="'+extraDefault+'">'+
- '<div class="helper">Exemple : 4 portions préparées = 2 mangées à ce repas + 2 restes à placer le jour de ton choix. Pour un repas à deux sans restes, choisis 2. Si vous mangez chacun un plat différent, choisis 1 portion par plat.</div></div>';
+ '<input type="number" id="mealPeople" min="1" max="30" value="" placeholder="Auto : portions de base">'+
+ '<div class="helper">Par défaut, Speedrive utilise les portions de base du plat : 1 ou 2 portions = aucun reste. Saisis 4 pour préparer davantage et prévoir des restes.</div></div>';
  out+='<div class="section-head"><h3>'+ (dishes.length?'Ajouter un autre plat':'Choisir un plat')+'</h3></div>';
  out+='<div class="meal-picker-filters">'+
  '<div class="field"><label for="mealRecipeSearch">Rechercher un plat</label>'+
@@ -1368,7 +1389,7 @@ async function refreshBackupList(){
   $('#snapshotList').innerHTML=rows.length?rows.map(s=>'<div class="shopping-row"><div class="grow"><strong style="font-size:12px">'+html(s.label)+'</strong><div class="shopping-meta">'+new Date(s.time).toLocaleString('fr-FR')+'</div></div><button class="btn tiny secondary" data-action="restore-backup" data-id="'+s.id+'">Restaurer</button></div>').join(''):'Aucune version précédente pour le moment. Elles apparaissent au fil des modifications.';
  }catch(e){box.textContent='Impossible de lire les versions locales.'}
 }
-function peopleInput(){return Math.min(30,Math.max(1,Number($('#mealPeople')?.value)||1))}
+function peopleInput(recipeId){const raw=$('#mealPeople')?.value;const selected=raw===''?Number(recipeById(recipeId)?.people)||2:Number(raw);return Number.isInteger(selected)&&selected>=1&&selected<=30?selected:null}
 function portionInputForDish(dish){
  const n=Number($('[data-dish-qty="'+dish+'"]')?.value);
  return Number.isInteger(n)&&n>0&&n<=30?n:null
@@ -1394,6 +1415,7 @@ function storeMealParts(w,index,parts){
 // Pour un plat de 4 personnes : 2 ici, 2 portions de restes à placer librement.
 function portionsEatenHere(d,dishes){
  const prepared=Math.max(0,Number(d?.people)||0);
+ if(prepared<=2)return prepared; // 1 ou 2 portions préparées : aucun reste, même avec plusieurs plats.
  return Math.min(prepared,prepared>=4?2:(dishes.length===1?2:1))
 }
 function sourceBudget(w,fromIndex,recipeId){
@@ -1669,6 +1691,18 @@ document.addEventListener('click',e=>{
    tabScrollV33.menus=0;tabScrollV33.courses=0;tabScrollV33.drive=0;render()
   }
   else if(mode==='week-current')returnToCurrentWeekV33()
+  else if(mode==='clear-store-courses'||mode==='clear-all-courses'){
+   const target=mode==='clear-all-courses'?'all':a.dataset.store;
+   if(!['carrefour','grandfrais','all'].includes(target))return;
+   const rows=shopping().filter(x=>target==='all'||x.store===target);
+   if(!rows.length)return;
+   const label=target==='all'?'toutes les courses':target==='carrefour'?'les courses Carrefour Drive':'les courses Grand Frais';
+   if(!confirm('Vider '+label+' de la semaine du '+niceDate(currentWeek)+' ('+rows.length+' article'+(rows.length>1?'s':'')+') ? Les recettes, les menus, les produits et le stock maison seront conservés.'))return;
+   checkpoint('Avant suppression des courses : '+label);
+   const before=weekBeforeUndo(),count=clearWeekShopping(w,target,rows);
+   if(!count)return;
+   persist();render(true);toastWeekUndo(count+' article'+(count>1?'s':'')+' retiré'+(count>1?'s':'')+' des courses.',before)
+  }
   else if(mode==='generate-week-courses'){
    const w=getWeek(),status=coursesStatus(w);
    if(!hasCookedMeals(w)){toast('Ajoute d’abord un plat aux menus de cette semaine.');return}
@@ -1806,7 +1840,7 @@ document.addEventListener('click',e=>{
    row.querySelector('.ingredient-unit').value=preferredIngredientUnit(ing);
    refreshIngredientEntry(row);row.querySelector('.ingredient-qty')?.focus()
   }
-  else if(mode==='choose-recipe'){if(!addRecipeToMeal(w,index,id,peopleInput())){toast('Ce plat est déjà présent dans ce repas. Modifie plutôt ses portions.');return}persist();closeModal();renderMealContext(index)}
+  else if(mode==='choose-recipe'){const portions=peopleInput(id);if(portions===null){toast('Choisis entre 1 et 30 portions.');return}if(!addRecipeToMeal(w,index,id,portions)){toast('Ce plat est déjà présent dans ce repas. Modifie plutôt ses portions.');return}persist();closeModal();renderMealContext(index)}
   else if(mode==='choose-leftovers')pickLeftoverSource(index);
   else if(mode==='apply-leftovers'){
    const source=Number(a.dataset.source),qty=Number($('#leftoverPeople')?.value);

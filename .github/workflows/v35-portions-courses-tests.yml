@@ -1,0 +1,24 @@
+name: V35 — tests portions et courses (aucun déploiement)
+on:
+  push:
+    branches: [speedrive-v35-portions-clear-courses]
+  pull_request:
+    branches: [developpement-v1]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  v35-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Vérifier la syntaxe de l'application
+        run: node --check app.js
+      - name: Tester les portions et les suppressions sélectives
+        run: node --test tests/v35-portions-courses.test.mjs
+      - name: Aucun accès Firebase et aucun déploiement
+        run: echo "Tests de données fictives uniquement ; production inchangée."

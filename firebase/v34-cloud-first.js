@@ -9,6 +9,11 @@ import {
 } from "https://www.gstatic.com/firebasejs/13.1.0/firebase-firestore.js";
 import { packState, unpackState, listPhotoRefs, detectNewDuplicates } from "./v34-cloud-codec.js";
 
+const knownPhotosByAccount = new Map();
+function knownPhotos(uid) {
+  if (!knownPhotosByAccount.has(uid)) knownPhotosByAccount.set(uid,new Set());
+  return knownPhotosByAccount.get(uid);
+}
 export class CloudUnavailable extends Error {
   constructor(message) { super(message); this.name = "CloudUnavailable"; }
 }
@@ -79,22 +84,27 @@ export async function loadAuthoritativeState() {
     }));
   }
   const state = await unpackState(pack,photos); // integrity before replacing local state
+  hashes.forEach(hash => knownPhotos(uid).add(hash));
   return { status:"ready", revision, state, updatedAt:head.data().updatedAt || null };
 }
 
-async function uploadPhotos(path, photos) {
-  for (let offset=0; offset<photos.length; offset+=4) {
-    await Promise.all(photos.slice(offset,offset+4).map(async image=>{
+async function uploadPhotos(path, photos, uid) {
+  // Reuse assets already verified or uploaded during this open session.
+  const pending = photos.filter(image => !knownPhotos(uid).has(image.id));
+  for (let offset=0; offset<pending.length; offset+=4) {
+    await Promise.all(pending.slice(offset,offset+4).map(async image=>{
       const target=path.photo(image.id);
       const found=await serverRead(()=>getDocFromServer(target));
       if (found.exists()) {
         if (found.data()?.data !== image.data) throw Error("Collision de photo détectée.");
+        knownPhotos(uid).add(image.id);
         return;
       }
       // Photo docs are immutable. Retry can encounter an already-created asset.
       await setDoc(target, {
         hash:image.id, data:image.data, createdAt:serverTimestamp()
       });
+      knownPhotos(uid).add(image.id);
     }));
   }
 }
@@ -113,7 +123,7 @@ export async function saveAuthoritativeState(nextState, expectedRevision, previo
 
   const pack=await packState(nextState), snapshotId=crypto.randomUUID();
   if (pack.count > 25) throw Error("Trop de blocs pour une sauvegarde atomique.");
-  await uploadPhotos(path,pack.photos);
+  await uploadPhotos(path,pack.photos,uid);
 
   // Stage all chunks before changing head: partial uploads are not published.
   const batch = writeBatch(firebaseDb);

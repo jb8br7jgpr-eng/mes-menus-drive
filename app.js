@@ -42,7 +42,7 @@ function writeSnapshot(snapshot,label='Sauvegarde automatique',force=false){
  })
 }
 // V34 CLOUD-FIRST DEVELOPMENT GATE. Keep FALSE until backup + security tests pass.
-const V34_CLOUD_ACTIVE = false;
+const V34_CLOUD_ACTIVE = true;
 let v34CloudRuntime = null;
 let saveQueue=Promise.resolve(),saveError=false;
 function persist(){

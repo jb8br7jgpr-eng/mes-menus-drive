@@ -117,3 +117,48 @@ test("lost acknowledgement is recovered if server already contains the exact dra
   assert.equal(f.session.status().phase,"ready");
   assert.equal(f.db.has("uid:draft"),false);
 });
+
+test("first import reads back the exact server revision before reporting saved",async()=>{
+  const f=fixture();let reads=0;
+  const original=f.cloud.loadAuthoritativeState.bind(f.cloud);
+  f.cloud.loadAuthoritativeState=async()=>{reads++;return original()};
+  await f.session.open("uid");
+  assert.equal(reads,1);
+  await f.session.initialImport(f.base);
+  assert.equal(reads,2,"first write must be followed by a new server read");
+  assert.equal(f.session.status().phase,"ready");
+  assert.equal(f.db.has("uid:draft"),false);
+});
+test("a lost first-import readback preserves the full local draft",async()=>{
+  const f=fixture();
+  await f.session.open("uid");
+  const original=f.cloud.loadAuthoritativeState.bind(f.cloud);
+  let failNextRead=true;
+  f.cloud.loadAuthoritativeState=async()=>{
+    if(failNextRead){failNextRead=false;throw Error("La réponse réseau a été perdue");}
+    return original();
+  };
+  await assert.rejects(()=>f.session.initialImport(f.base),/réponse réseau/);
+  assert.equal(f.cloud.latest.revision,1,"write already exists in cloud");
+  assert.equal(f.session.status().phase,"recovery");
+  assert.deepEqual(f.db.get("uid:draft").state,f.base);
+  assert.equal(f.db.has("uid:confirmed"),false,"cannot confirm before readback");
+  const result=await f.session.retryDraft();
+  assert.equal(result.recovered,true);
+  assert.equal(f.session.status().phase,"ready");
+  assert.equal(f.db.has("uid:draft"),false);
+  assert.equal(f.cloud.latest.revision,1,"must not duplicate the first import");
+});
+test("a mismatched first-import readback is never marked saved",async()=>{
+  const f=fixture();
+  await f.session.open("uid");
+  const original=f.cloud.loadAuthoritativeState.bind(f.cloud);
+  f.cloud.loadAuthoritativeState=async()=>({
+    ...(await original()),
+    state:{...f.base,recipes:[{id:"r1",name:"Unexpected data"}]}
+  });
+  await assert.rejects(()=>f.session.initialImport(f.base),/non confirmé/);
+  assert.equal(f.session.status().phase,"recovery");
+  assert.deepEqual(f.db.get("uid:draft").state,f.base);
+  assert.equal(f.db.has("uid:confirmed"),false);
+});

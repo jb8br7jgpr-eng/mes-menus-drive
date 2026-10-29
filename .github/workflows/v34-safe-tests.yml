@@ -23,6 +23,13 @@ jobs:
           java-version: '21'
       - name: Install test-only dependencies
         run: npm install --prefix firebase --no-audit --no-fund
+      - name: Browser-module syntax (no execution or deployment)
+        run: |
+          node --check app.js
+          node --check firebase/v34-cloud-runtime.js
+          node --check firebase/v34-ui.js
+          node --check firebase/v34-cloud-first.js
+          node --check firebase/v34-readonly-actions.js
       - name: Unit tests (no network access to Firebase production)
         run: npm run test:unit --prefix firebase
       - name: Firestore rules tests (local emulator, fake demo project)

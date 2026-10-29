@@ -5,7 +5,7 @@ import { randomBytes, createCipheriv, createDecipheriv, createHash } from "node:
 import { gzipSync, gunzipSync } from "node:zlib";
 
 const FORMAT = "speedrive-offsite-backup-v1";
-const MAX_JSON_BYTES = 32 * 1024 * 1024;
+const MAX_JSON_BYTES = 256 * 1024 * 1024;
 const sha256 = text => createHash("sha256").update(text).digest("hex");
 const checkKey = key => {
   const bytes=Buffer.isBuffer(key)?key:Buffer.from(key||"","base64");

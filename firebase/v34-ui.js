@@ -8,7 +8,7 @@ import { previewLocalMigration } from "./v34-model.js";
 import { inspectFirstCloudImport } from "./v34-import-preflight.js";
 import { currentCloudStatus, confirmFirstCloudImport, retryUnconfirmedSave } from "./v34-cloud-runtime.js";
 
-const ENABLE_ACCOUNT_SETUP = false; // DO NOT ENABLE before security tests.
+const ENABLE_ACCOUNT_SETUP = true; // DO NOT ENABLE before security tests.
 const root = document.getElementById("v34SyncRoot");
 let user = null, ready = false, loading = false;
 let error = "", info = "", localPreview = null;

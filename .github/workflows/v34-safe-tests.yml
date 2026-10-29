@@ -1,0 +1,56 @@
+name: V34 — safe tests only (no deploy)
+on:
+  push:
+    branches: [firebase-v34-cloud-first, firebase-v34-release-candidate]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  no-production-access:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout feature branch
+        uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Setup Java for Firestore emulator
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Install test-only dependencies
+        run: npm install --prefix firebase --no-audit --no-fund
+      - name: V33 visual parity and production safety switches
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --depth=1 origin developpement-v1:refs/remotes/origin/developpement-v1
+          for file in styles.css manifest.webmanifest speedrive-icon-v2.PNG speedrive-logo-v2.PNG; do
+            git show "origin/developpement-v1:$file" | cmp - "$file"
+          done
+          if [ "$GITHUB_REF_NAME" = "firebase-v34-release-candidate" ]; then
+            grep -Fqx 'const V34_CLOUD_ACTIVE = true;' <(grep -F 'const V34_CLOUD_ACTIVE = true;' app.js)
+            grep -Fq 'const ENABLE_ACCOUNT_SETUP = true;' firebase/v34-ui.js
+            grep -Fq "menus-drive-v34-cloud-20261029" sw.js
+          else
+            grep -Fqx 'const V34_CLOUD_ACTIVE = false;' <(grep -F 'const V34_CLOUD_ACTIVE = false;' app.js)
+            grep -Fq 'const ENABLE_ACCOUNT_SETUP = false;' firebase/v34-ui.js
+          fi
+          grep -Fq 'async function showV34ReadOnlyAudit()' app.js
+          echo "Visuels V33 identiques; bascule cloud conforme à la branche isolée."
+      - name: Browser-module syntax (no execution or deployment)
+        run: |
+          node --check app.js
+          node --check firebase/v34-cloud-runtime.js
+          node --check firebase/v34-ui.js
+          node --check firebase/v34-cloud-first.js
+          node --check firebase/v34-readonly-actions.js
+      - name: Unit tests (no network access to Firebase production)
+        run: npm run test:unit --prefix firebase
+      - name: Firestore rules tests (local emulator, fake demo project)
+        run: npm run test:rules --prefix firebase
+      - name: Restore encrypted test archive in Firebase emulator
+        run: npm run test:restore-emulator --prefix firebase

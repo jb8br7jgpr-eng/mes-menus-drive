@@ -1,0 +1,20 @@
+{
+  "name": "speedrive-v34-tests",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test:unit": "node --test v34-session-core.test.mjs backup/v34-backup-archive.test.mjs backup/v34-restore.test.mjs backup/v34-retention-plan.test.mjs v34-import-preflight.test.mjs v34-cloud-codec.test.mjs v34-readonly-actions.test.mjs",
+    "test:rules": "firebase emulators:exec --only firestore --project demo-speedrive-v34 \"node --test tests/firestore-rules.test.mjs\"",
+    "test:backup": "node --test backup/v34-backup-archive.test.mjs backup/v34-restore.test.mjs",
+    "test:restore-emulator": "firebase emulators:exec --only firestore --project demo-speedrive-v34 \"node backup/restore-smoke-emulator.mjs\""
+  },
+  "devDependencies": {
+    "firebase": "^13.1.0",
+    "@firebase/rules-unit-testing": "^6.0.0",
+    "firebase-tools": "^15.30.0"
+  },
+  "dependencies": {
+    "firebase-admin": "^14.5.0",
+    "@google-cloud/firestore": "^7.11.6"
+  }
+}

@@ -41,14 +41,41 @@ function writeSnapshot(snapshot,label='Sauvegarde automatique',force=false){
   tx.oncomplete=()=>resolve(true);tx.onerror=()=>reject(tx.error);tx.onabort=()=>reject(tx.error);
  })
 }
+// V34 CLOUD-FIRST DEVELOPMENT GATE. Keep FALSE until backup + security tests pass.
+const V34_CLOUD_ACTIVE = true;
+let v34CloudRuntime = null;
 let saveQueue=Promise.resolve(),saveError=false;
 function persist(){
  const snapshot=JSON.parse(JSON.stringify(state));
- if(usingFallback){try{localStorage.setItem('menus-drive-backup',JSON.stringify(snapshot));saveError=false}catch(e){saveError=true;toast('Stockage saturé : exporte une sauvegarde JSON.')}return}
+ let cloudPendingError=null;
+ if(V34_CLOUD_ACTIVE){
+  try{
+   if(!v34CloudRuntime)throw Error('Connexion cloud indisponible.');
+   v34CloudRuntime.noteLocalWritePending();
+  }catch(e){cloudPendingError=e}
+ }
+ if(usingFallback){
+  try{localStorage.setItem('menus-drive-backup',JSON.stringify(snapshot));
+    saveError=V34_CLOUD_ACTIVE;
+    if(V34_CLOUD_ACTIVE)toast('Sauvegarde cloud bloquée : stockage local indisponible.');
+  }catch(e){saveError=true;toast('Stockage saturé : exporte une sauvegarde JSON.')}
+  return;
+ }
  saveQueue=saveQueue.catch(()=>{}).then(async()=>{
-  await writeRecord(snapshot);saveError=false;
-  try{await writeSnapshot(snapshot)}catch(e){/* Les versions locales peuvent dépasser le quota : données principales conservées. */}
- }).catch(()=>{saveError=true;toast('Enregistrement impossible : exporte une sauvegarde JSON.')});
+  await writeRecord(snapshot);
+  try{await writeSnapshot(snapshot)}catch(e){/* Historique local facultatif. */}
+  if(V34_CLOUD_ACTIVE){
+   if(cloudPendingError)throw cloudPendingError;
+   await v34CloudRuntime.commitLocalModification(snapshot);
+  }
+  saveError=false;
+ }).catch(err=>{
+  if(V34_CLOUD_ACTIVE) v34CloudRuntime?.abortLocalWrite(err);
+  saveError=true;
+  toast(V34_CLOUD_ACTIVE
+   ? 'Sauvegarde cloud NON confirmée. Brouillon conservé sur ce téléphone.'
+   : 'Enregistrement impossible : exporte une sauvegarde JSON.');
+ });
 }
 function checkpoint(label){
  const snapshot=JSON.parse(JSON.stringify(state));
@@ -1287,8 +1314,10 @@ function extraOneOffModal(){
  '<button class="btn secondary wide" data-action="add-extra" style="margin-top:9px">← Rechercher un produit</button>';
  showModal('Article ponctuel',out);
 }
+// V34 branch only: read-only copy for migration preview; NEVER uploads any local data.
+window.speedriveV34ReadLocalCopy = () => JSON.parse(JSON.stringify(state));
 function settingsModal(){
- let out='<div class="card soft"><strong>Préparer Speedrive V34</strong><p class="subtext">Vérifie que les recettes, photos et menus de CET iPhone peuvent être conservés sur Firebase. Analyse entièrement locale, sans connexion ni transfert.</p><button class="btn wide secondary" data-action="v34-audit-local">🔍 Vérifier ma bibliothèque sans rien envoyer</button><p class="helper">V34 non activée : tes données restent sur ce téléphone.</p></div>';
+ let out='<div class="card soft"><strong>Connexion familiale V34</strong><p class="subtext">Connexion familiale des deux iPhone. Le premier transfert nécessite ta confirmation ; aucune donnée locale n’est remplacée sans vérification.</p><button type="button" class="btn wide secondary" data-v34-open>Connexion familiale et sauvegardes</button><button type="button" class="btn wide secondary" data-action="v34-audit-local">🔍 Vérifier ma bibliothèque sans rien envoyer</button></div>';
  out+='<div class="card soft"><strong>Sauvegarde automatique activée</strong><p class="subtext">Chaque modification est enregistrée immédiatement sur cet iPhone. Jusqu’à 10 points de restauration locaux sont conservés automatiquement (espacés d’environ 10 min).</p></div>';
  out+='<div class="section-head"><h3>Versions locales précédentes</h3><button class="btn tiny secondary" data-action="refresh-backups">Actualiser</button></div><div id="snapshotList" class="subtext">Chargement…</div>';
  out+='<div class="note" style="margin:13px 0">Important : ces sauvegardes restent sur ce téléphone. Effacer les données Safari ou perdre l’iPhone peut supprimer l’original et ses copies. Seul un export dans iCloud Drive protège contre cela.</div>';
@@ -1297,8 +1326,6 @@ function settingsModal(){
  out+='<div class="divider"></div><button class="btn danger wide" data-action="clear-all">Effacer toutes les données locales</button>';
  showModal('Sauvegardes et paramètres',out);refreshBackupList()
 }
-// V34 preflight stage: strictly READ-ONLY and only on explicit button press.
-// Nothing imported here can read Firebase credentials or call Firestore.
 async function showV34ReadOnlyAudit(){
  const copy=JSON.parse(JSON.stringify(state)); // do not modify or expose live state
  showModal('Contrôle local Speedrive V34',
@@ -1582,6 +1609,11 @@ function addExtra(e){e.preventDefault();const name=$('#extraName').value.trim(),
 }
 async function copyList(){const value=listText();if(!value){toast('Aucun produit à copier.');return}try{await navigator.clipboard.writeText(value);toast('Liste copiée !')}catch(err){showModal('Liste à copier','<p class="helper">Sélectionne le texte ci-dessous pour le copier :</p><textarea class="text-input" style="height:180px" readonly>'+html(value)+'</textarea>')}}
 function exportData(){const blob=new Blob([JSON.stringify({...state,exportedAt:new Date().toISOString()},null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='mes-menus-drive-sauvegarde-'+localDate(new Date())+'.json';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);toast('Sauvegarde créée. Conserve le fichier !')}
+// Accessible aussi en lecture seule V34, y compris si le voile cloud bloque les réglages.
+window.speedriveV34ExportLocalCopy=()=>{
+ if(state?.schema!==1)throw Error("Bibliothèque locale indisponible.");
+ exportData(); // Téléchargement local uniquement : aucune connexion ni écriture Firebase.
+};
 async function importData(file){if(!file)return;try{if(file.size>25*1024*1024)throw Error('Fichier trop volumineux.');const raw=JSON.parse(await file.text());if(raw.schema!==1||!Array.isArray(raw.recipes)||!raw.weeks||typeof raw.weeks!=='object'||!Array.isArray(raw.staples))throw Error('Format de sauvegarde non reconnu.');
   if(!confirm('Remplacer les données actuelles par celles de ce fichier ?'))return;
   checkpoint('Avant import JSON');state={schema:1,recipes:raw.recipes,products:Array.isArray(raw.products)?raw.products:[],weeks:raw.weeks,staples:raw.staples,storePreferences:raw.storePreferences&&typeof raw.storePreferences==='object'&&!Array.isArray(raw.storePreferences)?raw.storePreferences:{},ingredientCatalog:Array.isArray(raw.ingredientCatalog)?raw.ingredientCatalog:[],favoritesUnifiedV29:raw.favoritesUnifiedV29===true,coursesExplicitGenerationV1:raw.coursesExplicitGenerationV1===true,settings:{people:2,...raw.settings}};normalizeIngredientCatalog();migrateFrequentProducts();migrateLegacyGeneratedCourses();persist();closeModal();render();toast('Sauvegarde restaurée !')
@@ -1599,9 +1631,9 @@ document.addEventListener('click',e=>{
  const tab=e.target.closest('[data-tab]');if(tab){switchTabV33(tab.dataset.tab);return}
   const a=e.target.closest('[data-action]');if(!a){if(e.target.matches('[data-overlay]'))closeModal();return}
   const mode=a.dataset.action;
-  if(mode==='v34-audit-local'){void showV34ReadOnlyAudit();return}
-  if(mode==='v34-audit-back'){settingsModal();return}
-  const index=Number(a.dataset.index),w=getWeek(),id=a.dataset.id;
+ if(mode==='v34-audit-local'){void showV34ReadOnlyAudit();return}
+ if(mode==='v34-audit-back'){settingsModal();return}
+ const index=Number(a.dataset.index),w=getWeek(),id=a.dataset.id;
   if(mode==='close-modal')closeModal();
   else if(mode==='go-courses')switchTabV33('courses');
   else if(mode==='go-drive')switchTabV33('drive');
@@ -1898,7 +1930,32 @@ window.addEventListener('hashchange',()=>importCarrefourProductFromHash());
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal()});
 $('#settingsBtn').addEventListener('click',settingsModal);
 (async function boot(){currentWeek=monday(new Date());try{db=await openDatabase();const stored=await readRecord();if(stored?.schema===1)state={...baseState(),...stored,products:Array.isArray(stored.products)?stored.products:[]}}catch(err){usingFallback=true;try{const raw=localStorage.getItem('menus-drive-backup');if(raw){const saved=JSON.parse(raw);state={...baseState(),...saved,products:Array.isArray(saved.products)?saved.products:[]}}}catch(e){}toast('Mode de sauvegarde local de secours activé.')}
-  const ingredientMigration=normalizeIngredientCatalog(),favoriteMigration=migrateFrequentProducts(),courseMigration=migrateLegacyGeneratedCourses();
-  if(ingredientMigration||favoriteMigration||courseMigration)persist();
-  render();importCarrefourProductFromHash();if('serviceWorker' in navigator&&location.protocol==='https:')navigator.serviceWorker.register('./sw.js').catch(()=>{});
+  if(!V34_CLOUD_ACTIVE) {
+   const ingredientMigration=normalizeIngredientCatalog(),favoriteMigration=migrateFrequentProducts(),courseMigration=migrateLegacyGeneratedCourses();
+   if(ingredientMigration||favoriteMigration||courseMigration)persist();
+  } else {
+   // Show the blocking veil before any V33 button may become interactive.
+   document.getElementById('v34CloudGuard').hidden=false;
+  }
+  render();importCarrefourProductFromHash();
+  if(V34_CLOUD_ACTIVE) {
+   try {
+    v34CloudRuntime=await import('./firebase/v34-cloud-runtime.js');
+    v34CloudRuntime.setupCloudV34({
+     readLocalState:()=>JSON.parse(JSON.stringify(state)),
+     installCloudState:async remote=>{
+      const next={...baseState(),...remote,products:Array.isArray(remote.products)?remote.products:[]};
+      // Do not invoke persist(): this is a download, never an upload.
+      await saveQueue.catch(()=>{});
+      if(usingFallback)throw Error('IndexedDB local indisponible.');
+      await writeRecord(JSON.parse(JSON.stringify(next)));
+      state=next;render();
+     }
+    });
+   } catch(e) {
+    const tag=document.querySelector('[data-v34-guard-text]');
+    if(tag)tag.textContent='Connexion Firebase impossible — modifications bloquées';
+   }
+  }
+  if('serviceWorker' in navigator&&location.protocol==='https:')navigator.serviceWorker.register('./sw.js').catch(()=>{});
 })();

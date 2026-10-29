@@ -1,0 +1,88 @@
+# TEMPLATE ONLY — install this workflow in a DIFFERENT PRIVATE repository.
+# Destination: PRIVATE_REPO/.github/workflows/speedrive-daily-backup.yml
+# Never place this workflow in Speedrive's public repository or activate it
+# before reviewing the credentials, quotas, read-only permissions and restore test.
+name: Speedrive — daily encrypted private backup
+on:
+  schedule:
+    - cron: '17 3 * * *'
+  workflow_dispatch:
+permissions:
+  contents: write # required to upload encrypted assets to this PRIVATE repository
+concurrency:
+  group: speedrive-encrypted-backup
+  cancel-in-progress: false
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Fetch public backup TOOL CODE ONLY (never store personal data here)
+        uses: actions/checkout@v4
+        with:
+          repository: jb8br7jgpr-eng/mes-menus-drive
+          # SECURITY: PINNED COMMIT, not a moving branch. Review before updates.
+          ref: 8dba099acfa7d895460d17b74fc0f95f1791adb3
+          path: speedrive-source
+          persist-credentials: false
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install server-only Firebase backup dependency
+        run: npm install --prefix speedrive-source/firebase --omit=dev --no-audit --no-fund
+      - name: Validate encrypted backup and export latest confirmed revision
+        id: export
+        env:
+          FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
+          SPEEDRIVE_ACCOUNT_UID: ${{ secrets.SPEEDRIVE_ACCOUNT_UID }}
+          SPEEDRIVE_BACKUP_KEY_B64: ${{ secrets.SPEEDRIVE_BACKUP_KEY_B64 }}
+          SPEEDRIVE_BACKUP_OUTPUT_DIR: ${{ runner.temp }}/speedrive-archives
+        shell: bash
+        run: |
+          set -euo pipefail
+          node speedrive-source/firebase/backup/export-firestore.mjs
+          file=$(find "$SPEEDRIVE_BACKUP_OUTPUT_DIR" -maxdepth 1 -name '*.sdrive' -type f | head -n 1)
+          test -n "$file"
+          test -s "$file"
+          echo "file=$file" >> "$GITHUB_OUTPUT"
+          echo "asset=$(basename "$file")" >> "$GITHUB_OUTPUT"
+      - name: Create private release collection if missing
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! gh release view encrypted-backups >/dev/null 2>&1; then
+            gh release create encrypted-backups --title "Speedrive - encrypted backups" \
+              --notes "Private encrypted backups; restore requires independent AES key." \
+              --latest=false
+          fi
+      - name: Upload immutable daily archive to PRIVATE release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          BACKUP_FILE: ${{ steps.export.outputs.file }}
+          BACKUP_ASSET: ${{ steps.export.outputs.asset }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh release upload encrypted-backups "$BACKUP_FILE" # no --clobber
+          mkdir -p "$RUNNER_TEMP/speedrive-verify"
+          gh release download encrypted-backups --pattern "$BACKUP_ASSET" \
+            --dir "$RUNNER_TEMP/speedrive-verify"
+          expected=$(sha256sum "$BACKUP_FILE" | cut -d ' ' -f 1)
+          actual=$(sha256sum "$RUNNER_TEMP/speedrive-verify/$BACKUP_ASSET" | cut -d ' ' -f 1)
+          test "$expected" = "$actual"
+          echo "Encrypted offsite archive independently downloaded and SHA-256 verified."
+      - name: Extra 90-day fallback via PRIVATE GitHub Actions artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: encrypted-speedrive-${{ github.run_id }}
+          path: ${{ steps.export.outputs.file }}
+          retention-days: 90
+          if-no-files-found: error
+      # Do NOT delete older release assets automatically until the retention
+      # policy and a real restoration test have been verified and approved.
+      # A scheduled backup is not a substitute for testing restoration.

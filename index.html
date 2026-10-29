@@ -13,13 +13,15 @@
   <link rel="icon" type="image/png" href="./speedrive-icon-v2.PNG?v=20261029-31">
   <link rel="apple-touch-icon" href="./speedrive-icon-v2.PNG?v=20261029-31">
   <link rel="stylesheet" href="./styles.css?v=20261029-33">
+  <link rel="stylesheet" href="./firebase/v34-ui.css?v=20261029-34">
   <style>
     /* Navigation essentielle : 5 cases fixes, même si Safari conserve une ancienne feuille de style. */
     .bottom-nav { display: grid !important; grid-template-columns: repeat(5, minmax(0, 1fr)) !important; }
     .bottom-nav > .nav-item { min-width: 0; max-width: 100%; overflow: hidden; }
     .bottom-nav > .nav-item > span:last-child { display: block; max-width: 100%; white-space: nowrap; }
   </style>
-  <script defer src="./app.js?v=20261029-33-audit1"></script>
+  <script defer src="./app.js?v=20261029-34"></script>
+  <script type="module" src="./firebase/v34-ui.js?v=20261029-34"></script>
 </head>
 <body>
   <div class="app-shell">
@@ -40,7 +42,17 @@
       <button data-tab="drive" class="nav-item"><span class="nav-icon"><svg class="speedrive-nav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="20" r="1"/><circle cx="18" cy="20" r="1"/><path d="M2 3h2l2.3 11.4a2 2 0 0 0 2 1.6H19a2 2 0 0 0 2-1.7L22 7H5"/></svg></span><span>Drive</span></button>
     </nav>
   </div>
+  <div id="v34CloudStatus" hidden aria-live="polite"></div>
+  <div id="v34CloudGuard" hidden>
+    <div class="v34-guard-card">
+      <strong data-v34-guard-text>Connexion Firebase nécessaire</strong>
+      <button type="button" class="v34-button v34-primary" data-v34-open>Compte et sauvegardes</button>
+      <button type="button" class="v34-button" data-v34-refresh>Réessayer le chargement du serveur</button>
+      <button type="button" class="v34-button" data-v34-export>Exporter une copie JSON de secours</button>
+    </div>
+  </div>
   <div id="modalRoot"></div>
+  <div id="v34SyncRoot" data-open="false"></div>
   <div id="toast" role="status" aria-live="polite"></div>
 </body>
 </html>

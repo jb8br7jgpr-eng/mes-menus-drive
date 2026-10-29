@@ -41,14 +41,33 @@ function writeSnapshot(snapshot,label='Sauvegarde automatique',force=false){
   tx.oncomplete=()=>resolve(true);tx.onerror=()=>reject(tx.error);tx.onabort=()=>reject(tx.error);
  })
 }
+// V34 CLOUD-FIRST DEVELOPMENT GATE. Keep FALSE until backup + security tests pass.
+const V34_CLOUD_ACTIVE = false;
+let v34CloudRuntime = null;
 let saveQueue=Promise.resolve(),saveError=false;
 function persist(){
  const snapshot=JSON.parse(JSON.stringify(state));
- if(usingFallback){try{localStorage.setItem('menus-drive-backup',JSON.stringify(snapshot));saveError=false}catch(e){saveError=true;toast('Stockage saturé : exporte une sauvegarde JSON.')}return}
+ if(usingFallback){
+  try{localStorage.setItem('menus-drive-backup',JSON.stringify(snapshot));
+    saveError=V34_CLOUD_ACTIVE;
+    if(V34_CLOUD_ACTIVE)toast('Sauvegarde cloud bloquée : stockage local indisponible.');
+  }catch(e){saveError=true;toast('Stockage saturé : exporte une sauvegarde JSON.')}
+  return;
+ }
  saveQueue=saveQueue.catch(()=>{}).then(async()=>{
-  await writeRecord(snapshot);saveError=false;
-  try{await writeSnapshot(snapshot)}catch(e){/* Les versions locales peuvent dépasser le quota : données principales conservées. */}
- }).catch(()=>{saveError=true;toast('Enregistrement impossible : exporte une sauvegarde JSON.')});
+  await writeRecord(snapshot);
+  try{await writeSnapshot(snapshot)}catch(e){/* Historique local facultatif. */}
+  if(V34_CLOUD_ACTIVE){
+   if(!v34CloudRuntime)throw Error('Connexion serveur non initialisée.');
+   await v34CloudRuntime.commitLocalModification(snapshot);
+  }
+  saveError=false;
+ }).catch(err=>{
+  saveError=true;
+  toast(V34_CLOUD_ACTIVE
+   ? 'Sauvegarde cloud NON confirmée. Brouillon conservé sur ce téléphone.'
+   : 'Enregistrement impossible : exporte une sauvegarde JSON.');
+ });
 }
 function checkpoint(label){
  const snapshot=JSON.parse(JSON.stringify(state));
@@ -1860,7 +1879,32 @@ window.addEventListener('hashchange',()=>importCarrefourProductFromHash());
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal()});
 $('#settingsBtn').addEventListener('click',settingsModal);
 (async function boot(){currentWeek=monday(new Date());try{db=await openDatabase();const stored=await readRecord();if(stored?.schema===1)state={...baseState(),...stored,products:Array.isArray(stored.products)?stored.products:[]}}catch(err){usingFallback=true;try{const raw=localStorage.getItem('menus-drive-backup');if(raw){const saved=JSON.parse(raw);state={...baseState(),...saved,products:Array.isArray(saved.products)?saved.products:[]}}}catch(e){}toast('Mode de sauvegarde local de secours activé.')}
-  const ingredientMigration=normalizeIngredientCatalog(),favoriteMigration=migrateFrequentProducts(),courseMigration=migrateLegacyGeneratedCourses();
-  if(ingredientMigration||favoriteMigration||courseMigration)persist();
-  render();importCarrefourProductFromHash();if('serviceWorker' in navigator&&location.protocol==='https:')navigator.serviceWorker.register('./sw.js').catch(()=>{});
+  if(!V34_CLOUD_ACTIVE) {
+   const ingredientMigration=normalizeIngredientCatalog(),favoriteMigration=migrateFrequentProducts(),courseMigration=migrateLegacyGeneratedCourses();
+   if(ingredientMigration||favoriteMigration||courseMigration)persist();
+  } else {
+   // Show the blocking veil before any V33 button may become interactive.
+   document.getElementById('v34CloudGuard').hidden=false;
+  }
+  render();importCarrefourProductFromHash();
+  if(V34_CLOUD_ACTIVE) {
+   try {
+    v34CloudRuntime=await import('./firebase/v34-cloud-runtime.js');
+    v34CloudRuntime.setupCloudV34({
+     readLocalState:()=>JSON.parse(JSON.stringify(state)),
+     installCloudState:async remote=>{
+      const next={...baseState(),...remote,products:Array.isArray(remote.products)?remote.products:[]};
+      // Do not invoke persist(): this is a download, never an upload.
+      await saveQueue.catch(()=>{});
+      if(usingFallback)throw Error('IndexedDB local indisponible.');
+      await writeRecord(JSON.parse(JSON.stringify(next)));
+      state=next;render();
+     }
+    });
+   } catch(e) {
+    const tag=document.querySelector('[data-v34-guard-text]');
+    if(tag)tag.textContent='Connexion Firebase impossible — modifications bloquées';
+   }
+  }
+  if('serviceWorker' in navigator&&location.protocol==='https:')navigator.serviceWorker.register('./sw.js').catch(()=>{});
 })();

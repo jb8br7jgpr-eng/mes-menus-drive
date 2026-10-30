@@ -2144,9 +2144,25 @@ document.addEventListener('click',e=>{
    const x=shopping().find(i=>i.id===id),field=$('#homeStockAmount'),unit=$('#homeStockUnit')?.value;
    const amount=field?.value===''?NaN:Number(field?.value),value=x?stockInputToBase(x,amount,unit):null;
    if(value===null||!Number.isFinite(value)){toast('Choisis une quantité positive et une unité compatible.');return}
-   w.pantry[x.stockKey]=value;
-   w.pantryUnits[x.stockKey]=unit;
-   persist();closeModal();render(true);toast('Stock maison déduit des achats !')
+   if(stockModulesV41){
+    try{
+     const identity=stockModulesV41.core.stockIdentityV41({ingredientId:x.ingredientId||null,productId:x.productId||null},state.ingredientCatalog);
+     const old=stockModulesV41.core.availableStockV41(state.stockV41,identity,x.stockUnit);
+     const delta=Math.round((value-old)*1000)/1000;
+     if(Math.abs(delta)>0.0001){
+      const result=stockModulesV41.core.applyStockTransactionV41(state.stockV41,{
+       id:'v41:stock-courses:'+uid(),label:'Correction du stock maison',
+       movements:[{type:'inventory',direction:delta>0?'add':'consume',identity,
+        name:x.name,category:x.category,store:x.store,amount:Math.abs(delta),unit:x.stockUnit}]
+      });
+      state.stockV41=result.stock;
+     }
+    }catch(err){toast(err.message||'Stock non modifié.');return}
+   }else{
+    w.pantry[x.stockKey]=value;
+    w.pantryUnits[x.stockKey]=unit;
+   }
+   persist();closeModal();render(true);toast('Stock maison mis à jour !')
   }
   else if(mode==='undo-week')undoWeekAction();
   else if(mode==='week-prev'||mode==='week-next'){

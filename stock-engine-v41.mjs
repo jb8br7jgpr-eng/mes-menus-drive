@@ -141,16 +141,17 @@ export function previewLegacyPantryV41(week,ingredientCatalog=[],products=[]) {
   const separator=sourceKey.lastIndexOf("|");
   if(separator<1){warnings.push("Unité inconnue : "+sourceKey);continue}
   const left=sourceKey.slice(0,separator),unit=sourceKey.slice(separator+1);
-  let identity,name,category,store;
+  let identity,name,category,store,product=null;
   if(left.startsWith("ingredient:")){
    const id=left.slice("ingredient:".length);
    const ing=ingredientCatalog.find(x=>x.id===id);
    if(!ing){warnings.push("Ingrédient absent du catalogue : "+sourceKey);continue}
    identity=stockIdentityV41({ingredientId:id},ingredientCatalog);
    name=ing.name;category=ing.category;store=ing.store;
+   product=products.find(x=>x.id===ing.productId)||null;
   } else if(left.startsWith("produit:")){
    const id=left.slice("produit:".length);
-   const product=products.find(x=>x.id===id);
+   product=products.find(x=>x.id===id);
    if(!product){warnings.push("Produit absent du catalogue : "+sourceKey);continue}
    identity=stockIdentityV41({productId:id},ingredientCatalog);
    const linked=ingredientCatalog.find(x=>identity==="ingredient:"+x.id);
@@ -162,7 +163,7 @@ export function previewLegacyPantryV41(week,ingredientCatalog=[],products=[]) {
    continue
   }
   let amount,canonical;
-  try{({amount,unit:canonical}=stockMeasureV41(qty,unit))}
+  try{({amount,unit:canonical}=stockMeasureV41(qty,unit,product))}
   catch(e){warnings.push("Quantité ou unité invalide : "+sourceKey);continue}
   const target=identity+"|"+canonical;
   const row={sourceKey,identity,name,category:category||"Autres",store:store||null,

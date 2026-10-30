@@ -1587,7 +1587,10 @@ function undoMealValidationControlsV41(index,meal){
   const key=index+':'+dish.recipeId;
   if(actions[key]){
    recognizedKeys.add(key);
-   make('recipe',dish.recipeId,null,recipeById(dish.recipeId)?.name||'Plat')
+   make('recipe',dish.recipeId,null,recipeById(dish.recipeId)?.name||'Plat');
+   if(actions[key].status==='eaten')buttons.push(
+    '<button class="btn secondary wide v41-meal-undo" data-action="v41-review-validation-recovery" data-index="'+index+
+    '" data-id="'+html(dish.recipeId)+'">Toujours bloqué ? Réparer ce repas</button>');
   }
  }
  for(const leftover of mealLeftovers(meal)){

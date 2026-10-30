@@ -814,3 +814,20 @@
   .v37-bulk-modal .v37-bulk-item{padding:9px;min-height:102px}
   .v37-bulk-modal .v37-bulk-amount{padding-left:0}
 }
+
+/* V38 — expliciter l'unité achetée et les contenus Carrefour. */
+.v38-purchase-unit{
+ background:#eff7ee;border:1px solid #cfdfcf;border-radius:13px;
+ padding:11px 12px;margin:10px 0 12px
+}
+.v38-purchase-unit label{font-weight:850}
+.v38-purchase-unit select{width:100%;min-height:43px;font-size:16px}
+.v38-purchase-unit .helper{font-size:11px;margin:8px 0 1px;color:#496f55;line-height:1.5}
+.v38-pack-details{border:1px solid #d8e5d4;border-radius:13px;padding:0 12px 12px;margin-bottom:13px;background:#fcfefb}
+.v38-pack-details>summary{padding:12px 0;font-size:12px;font-weight:850;color:#2b6644;cursor:pointer}
+.v38-pack-details[open]>summary{border-bottom:1px solid #e0e9dc;margin-bottom:10px}
+.v38-pack-warning{background:#f9f4e8;border:1px solid #ebe0c5;border-radius:10px;padding:10px;font-size:11px;color:#645130;line-height:1.5;margin:4px 0 12px}
+.v38-pack-preview{font-size:12px;line-height:1.5;color:#285f40;background:#e9f5e9;
+ border:1px solid #cfe3d0;border-radius:10px;padding:10px 11px;margin:4px 0 13px}
+.v38-pack-preview.unconfigured{background:#fff6e9;border-color:#f0dfc1;color:#856233}
+@media(max-width:380px){.v38-pack-details,.v38-purchase-unit{padding-left:9px;padding-right:9px}}

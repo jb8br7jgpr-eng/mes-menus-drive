@@ -22,6 +22,11 @@ const recipes=[
 ];
 const mealDishes=m=>m?.type==='recipe'?[{recipeId:m.recipeId,people:m.people}]:
  m?.type==='multi'?m.dishes.filter(x=>x.recipeId&&!x.type):[];
+const mealLeftovers=m=>m?.type==='leftovers'?
+ [{recipeId:m.recipeId,people:Number(m.leftoverPortions)||2,fromIndex:m.fromIndex}]:
+ m?.type==='multi'?m.dishes.filter(x=>x.type==='leftovers')
+  .map(x=>({recipeId:x.recipeId,people:x.people,fromIndex:x.fromIndex})):[];
+
 function fixture(stock=null){
  const week={meals:Array(14).fill(null),extras:[],checked:[],excluded:[],pantry:{},generatedIngredients:[]};
  const state={schema:1,recipes,products,ingredientCatalog:ingredients,weeks:{[weekId]:week},stockV41:stock};
@@ -35,7 +40,7 @@ function fixture(stock=null){
   render:()=>{},renderMealContext:()=>{},closeModal:()=>{},
   showModal:(title,body)=>{modals.push({title,body})},
   getWeek:()=>state.weeks[weekId],
-  recipeById:id=>recipes.find(x=>x.id===id),mealDishes,
+  recipeById:id=>recipes.find(x=>x.id===id),mealDishes,mealLeftovers,
   shopping:()=>state.weeks[weekId].checked.includes('produit:pack|achat')?
    [{id:'produit:pack|achat',name:'Pâtes',productId:'pack',ingredientId:'pasta',
      unit:'paquet',qty:1,checked:true,excluded:false,covered:false,manualExtraIds:['e1']}]:[],
@@ -244,8 +249,6 @@ test('Cette semaine affiche aussi les restes et les repas commandés sans nouvel
  f.week.meals[0]={type:'recipe',recipeId:'pasta-dinner',people:4};
  f.week.meals[2]={type:'leftovers',recipeId:'pasta-dinner',fromIndex:0,leftoverPortions:2};
  f.week.meals[3]={type:'ordered'};
- const mealLeftovers=meal=>meal?.type==='leftovers'?
-  [{recipeId:meal.recipeId,people:meal.leftoverPortions,fromIndex:meal.fromIndex}]:[];
  const view=renderStockV41({state:f.state,week:f.week,weekId,view:'week',
   recipeById:f.ctx.recipeById,mealDishes,mealLeftovers});
  assert.match(view,/Restes : Pâtes/);
@@ -307,4 +310,41 @@ test('Conditionnement inconnu : le stock est mesuré dans l’unité vendue et n
  assert.equal(purchase.unit,'paquet');
  assert.equal(purchase.qty,1);
  assert.equal(purchase.stockAmount,1);
+});
+
+test('Restes : repas d’origine non préparé bloque C’est mangé sans toucher aux ingrédients',()=>{
+ const initial=applyStockTransactionV41(emptyStockV41(),{id:'begin-leftovers',movements:[
+  {type:'inventory',direction:'add',identity:'ingredient:pasta',name:'Pâtes',amount:500,unit:'g'}
+ ]}).stock;
+ const f=fixture(initial);withInputs(f.inputs);
+ f.week.meals[0]={type:'recipe',recipeId:'pasta-dinner',people:4};
+ f.week.meals[3]={type:'leftovers',recipeId:'pasta-dinner',fromIndex:0,leftoverPortions:2};
+ f.invoke('v41-eat-leftovers',{index:3,id:'pasta-dinner',dataset:{source:'0'}});
+ assert.equal(f.saved,0);
+ assert.match(f.message,/d’abord/);
+ assert.equal(availableStockV41(f.state.stockV41,'ingredient:pasta','g'),500);
+ f.invoke('v41-eat-recipe',{index:0,id:'pasta-dinner'});
+ assert.equal(availableStockV41(f.state.stockV41,'ingredient:pasta','g'),0);
+ f.invoke('v41-eat-leftovers',{index:3,id:'pasta-dinner',dataset:{source:'0'}});
+ assert.equal(f.week.v41MealActions['3:leftovers:0:pasta-dinner'].status,'eaten');
+ assert.equal(availableStockV41(f.state.stockV41,'ingredient:pasta','g'),0,
+  'les restes ne retirent jamais deux fois les ingrédients');
+ const saved=f.saved;
+ f.invoke('v41-eat-leftovers',{index:3,id:'pasta-dinner',dataset:{source:'0'}});
+ assert.equal(f.saved,saved);
+});
+
+test('Congeler une préparation ne peut pas effacer des restes déjà mangés',()=>{
+ const initial=applyStockTransactionV41(emptyStockV41(),{id:'begin-freeze-leftovers',movements:[
+  {type:'inventory',direction:'add',identity:'ingredient:pasta',name:'Pâtes',amount:500,unit:'g'}
+ ]}).stock;
+ const f=fixture(initial);withInputs({...f.inputs,v41FreezePortions:2});
+ f.week.meals[0]={type:'recipe',recipeId:'pasta-dinner',people:4};
+ f.week.meals[3]={type:'leftovers',recipeId:'pasta-dinner',fromIndex:0,leftoverPortions:2};
+ f.week.v41MealActions={'3:leftovers:0:pasta-dinner':{status:'eaten'}};
+ f.invoke('v41-confirm-freeze-recipe',{index:0,id:'pasta-dinner'});
+ assert.equal(f.saved,0);
+ assert.match(f.message,/déjà été mangés/);
+ assert.equal(availableFreezerV41(f.state.stockV41,'pasta-dinner'),0);
+ assert.equal(availableStockV41(f.state.stockV41,'ingredient:pasta','g'),500);
 });

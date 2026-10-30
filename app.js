@@ -1563,7 +1563,7 @@ function refreshMealRecipePicker(){
 }
 function pickMeal(index){
  const meal=getWeek().meals[index],dishes=mealDishes(meal),leftovers=mealLeftovers(meal);
- let out=meal?'<button class="btn secondary wide" data-action="v41-replace-meal" data-index="'+index+'">↔ Remplacer ce repas</button>':'';
+ let out='<button class="btn secondary wide" data-action="v41-replace-meal" data-index="'+index+'">'+(meal?'↔ Remplacer ce repas':'❄️ Congélateur ou repas commandé')+'</button>';
  if(meal?.type==='frozen'||meal?.type==='ordered'){
   showModal('Gérer mon repas','<p class="helper">'+(meal.type==='frozen'?'❄️ Plat issu du congélateur':'🍕 Repas libre ou commandé')+'</p>'+
     '<button class="btn wide" data-action="v41-replace-meal" data-index="'+index+'">↔ Remplacer ce repas</button>');

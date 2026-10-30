@@ -1448,6 +1448,128 @@ function extraSearchResults(term=''){
   '<span class="grow"><strong>'+html(x.name)+'</strong><small>'+(x.kind==='ingredient'?'Ingrédient':'Quotidien')+
   ' · '+(x.store==='grandfrais'?'Grand Frais':'Carrefour')+(x.frequent?' · ☆ fréquent':'')+'</small></span><span aria-hidden="true">＋</span></button>').join('');
 }
+
+/* V37 — sélectionner et quantifier tous les ingrédients et achats du quotidien.
+   Les nouvelles lignes utilisent le format extras déjà synchronisé par Firebase. */
+function bulkCatalogueV37(){
+ const linked=new Set((state.ingredientCatalog||[]).map(i=>i.productId).filter(Boolean));
+ const items=[
+  ...(state.ingredientCatalog||[]).map(i=>{
+   const unit=preferredIngredientUnit(i);
+   const matching=state.recipes.flatMap(r=>r.ingredients||[]).find(line=>
+    (line.ingredientId===i.id||norm(line.name)===norm(i.name))&&line.unit===unit&&Number(line.qty)>0);
+   return {kind:'ingredient',id:i.id,name:i.name,store:ingredientStore(i),frequent:!!i.frequent,
+    qty:Number(i.qty)>0?Number(i.qty):Number(matching?.qty)>0?Number(matching.qty):1,unit}
+  }),
+  ...(state.products||[]).filter(p=>!linked.has(p.id)).map(p=>({
+   kind:'daily',id:p.id,name:p.name,
+   store:state.storePreferences?.['product:'+p.id]||p.store||'carrefour',
+   frequent:!!p.frequent,qty:Number(p.qty)>0?Number(p.qty):1,unit:units.includes(p.unit)?p.unit:'pièce'
+  }))
+ ];
+ return items.sort((a,b)=>Number(b.frequent)-Number(a.frequent)||
+   a.name.localeCompare(b.name,'fr',{sensitivity:'base'})||a.kind.localeCompare(b.kind))
+}
+function bulkPurchaseExtraV37(kind,id,amount,unit){
+ const ingredient=kind==='ingredient',item=ingredient?ingredientById(id):kind==='daily'?productById(id):null;
+ if(!item||!Number.isFinite(amount)||amount<=0||amount>100000||!units.includes(unit))return null;
+ return {id:uid(),name:item.name,qty:amount,unit,
+  productId:ingredient?(item.productId||null):item.id,
+  ingredientId:ingredient?item.id:null,fromCatalogue:true}
+}
+function openBulkCatalogueV37(favoritesOnly=false){
+ const items=bulkCatalogueV37();
+ if(!items.length){toast('Ajoute d’abord des produits ou ingrédients dans ton catalogue.');return}
+ let out='<p class="helper">Sélectionne plusieurs articles, règle leur quantité et ajoute tout en une fois. Ingrédients et achats du quotidien sont réunis ici.</p>'+
+ '<div class="v37-bulk-filters"><div class="field"><label for="v37BulkSearch">Rechercher un article</label>'+
+ '<input id="v37BulkSearch" type="search" autocomplete="off" placeholder="Ex. lait, pâtes, sopalin…"></div>'+
+ '<div class="field"><label for="v37BulkFilter">Afficher</label>'+
+ '<select id="v37BulkFilter"><option value="all">Tous les produits</option>'+
+ '<option value="frequent" '+(favoritesOnly?'selected':'')+'>Mes achats fréquents</option>'+
+ '<option value="carrefour">Carrefour Drive</option><option value="grandfrais">Grand Frais</option></select></div></div>'+
+ '<div class="v37-bulk-toolbar"><button class="btn tiny secondary" data-action="v37-bulk-all">Sélectionner les résultats</button>'+
+ '<button class="btn tiny ghost" data-action="v37-bulk-none">Tout désélectionner</button></div>'+
+ '<div class="v37-bulk-results" aria-live="polite"><span id="v37BulkVisible"></span></div>'+
+ '<div class="v37-bulk-list">';
+ const existing=shopping();
+ out+=items.map(x=>{
+  const matched=existing.some(row=>(x.kind==='ingredient'&&row.ingredientId===x.id)||
+   (x.kind==='daily'&&row.productId===x.id));
+  return '<div class="v37-bulk-item" data-v37-row data-kind="'+x.kind+'" data-id="'+html(x.id)+
+   '" data-store="'+html(x.store)+'" data-frequent="'+x.frequent+'" data-search="'+html(norm(x.name))+'">'+
+   '<label class="v37-bulk-choice"><input type="checkbox" data-v37-select aria-label="Sélectionner '+html(x.name)+'">'+
+   '<span class="v37-bulk-item-info"><strong>'+html(x.name)+'</strong><small>'+
+   (x.kind==='ingredient'?'🥕 Ingrédient':'🧻 Achat du quotidien')+' · '+
+   (x.store==='grandfrais'?'Grand Frais':'Carrefour Drive')+
+   (matched?' · déjà dans les courses (quantités cumulées)':'')+'</small></span></label>'+
+   '<div class="v37-bulk-amount"><button type="button" class="v37-bulk-step" data-action="v37-qty-minus" aria-label="Diminuer la quantité de '+html(x.name)+'">−</button>'+
+   '<input type="number" inputmode="decimal" min="0.01" max="100000" step="any" data-v37-qty value="'+html(x.qty)+'" aria-label="Quantité de '+html(x.name)+'">'+
+   '<button type="button" class="v37-bulk-step" data-action="v37-qty-plus" aria-label="Augmenter la quantité de '+html(x.name)+'">＋</button>'+
+   '<select data-v37-unit aria-label="Unité de '+html(x.name)+'">'+selectOptions(units,x.unit)+'</select></div></div>';
+ }).join('');
+ out+='</div><div class="v37-bulk-footer"><div class="v37-bulk-status" id="v37BulkStatus">Aucun article sélectionné</div>'+
+ '<button class="btn wide" data-action="v37-bulk-add" id="v37BulkSubmit" disabled>Ajouter aux courses</button>'+
+ '<button class="btn ghost wide v37-bulk-exceptional" data-action="extra-one-off">＋ Article ponctuel, hors catalogue</button></div>';
+ showModal('🛒 Ajouter des articles',out);
+ modalRoot.querySelector('.modal')?.classList.add('v37-bulk-modal');
+ filterBulkV37()
+}
+function filterBulkV37(){
+ const query=norm($('#v37BulkSearch')?.value||''),scope=$('#v37BulkFilter')?.value||'all';
+ let visible=0;
+ modalRoot.querySelectorAll('[data-v37-row]').forEach(row=>{
+  const show=(!query||row.dataset.search.includes(query))&&
+   (scope==='all'||(scope==='frequent'?row.dataset.frequent==='true':row.dataset.store===scope));
+  row.hidden=!show;if(show)visible++
+ });
+ const result=$('#v37BulkVisible');
+ if(result)result.textContent=visible+' résultat'+(visible>1?'s':'')+(visible===0?' · aucune correspondance':'');
+ updateBulkV37()
+}
+function updateBulkV37(){
+ const checked=modalRoot.querySelectorAll('[data-v37-row] [data-v37-select]:checked').length;
+ const submit=$('#v37BulkSubmit'),label=$('#v37BulkStatus');
+ if(submit){submit.disabled=!checked;submit.textContent=checked?'＋ Ajouter '+checked+' article'+(checked>1?'s':'')+' aux courses':'Ajouter aux courses'}
+ if(label)label.textContent=checked+' article'+(checked>1?'s':'')+' sélectionné'+(checked>1?'s':'');
+}
+function stepBulkV37(row,direction){
+ const input=row?.querySelector('[data-v37-qty]'),unit=row?.querySelector('[data-v37-unit]')?.value;
+ if(!input||![-1,1].includes(direction))return;
+ const jump=['g','ml'].includes(unit)?100:['cl'].includes(unit)?10:1;
+ const original=Number(input.value);
+ const current=Number.isFinite(original)&&original>0?original:jump;
+ const result=Math.round((current+direction*jump)*100)/100;
+ input.value=String(Math.max(unit==='g'||unit==='ml'?1:0.01,Math.min(100000,result)));
+ row.querySelector('[data-v37-select]').checked=true;
+ updateBulkV37()
+}
+function commitBulkV37(){
+ const selected=[...modalRoot.querySelectorAll('[data-v37-row]')].filter(row=>row.querySelector('[data-v37-select]')?.checked);
+ if(!selected.length){toast('Sélectionne au moins un article.');return}
+ const staged=[];
+ for(const row of selected){
+  const raw=row.querySelector('[data-v37-qty]')?.value||'',
+   amount=raw.trim()===''?NaN:Number(raw),unit=row.querySelector('[data-v37-unit]')?.value;
+  const extra=bulkPurchaseExtraV37(row.dataset.kind,row.dataset.id,amount,unit);
+  if(!extra){toast('Vérifie la quantité et l’unité de '+(row.querySelector('strong')?.textContent||'cet article')+'.');return}
+  staged.push(extra)
+ }
+ const current=getWeek(),before=weekBeforeUndo(),beforeRows=shopping();
+ const affected=new Set(beforeRows.filter(row=>staged.some(extra=>
+   (extra.ingredientId&&row.ingredientId===extra.ingredientId)||
+   (extra.productId&&row.productId===extra.productId))).map(row=>row.id));
+ current.extras.push(...staged);
+ // Un nouvel achat ne doit jamais rester automatiquement marqué « acheté » ou « retiré ».
+ const afterRows=shopping();
+ afterRows.forEach(row=>{if(staged.some(extra=>
+  (extra.ingredientId&&row.ingredientId===extra.ingredientId)||
+  (extra.productId&&row.productId===extra.productId)))affected.add(row.id)});
+ current.checked=current.checked.filter(id=>!affected.has(id));
+ current.excluded=current.excluded.filter(id=>!affected.has(id));
+ persist();closeModal();tabScrollV33.courses=0;switchTabV33('courses');
+ toastWeekUndo(staged.length+' article'+(staged.length>1?'s':'')+' ajouté'+(staged.length>1?'s':'')+' aux courses.',before)
+}
+
 function extraModal(){
  let out='<p class="helper">Choisis un produit enregistré : sa quantité habituelle et son magasin seront repris automatiquement. Les achats restent ponctuels à cette semaine.</p>'+
  '<div class="field"><label for="courseAddSearch">Rechercher dans mes produits</label>'+

@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {emptyStockV41,applyStockTransactionV41} from '../stock-engine-v41.mjs';
 import {kitchenMovementsV41,shoppingShortfallsV41,planFrozenMealV41,
-  remainingFreezerPortionsV41,freezerReservationsV41,purchasedMovementsV41} from '../stock-week-v41.mjs';
+  remainingFreezerPortionsV41,freezerReservationsV41,purchasedMovementsV41,repeatWeekMealsV41} from '../stock-week-v41.mjs';
 const ing=[{id:'pasta',name:'Pâtes',productId:'pack',store:'carrefour'}];
 const products=[{id:'pack',name:'Pâtes 500g',unit:'paquet',packAmount:500,packUnit:'g'}];
 const recipe={id:'pates',people:2,ingredients:[{name:'Pâtes',ingredientId:'pasta',qty:300,unit:'g'}]};
@@ -59,4 +59,51 @@ test('Recette ancienne reliée par nom : 1 boîte de 6 œufs déduit bien six pi
  assert.equal(movements[0].identity,'ingredient:eggs');
  assert.equal(movements[0].amount,6);
  assert.equal(movements[0].unit,'pièce');
+});
+
+test('Reprendre la semaine passée réattribue chaque lot sans dupliquer les réservations',()=>{
+ const frozen=applyStockTransactionV41(emptyStockV41(),{id:'stock-reprise',movements:[
+  {type:'freezer',direction:'add',lotId:'chili-lot',recipeId:'chili',portions:3,name:'Chili'}
+ ]}).stock;
+ const prior={meals:Array(14).fill(null),v41MealActions:{'0:chili':{status:'eaten'}}};
+ prior.meals[0]={type:'frozen',lotId:'chili-lot',recipeId:'chili',portions:2,consumed:true};
+ prior.meals[1]={type:'recipe',recipeId:'pates',people:4};
+ prior.meals[4]={type:'leftovers',recipeId:'pates',fromIndex:1,leftoverPortions:2};
+ const target={meals:Array(14).fill(null),extras:[{id:'essuie-tout'}],
+  generatedIngredients:[],v41MealActions:{},checked:[],excluded:[]};
+ const weeks={'2026-10-19':prior,'2026-10-26':target};
+ const result=repeatWeekMealsV41(weeks,frozen,'2026-10-19','2026-10-26');
+ assert.equal(result.skippedFrozen,0);
+ assert.equal(result.copiedFrozen,1);
+ const copied=result.weeks['2026-10-26'];
+ assert.equal(copied.meals[0].consumed,undefined,'ancienne consommation jamais recopiée');
+ assert.equal(copied.meals[0].portions,2);
+ assert.equal(copied.meals[1].people,4);
+ assert.equal(copied.meals[4].fromIndex,1);
+ assert.deepEqual(copied.v41MealActions,{});
+ assert.equal(copied.extras.length,1,'les achats manuels restent');
+ assert.equal(freezerReservationsV41(result.weeks)['chili-lot'],2);
+ assert.equal(weeks['2026-10-26'].meals[0],null,'état source non modifié');
+});
+test('Reprendre la semaine passée n’invente pas de portions déjà réservées ailleurs',()=>{
+ const frozen=applyStockTransactionV41(emptyStockV41(),{id:'stock-reprise',movements:[
+  {type:'freezer',direction:'add',lotId:'lot-a',recipeId:'chili',portions:2}
+ ]}).stock;
+ const week=()=>({meals:Array(14).fill(null),extras:[],checked:[],excluded:[]});
+ const prior=week();prior.meals[1]={type:'frozen',lotId:'lot-a',recipeId:'chili',portions:2,consumed:true};
+ const reserved=week();reserved.meals[3]={type:'frozen',lotId:'lot-a',recipeId:'chili',portions:2};
+ const target=week();target.meals[1]={type:'ordered'};
+ const weeks={'2026-10-19':prior,'2026-10-26':target,'2026-11-02':reserved};
+ const result=repeatWeekMealsV41(weeks,frozen,'2026-10-19','2026-10-26');
+ assert.equal(result.skippedFrozen,1);
+ assert.equal(result.weeks['2026-10-26'].meals[1],null,'un repas congelé sans stock n’est pas cloné');
+ assert.equal(freezerReservationsV41(result.weeks)['lot-a'],2);
+});
+test('Reprendre une semaine supprime les restes qui n’ont plus de plat source',()=>{
+ const source={meals:Array(14).fill(null)};
+ source.meals[3]={type:'leftovers',recipeId:'chili',fromIndex:1,leftoverPortions:2};
+ const target={meals:Array(14).fill(null)};
+ const repeated=repeatWeekMealsV41(
+  {'2026-10-19':source,'2026-10-26':target},emptyStockV41(),'2026-10-19','2026-10-26');
+ assert.equal(repeated.weeks['2026-10-26'].meals[3],null);
 });

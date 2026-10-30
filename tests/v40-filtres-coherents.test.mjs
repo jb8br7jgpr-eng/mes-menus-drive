@@ -36,6 +36,9 @@ test('Les mêmes champs apparaissent dans Produits et dans Ajout des courses',()
  assert.ok(modal.indexOf('id="v37BulkSearch"')<modal.indexOf('id="v40BulkStore"'));
  assert.ok(modal.indexOf('id="v40BulkStore"')<modal.indexOf('id="v40BulkCategory"'));
  assert.ok(!modal.includes('id="v37BulkFilter"'),'ancien filtre mélangeant magasin et favoris supprimé');
+ assert.match(modal,/data-action="v40-reset-filters" data-context="courses"/);
+ assert.match(catalogue,/data-action="v40-reset-filters" data-context="produits"/);
+ assert.match(js,/mode==='v40-reset-filters'/);
  assert.match(css,/\.v40-filter-search\{width:100%/);
  assert.match(css,/grid-template-columns:76px minmax\(0,1fr\)/);
  assert.match(css,/@media\(min-width:660px\)/);

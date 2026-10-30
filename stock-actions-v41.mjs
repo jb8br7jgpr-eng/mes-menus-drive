@@ -12,8 +12,16 @@ function commit(ctx,transaction,done) {
  try {
   const res=applyStockTransactionV41(stockOf(ctx.state),transaction);
   if(!res.changed){ctx.toast('Cette opération a déjà été enregistrée.');return false}
+  // Ne jamais laisser l'inventaire avancé si la validation associée échoue.
+  const previousStock=ctx.state.stockV41;
+  const previousWeeks=JSON.parse(JSON.stringify(ctx.state.weeks));
   ctx.state.stockV41=res.stock;
-  done?.();
+  try { done?.(); }
+  catch(error){
+   ctx.state.stockV41=previousStock;
+   ctx.state.weeks=previousWeeks;
+   throw error;
+  }
   ctx.persist();ctx.closeModal();ctx.render(true);ctx.toast(transaction.label||'Stock mis à jour !');
   return true;
  } catch(e){ctx.toast(e.message||'Stock non modifié.');return false}
@@ -49,15 +57,19 @@ function replaceModal(ctx,index) {
  const meal=ctx.getWeek().meals[index],actions=ctx.getWeek().v41MealActions||{};
  if(Object.keys(actions).some(k=>k.startsWith(index+':'))){ctx.toast('Repas déjà terminé : corrige le stock si nécessaire.');return}
  const recipes=ctx.state.recipes.slice().sort((a,b)=>a.name.localeCompare(b.name,'fr'));
- const frozen=Object.values(stockOf(ctx.state).freezer||{}).filter(l=>remainingFreezerPortionsV41(stockOf(ctx.state),ctx.state.weeks,l.lotId)>0);
+ const frozen=Object.values(stockOf(ctx.state).freezer||{}).filter(l=>remainingFreezerPortionsV41(
+  stockOf(ctx.state),ctx.state.weeks,l.lotId,{weekId:ctx.currentWeek,index})>0);
  let body='<p class="helper">Remplace uniquement ce repas. L’ancien plat ne déduit aucun ingrédient du stock.</p>'+
   '<button class="btn secondary wide" data-action="v41-replace-ordered" data-index="'+index+'">🍕 Repas commandé / libre</button>'+
-  '<div class="section-head"><h3>Un plat de mes recettes</h3></div><div class="v41-select-list">'+
+  '<div class="section-head"><h3>Un plat de mes recettes</h3></div>'+
+  input('v41RecipePortions','Portions à préparer',2,1,30)+
+  '<div class="v41-select-list">'+
   recipes.map(r=>'<button class="v41-select-row" data-action="v41-replace-recipe" data-index="'+index+'" data-id="'+esc(r.id)+'">'+esc(r.name)+' <span>→</span></button>').join('')+'</div>';
  if(frozen.length)body+='<div class="section-head"><h3>Un plat du congélateur</h3></div>'+
-  input('v41FrozenMealPortions','Portions à décongeler',Math.min(2,Math.max(...frozen.map(x=>remainingFreezerPortionsV41(stockOf(ctx.state),ctx.state.weeks,x.lotId)))),1,30)+
+  input('v41FrozenMealPortions','Portions à décongeler',Math.min(2,Math.max(...frozen.map(x=>remainingFreezerPortionsV41(
+    stockOf(ctx.state),ctx.state.weeks,x.lotId,{weekId:ctx.currentWeek,index})))),1,30)+
   '<div class="v41-select-list">'+frozen.map(l=>'<button class="v41-select-row" data-action="v41-replace-frozen" data-index="'+index+'" data-id="'+esc(l.lotId)+'">'+
-  esc(l.name)+'<small>'+remainingFreezerPortionsV41(stockOf(ctx.state),ctx.state.weeks,l.lotId)+' portions libres</small></button>').join('')+'</div>';
+  esc(l.name)+'<small>'+remainingFreezerPortionsV41(stockOf(ctx.state),ctx.state.weeks,l.lotId,{weekId:ctx.currentWeek,index})+' portions disponibles pour ce repas</small></button>').join('')+'</div>';
  ctx.showModal('Remplacer le repas',body);
 }
 export function handleStockActionV41(ctx) {
@@ -205,8 +217,12 @@ export function handleStockActionV41(ctx) {
    if(mode==='v41-replace-ordered'){
     ctx.clearMealWithPair(w,index);w.meals[index]={type:'ordered'};
    }else if(mode==='v41-replace-recipe'){
-    const r=ctx.recipeById(id);if(!r)throw Error('Recette introuvable.');
-    ctx.selectRecipeForMeal(w,index,id,Number(r.people)||2);
+    const r=ctx.recipeById(id),portions=amount('v41RecipePortions');
+    if(!r)throw Error('Recette introuvable.');
+    if(!Number.isInteger(portions)||portions<1||portions>30)throw Error('Choisis entre 1 et 30 portions.');
+    // Supprimer l'ancien repas et tous ses restes liés avant de placer le nouveau.
+    ctx.clearMealWithPair(w,index);
+    ctx.selectRecipeForMeal(w,index,id,portions);
    }else{
     const n=amount('v41FrozenMealPortions');
     state.weeks=planFrozenMealV41(state.weeks,stock,ctx.currentWeek,index,id,n);

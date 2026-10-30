@@ -603,6 +603,7 @@ function renderProduits(){
  '</div></div></div>';
  out+='<div class="catalog-primary-actions"><button class="btn" data-action="add-unified-product">＋ Ajouter un produit</button>'+
  '<button class="btn secondary" data-action="open-carrefour-import">📋 Importer Carrefour</button></div>';
+ out+='<button class="btn secondary wide v37-catalogue-add" data-action="v37-open-bulk">☑ Ajouter plusieurs produits aux courses</button>';
  out+='<div class="field catalog-search"><input class="text-input" id="productSearch" value="'+html(productSearch)+'" placeholder="⌕ Rechercher un produit…" aria-label="Rechercher un produit"></div>';
  out+='<div class="section-head"><h2>Votre catalogue</h2><span class="pill" id="catalogueCount">'+n+' produit'+(n>1?'s':'')+'</span></div>'+
  '<div id="catalogueResults">'+unifiedCatalogueRows()+'</div>'+
@@ -2139,11 +2140,21 @@ document.addEventListener('click',e=>{
   }
   else if(mode==='complete-week')populate();
   else if(mode==='repeat-week'){const prev=state.weeks[offsetDate(currentWeek,-7)];if(!prev?.meals?.some(Boolean)){toast('Aucun menu trouvé la semaine précédente.');return}if(w.meals.some(Boolean)&&!confirm('Remplacer les repas de cette semaine ?'))return;w.meals=JSON.parse(JSON.stringify(prev.meals));persist();render();toast('Menus de la semaine précédente repris !')}
-  else if(mode==='add-extra')extraModal();
+  else if(mode==='add-extra'||mode==='v37-open-bulk')openBulkCatalogueV37();
+   else if(mode==='v37-bulk-all'||mode==='v37-bulk-none'){
+    modalRoot.querySelectorAll('[data-v37-row]').forEach(row=>{
+     if(mode==='v37-bulk-none'||!row.hidden)
+      row.querySelector('[data-v37-select]').checked=mode==='v37-bulk-all'
+    });
+    updateBulkV37()
+   }
+   else if(mode==='v37-qty-minus'||mode==='v37-qty-plus')
+    stepBulkV37(a.closest('[data-v37-row]'),mode==='v37-qty-plus'?1:-1);
+   else if(mode==='v37-bulk-add')commitBulkV37();
   else if(mode==='extra-one-off')extraOneOffModal();
   else if(mode==='select-extra-catalogue')unifiedToCourses(a.dataset.kind,id);
   else if(mode==='frequent-to-courses')unifiedToCourses(a.dataset.kind,id);
-   else if(mode==='bulk-favorites')bulkFavoritesV36();
+   else if(mode==='bulk-favorites')openBulkCatalogueV37(true);
    else if(mode==='bulk-select-all'||mode==='bulk-select-none'){
     document.querySelectorAll('[data-v36-favorite]:not(:disabled)').forEach(cb=>{cb.checked=mode==='bulk-select-all'});
     updateBulkFavoritesCountV36()
@@ -2198,6 +2209,13 @@ document.addEventListener('click',e=>{
   else if(mode==='clear-all'){if(confirm('Effacer toutes les données actuelles ? Une copie locale sera conservée dans les versions précédentes.')){checkpoint('Avant effacement');state=baseState();persist();closeModal();render();toast('Données actuelles effacées.')}}
 });
 document.addEventListener('change',e=>{
+  if(e.target.matches('[data-v37-select]')){updateBulkV37();return}
+  if(e.target.id==='v37BulkFilter'){filterBulkV37();return}
+  if(e.target.matches('[data-v37-unit]')){
+   e.target.closest('[data-v37-row]')?.querySelector('[data-v37-select]')?.click();
+   return
+  }
+  if(e.target.matches('[data-v37-qty]')){const row=e.target.closest('[data-v37-row]');if(row)row.querySelector('[data-v37-select]').checked=true;updateBulkV37();return}
   if(e.target.matches('[data-v36-favorite]')){updateBulkFavoritesCountV36();return}
  if(e.target.id==='catalogueStore'){$('#catalogueReferencePanel')?.toggleAttribute('hidden',e.target.value==='grandfrais');return}
  if(e.target.id==='mealRecipeType'){refreshMealRecipePicker();return}
@@ -2227,6 +2245,7 @@ document.addEventListener('change',e=>{
  }
  }else if(e.target.matches('[data-store-item]')){const item=e.target.dataset.storeItem,store=e.target.value;closeModal();setShoppingStore(item,store)}else if(e.target.matches('[data-check]')){const w=getWeek(),id=e.target.dataset.check;w.checked=e.target.checked?[...new Set([...w.checked,id])]:w.checked.filter(x=>x!==id);persist();render(true)}else if(e.target.id==='importFile')importData(e.target.files?.[0])});
 document.addEventListener('input',e=>{
+  if(e.target.id==='v37BulkSearch'){filterBulkV37();return}
  if(e.target.id==='courseAddSearch'){const results=$('#courseAddSearchResults');if(results)results.innerHTML=extraSearchResults(e.target.value);return}
  if(e.target.id==='mealRecipeSearch'){refreshMealRecipePicker();return}
  if(e.target.id==='homeStockAmount')refreshStockPreview();if(e.target.matches?.('.ingredient-name'))refreshIngredientEntry(e.target.closest('.ingredient-line'));if(e.target.matches?.('.ingredient-unit'))e.target.closest('.ingredient-line').dataset.unitSelected='true';if(e.target.id==='recipeSearch'){search=e.target.value;const result=$('#recipeResults'),count=$('#recipeCount');if(result)result.innerHTML=recipeRows();if(count)count.textContent=visibleRecipes().length+' / '+state.recipes.length+' plats'}else if(e.target.id==='productSearch'){productSearch=e.target.value;const result=$('#catalogueResults'),count=$('#catalogueCount');if(result)result.innerHTML=unifiedCatalogueRows();if(count){const n=unifiedCatalogueItems().length;count.textContent=n+' produit'+(n>1?'s':'')}}});

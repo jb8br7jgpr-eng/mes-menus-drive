@@ -1,5 +1,5 @@
-const CACHE='menus-drive-v41-draft-20261030';
-const ASSETS=['./','./index.html','./styles.css?v=20261030-40-1','./stock-ui-v41.css?v=20261030-41-draft','./app.js?v=20261030-41-draft','./stock-engine-v41.mjs','./stock-week-v41.mjs','./stock-ui-v41.mjs','./stock-actions-v41.mjs','./manifest.webmanifest?v=20261029-31','./speedrive-logo-v2.PNG?v=20261029-31','./speedrive-icon-v2.PNG?v=20261029-31'];
+const CACHE='menus-drive-v41-release-20261030';
+const ASSETS=['./','./index.html','./styles.css?v=20261030-40-1','./stock-ui-v41.css?v=20261030-41-release','./app.js?v=20261030-41-release','./stock-engine-v41.mjs','./stock-week-v41.mjs','./stock-ui-v41.mjs','./stock-actions-v41.mjs','./manifest.webmanifest?v=20261029-31','./speedrive-logo-v2.PNG?v=20261029-31','./speedrive-icon-v2.PNG?v=20261029-31'];
 self.addEventListener('install',event=>{
   event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(ASSETS)).then(()=>self.skipWaiting()));
 });

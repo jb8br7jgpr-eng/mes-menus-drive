@@ -454,6 +454,11 @@ function catalogueEditor(kind,id=null,draft=null,linkedIngredientId=null){
  const referenceOptions=(state.products||[]).slice().sort((a,b)=>a.name.localeCompare(b.name,'fr')).map(p=>
   '<option value="'+html(p.id)+'" '+(record.productId===p.id?'selected':'')+'>'+html([p.name,p.brand,p.packaging].filter(Boolean).join(' · '))+'</option>').join('');
  const isImported=Boolean(draft?.url&&!id);
+ const suggestedUnit=units.includes(record.unit)?record.unit:(isIngredient?preferredIngredientUnit(record):'paquet');
+ const sampleIngredient=isIngredient?(state.recipes||[]).flatMap(r=>r.ingredients||[]).find(line=>
+   (line.ingredientId&&line.ingredientId===record.id||norm(line.name)===norm(record.name))&&
+   line.unit===suggestedUnit&&Number(line.qty)>0):null;
+ const suggestedQty=Number(record.qty)>0?Number(record.qty):Number(sampleIngredient?.qty)>0?Number(sampleIngredient.qty):1;
  let body='<form id="catalogueEditorForm" data-kind="'+kind+'" data-id="'+html(id||'')+'" data-ingredient-id="'+html(linkedIngredientId||'')+'">'+
   '<div class="catalogue-type-locked">'+(isIngredient?'🥕 Ingrédient · recettes et courses':'🧻 Achat du quotidien · courses uniquement')+'</div>'+
   '<div class="field"><label for="catalogueName">Nom du produit</label><input id="catalogueName" maxlength="100" required placeholder="Ex. Tomates ou papier toilette" value="'+html(record.name||'')+'"></div>'+
@@ -461,9 +466,10 @@ function catalogueEditor(kind,id=null,draft=null,linkedIngredientId=null){
   '<option value="carrefour" '+(store==='carrefour'?'selected':'')+'>Carrefour Drive</option>'+
   '<option value="grandfrais" '+(store==='grandfrais'?'selected':'')+'>Grand Frais</option></select></div>'+
   '<div class="field"><label for="catalogueCategory">Catégorie</label><select id="catalogueCategory">'+selectOptions(productCategories,record.category||'Autres')+'</select></div>'+
-  '<div class="row stock-editor-row"><div class="field grow"><label for="catalogueQty">Quantité habituelle</label><input id="catalogueQty" type="number" inputmode="decimal" step="any" min=".01" required value="'+html(record.qty||1)+'"></div>'+
-  '<div class="field grow"><label for="catalogueUnit">Unité</label><select id="catalogueUnit">'+selectOptions(units,record.unit||(isIngredient?preferredIngredientUnit(record):'paquet'))+'</select></div></div>'+
-  '<p class="helper">Quantité proposée pour un ajout ponctuel aux courses. Chaque recette conserve ses propres quantités.</p>'+
+  '<details class="v38-course-defaults"><summary>🛒 Quantité proposée aux courses : <strong>'+html(quantity(suggestedQty,suggestedUnit))+'</strong><small>Facultatif · toucher pour modifier</small></summary>'+
+  '<div class="row stock-editor-row"><div class="field grow"><label for="catalogueQty">Quantité pré-remplie</label><input id="catalogueQty" type="number" inputmode="decimal" step="any" min=".01" required value="'+html(suggestedQty)+'"></div>'+
+  '<div class="field grow"><label for="catalogueUnit">Unité</label><select id="catalogueUnit">'+selectOptions(units,suggestedUnit)+'</select></div></div>'+
+  '<p class="helper">C’est seulement la quantité suggérée lorsque tu ajoutes cet article à tes courses. Tu peux la changer à chaque ajout. Cela ne change ni les quantités des recettes, ni le stock maison, ni le contenu des paquets Carrefour.</p></details>'+
   '<label class="catalogue-frequent-check"><input id="catalogueFrequent" type="checkbox" '+(record.frequent?'checked':'')+'> ☆ Ajouter à mes achats fréquents</label>';
  if(isIngredient){
   body+='<div class="catalogue-reference-panel" id="catalogueReferencePanel" '+(store==='grandfrais'?'hidden':'')+'>'+
@@ -1456,7 +1462,7 @@ function bulkCatalogueV37(){
  const linked=new Set((state.ingredientCatalog||[]).map(i=>i.productId).filter(Boolean));
  const items=[
   ...(state.ingredientCatalog||[]).map(i=>{
-   const unit=preferredIngredientUnit(i);
+   const unit=units.includes(i.unit)?i.unit:preferredIngredientUnit(i);
    const matching=state.recipes.flatMap(r=>r.ingredients||[]).find(line=>
     (line.ingredientId===i.id||norm(line.name)===norm(i.name))&&line.unit===unit&&Number(line.qty)>0);
    return {kind:'ingredient',id:i.id,name:i.name,store:ingredientStore(i),frequent:!!i.frequent,
@@ -1481,7 +1487,7 @@ function bulkPurchaseExtraV37(kind,id,amount,unit){
 function openBulkCatalogueV37(favoritesOnly=false){
  const items=bulkCatalogueV37();
  if(!items.length){toast('Ajoute d’abord des produits ou ingrédients dans ton catalogue.');return}
- let out='<p class="helper">Sélectionne plusieurs articles, règle leur quantité et ajoute tout en une fois. Ingrédients et achats du quotidien sont réunis ici.</p>'+
+ let out='<p class="helper">Choisis tes articles et leurs quantités. Les chiffres affichés sont de simples propositions : tu peux les changer ici, sans modifier tes recettes ni les fiches produits.</p>'+
  '<div class="v37-bulk-filters"><div class="field"><label for="v37BulkSearch">Rechercher un article</label>'+
  '<input id="v37BulkSearch" type="search" autocomplete="off" placeholder="Ex. lait, pâtes, sopalin…"></div>'+
  '<div class="field"><label for="v37BulkFilter">Afficher</label>'+

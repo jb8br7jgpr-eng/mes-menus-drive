@@ -1571,16 +1571,7 @@ function commitBulkV37(){
  toastWeekUndo(staged.length+' article'+(staged.length>1?'s':'')+' ajouté'+(staged.length>1?'s':'')+' aux courses.',before)
 }
 
-function extraModal(){
- return openBulkCatalogueV37();
-
- let out='<p class="helper">Choisis un produit enregistré : sa quantité habituelle et son magasin seront repris automatiquement. Les achats restent ponctuels à cette semaine.</p>'+
- '<div class="field"><label for="courseAddSearch">Rechercher dans mes produits</label>'+
- '<input id="courseAddSearch" class="text-input" placeholder="Ex. dentifrice, lait, pommes…" autocomplete="off"></div>'+
- '<div id="courseAddSearchResults" class="course-search-results">'+extraSearchResults()+'</div>'+
- '<button class="btn secondary wide course-one-off" data-action="extra-one-off">＋ Article ponctuel, hors catalogue</button>';
- showModal('Ajouter aux courses',out);
-}
+function extraModal(){return openBulkCatalogueV37()}
 function extraOneOffModal(){
  const out='<p class="helper">Pour un achat exceptionnel, sans nouvelle fiche dans Produits. Pour un article habituel, utilise la recherche du catalogue.</p>'+
  '<form id="extraForm"><div class="field"><label for="extraName">Nom de l’article</label><input id="extraName" maxlength="80" required placeholder="Ex. cadeau, fournitures…"></div>'+

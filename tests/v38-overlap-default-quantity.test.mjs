@@ -41,7 +41,8 @@ test('Une quantité et une unité déjà définies sont respectées dans les ach
  const run=runInNewContext(code+';bulkCatalogueV37',{
   state,norm:s=>String(s).toLowerCase(),ingredientStore:x=>x.store,
   preferredIngredientUnit:x=>x.id==='b'?'g':'pièce',
-  units:['pièce','g','kg','paquet']
+  units:['pièce','g','kg','paquet'],
+  catalogueCategoryV40:item=>item.category||'Autres'
  });
  const items=run();
  const ail=items.find(x=>x.id==='a'),cannelle=items.find(x=>x.id==='b');

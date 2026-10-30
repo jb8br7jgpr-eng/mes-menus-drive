@@ -49,7 +49,9 @@ test('Le filtre par catégorie fonctionne pour ingrédients ET achats du quotidi
  };
  const fn=runInNewContext(between('function unifiedCatalogueItems(){','function unifiedCatalogueRows(){')+';unifiedCatalogueItems',{
   state,catalogueTypeFilter:'all',catalogueStoreFilter:'all',catalogueCategoryFilter:'Œufs',
-  productSearch:'',norm:v=>String(v||'').toLowerCase(),ingredientStore:x=>x.store
+  productSearch:'',norm:v=>String(v||'').toLowerCase(),ingredientStore:x=>x.store,
+  catalogueSortV40:'name',catalogueCategoryV40:item=>item.category||'Autres',
+  catalogueSortCompareV40:(a,b)=>a.name.localeCompare(b.name,'fr')
  });
  const one=fn();
  assert.equal(one.length,1);
@@ -74,11 +76,11 @@ test('Les fiches affichent la catégorie et le filtre est un select compact',()=
  const editor=between('function catalogueEditor(', 'function previewCarrefourPackV38(');
  assert.match(editor,/productCategoryOptions\(record.category\|\|'Autres'\)/);
  const listing=between('function renderProduits(){','function chooseUnifiedProductType(){');
- assert.match(listing,/id="catalogueCategoryFilter"/);
+ assert.match(listing,/categoryId:'catalogueCategoryFilter'/);
  assert.match(listing,/productCategoryChoices\(\)/);
  const row=between('function unifiedCatalogueRows(){','function renderProduits(){');
  assert.match(row,/v39-category-label/);
- assert.match(css,/\.v39-catalog-search-tools/);
+ assert.match(css,/\.v40-filter-panel/);
 });
 test('Les données restent compatibles avec la sauvegarde existante et les menus',()=>{
  assert.match(js,/const baseState=\(\)=>\(\{schema:1/);

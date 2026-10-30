@@ -27,7 +27,8 @@ function api(){
  const ctx={state,units,ingredientStore:i=>i.store,preferredIngredientUnit:i=>i.id==='ing-pomme'?'pièce':'ml',
    norm:s=>String(s).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase(),
    ingredientById:id=>state.ingredientCatalog.find(x=>x.id===id),
-   productById:id=>state.products.find(x=>x.id===id),uid:()=> 'nouveau'};
+   productById:id=>state.products.find(x=>x.id===id),uid:()=> 'nouveau',
+   catalogueCategoryV40:item=>item.category||'Autres'};
  const methods=runInNewContext(between('bulkCatalogueV37','extraModal')+';({bulkCatalogueV37,bulkPurchaseExtraV37,commitBulkV37})',ctx);
  return {state,ctx,methods}
 }

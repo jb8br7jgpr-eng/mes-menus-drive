@@ -12,6 +12,7 @@ const baseState=()=>({schema:1,recipes:[],products:[],weeks:{},staples:[],storeP
 let state=baseState(), currentTab='menus', currentWeek='', search='', recipeSort='az', recipeTypeFilter='all', productSearch='', productCategory='Toutes', ingredientStoreTab='carrefour', catalogueTypeFilter='all', catalogueStoreFilter='all', db=null, usingFallback=false;
 let pendingRecipeDraftImage='',pendingIngredientLinkId=null;
 let independentProductsOpen=false;const courseOpenSections=new Set();
+let calendarMonthV36='';
 const tabScrollV33={menus:0,plats:0,produits:0,courses:0,drive:0};
 const app=$('#app'), modalRoot=$('#modalRoot');
 const uid=()=>Math.random().toString(36).slice(2,10)+Date.now().toString(36);
@@ -155,6 +156,47 @@ function renderMealContext(index){
 }
 function pageHeading(kicker,title,sub){return '<div class="eyebrow">'+kicker+'</div><h1>'+title+'</h1><p class="muted" style="font-size:13px">'+sub+'</p>'}
 function recipeById(id){return state.recipes.find(r=>r.id===id)}
+
+function weekHasMealsV36(key){
+ const week=state.weeks[key];return !!(week&&Array.isArray(week.meals)&&week.meals.some(Boolean))
+}
+function calendarMarkupV36(){
+ const date=parseDate(calendarMonthV36+'-01'),year=date.getFullYear(),month=date.getMonth();
+ const start=new Date(year,month,1,12),count=new Date(year,month+1,0,12).getDate();
+ const offset=(start.getDay()+6)%7,cells=Math.ceil((offset+count)/7)*7;
+ let out='<div class="v36-calendar-nav"><button class="icon-btn" data-action="calendar-shift" data-shift="-1" aria-label="Mois précédent">‹</button><strong>'+
+ html(start.toLocaleDateString('fr-FR',{month:'long',year:'numeric'}))+
+ '</strong><button class="icon-btn" data-action="calendar-shift" data-shift="1" aria-label="Mois suivant">›</button></div>';
+ out+='<div class="v36-calendar-grid" role="group" aria-label="Calendrier des semaines">'+
+ days.map(d=>'<span class="v36-calendar-weekday">'+d.slice(0,1)+'</span>').join('');
+ for(let i=0;i<cells;i++){
+  const day=new Date(year,month,1-offset+i,12),key=monday(day),iso=localDate(day),planned=day.getDay()===1&&weekHasMealsV36(key);
+  out+='<button type="button" class="v36-calendar-day'+(currentWeek===key?' selected':'')+
+   (day.getMonth()!==month?' outside':'')+(iso===localDate(new Date())?' today':'')+
+   '" data-action="calendar-select" data-date="'+iso+'" aria-pressed="'+(currentWeek===key)+'" aria-label="'+
+   html(day.toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long'}))+(planned?', semaine planifiée':'')+
+   '"><span>'+day.getDate()+'</span><i class="'+(planned?'planned':'')+'" aria-hidden="true"></i></button>';
+ }
+ out+='</div><p class="helper v36-calendar-legend">● Point vert : semaine contenant des menus. Touche un jour pour ouvrir sa semaine.</p>'+
+ '<button class="btn secondary wide" data-action="calendar-current">↩ Revenir à la semaine actuelle</button>';
+ return out
+}
+function openCalendarV36(month=null){
+ calendarMonthV36=month||currentWeek.slice(0,7);
+ showModal('📅 Retrouver une semaine',calendarMarkupV36())
+}
+function shiftCalendarV36(shift){
+ if(![-1,1].includes(shift))return;
+ const d=parseDate(calendarMonthV36+'-01'),next=new Date(d.getFullYear(),d.getMonth()+shift,1,12);
+ openCalendarV36(localDate(next).slice(0,7))
+}
+function selectCalendarV36(iso){
+ if(!/^\d{4}-\d{2}-\d{2}$/.test(iso||''))return;
+ const d=parseDate(iso);if(localDate(d)!==iso)return;
+ currentWeek=monday(d);tabScrollV33.menus=0;tabScrollV33.courses=0;tabScrollV33.drive=0;
+ closeModal();render()
+}
+
 function emptyView(emoji,title,description,button){return '<div class="empty"><div class="illustration">'+emoji+'</div><strong>'+title+'</strong><p>'+description+'</p>'+button+'</div>'}
 // Toutes les anciennes cases (un seul plat) restent lisibles après la mise à jour.
 function mealDishes(meal){
@@ -182,8 +224,9 @@ function mealCard(meal,i){
   mealLeftovers(meal).forEach(x=>{const r=recipeById(x.recipeId);names.push('🍱 Restes : '+(r?.name||'Autre plat')+' · '+x.people+' portion'+(x.people>1?'s':''))});
   if(names.length){classes=' filled';note=names.length===1?'1 plat':names.length+' plats pour ce repas'}
  }
+ const available=mealDishes(meal).reduce((n,d)=>n+Math.max(0,sourceBudget(getWeek(),i,d.recipeId)-usedLeftovers(getWeek(),i,d.recipeId)),0);
  return '<button class="meal-tile'+classes+'" data-action="pick-meal" data-index="'+i+'" aria-label="'+html(days[Math.floor(i/2)])+' '+(i%2?'soir':'midi')+', '+html(names.join(' et ')||'ajouter un plat')+'"><span class="meal-type">'+(i%2?'Soir':'Midi')+(note?' · '+html(note):'')+'</span>'+
- (names.length?names.map(n=>'<strong>'+html(n)+'</strong>').join(''):'<span class="add">＋ Ajouter un plat</span>')+'</button>';
+ (names.length?names.map(n=>'<strong>'+html(n)+'</strong>').join(''):'<span class="add">＋ Ajouter un plat</span>')+(available?'<span class="v36-leftover-pill">🍱 '+available+' portion'+(available>1?'s':'')+' disponible'+(available>1?'s':'')+'</span>':'')+'</button>';
 }
 function renderMenus(){const w=getWeek(),count=w.meals.filter(Boolean).length, last=offsetDate(currentWeek,6),isThis=currentWeek===monday(new Date());
   let out='<div class="hero"><div class="eyebrow">Planificateur hebdomadaire</div><h1>Qu’est-ce qu’on mange cette semaine ?</h1><p>Planifie tes repas, cuisine pour deux ou plus et place les restes quand tu veux.</p>'+
@@ -193,10 +236,12 @@ function renderMenus(){const w=getWeek(),count=w.meals.filter(Boolean).length, l
   out+='<div class="section-head week-v32-heading"><h2>Votre semaine</h2><div class="week-v32-heading-actions">'+
   (isThis?'<button class="week-v32-today-link" data-action="jump-today">Aujourd’hui ↓</button>':'')+
   '<span class="pill">'+count+' / 14 repas</span></div></div>';
-  out+='<div class="week-control"><button class="icon-btn" aria-label="Semaine précédente" data-action="week-prev">‹</button><div class="week-label">Du '+niceDate(currentWeek)+' au '+niceDate(last)+(isThis?'<small>Cette semaine</small>':'<small>Planning personnalisé</small>')+'</div><button class="icon-btn" aria-label="Semaine suivante" data-action="week-next">›</button></div>'+
+  out+='<div class="week-control"><button class="icon-btn" aria-label="Semaine précédente" data-action="week-prev">‹</button><button class="week-label v36-week-label" data-action="open-week-calendar" aria-label="Ouvrir le calendrier des semaines">Du '+niceDate(currentWeek)+' au '+niceDate(last)+(isThis?'<small>Cette semaine · 📅</small>':'<small>📅 Choisir une semaine</small>')+'</button><button class="icon-btn" aria-label="Semaine suivante" data-action="week-next">›</button></div>'+
   (!isThis?'<div class="week-v33-return"><button class="week-v33-return-btn" data-action="week-current">↩ Revenir à la semaine actuelle</button></div>':'');
   out+='<div class="status-bar"><span style="width:'+(count/14*100)+'%"></span></div>';
   out+=courseGenerationBanner(w,'menus');
+  const availableThisWeek=w.meals.reduce((total,meal,i)=>total+mealDishes(meal).reduce((n,d)=>n+Math.max(0,sourceBudget(w,i,d.recipeId)-usedLeftovers(w,i,d.recipeId)),0),0);
+  if(availableThisWeek)out+='<div class="v36-leftovers-summary">🍱 <strong>'+availableThisWeek+' portion'+(availableThisWeek>1?'s':'')+' disponible'+(availableThisWeek>1?'s':'')+'</strong> à placer dans les prochains repas si tu le souhaites.</div>';
   out+='<div class="meal-list">';
   for(let day=0;day<7;day++){
    const d=offsetDate(currentWeek,day),isToday=d===localDate(new Date()),hasMeals=Boolean(w.meals[day*2]||w.meals[day*2+1]);
@@ -208,6 +253,33 @@ function renderMenus(){const w=getWeek(),count=w.meals.filter(Boolean).length, l
   out+='<p class="helper">Choisis librement quand manger les restes : touche le repas souhaité, puis « Placer des restes ici ». La sélection indique les plats cuisinés et les portions encore disponibles. Aucun repas de restes n’est rempli automatiquement.</p>';
   return out
 }
+
+function planRecipeV36(recipeId){
+ const recipe=recipeById(recipeId);if(!recipe)return;
+ const w=getWeek(),end=offsetDate(currentWeek,6);
+ let out='<p class="helper">Choisis où ajouter <strong>'+html(recipe.name)+'</strong>. Les plats déjà prévus restent en place.</p>'+
+ '<div class="v36-plan-week">📅 Du '+niceDate(currentWeek)+' au '+niceDate(end)+' <small>· semaine sélectionnée</small></div>'+
+ '<div class="field"><label for="v36PlanPortions">Portions à préparer</label>'+
+ '<input id="v36PlanPortions" type="number" min="1" max="30" value="'+Number(recipe.people||2)+'">'+
+ '<span class="helper">Portions de base proposées automatiquement.</span></div>'+
+ '<div class="v36-plan-grid">';
+ for(let i=0;i<14;i++){
+  const meal=w.meals[i],already=mealDishes(meal).some(d=>d.recipeId===recipeId);
+  out+='<button class="v36-plan-target" data-action="plan-recipe-to-meal" data-id="'+html(recipeId)+'" data-index="'+i+'" '+(already?'disabled':'')+'>'+
+  '<strong>'+days[Math.floor(i/2)]+' '+(i%2?'soir':'midi')+'</strong><small>'+
+  (already?'Déjà prévu':meal?'Ajouter au repas':'Repas libre')+'</small></button>'
+ }
+ showModal('＋ Ajouter aux menus',out+'</div>')
+}
+function commitPlannedRecipeV36(recipeId,index,portions){
+ if(!Number.isInteger(index)||index<0||index>13||!Number.isInteger(portions)||portions<1||portions>30)return false;
+ const w=getWeek(),before=weekBeforeUndo();
+ if(!addRecipeToMeal(w,index,recipeId,portions))return false;
+ persist();closeModal();currentTab='menus';tabScrollV33.menus=0;renderMealContext(index);
+ toastWeekUndo('Plat ajouté aux menus.',before,index);
+ return true
+}
+
 function recipeImg(r){return '<span class="recipe-img">'+(r.image?'<img src="'+html(r.image)+'" alt="">':html(icons[r.category]||'🍽️'))+'</span>'}
 function normalRecipeType(value){
  if(value==='Salade')return 'Salades';
@@ -229,7 +301,7 @@ function recipeRows(){
  return list.map(r=>'<div class="recipe-card"><button class="recipe-preview-trigger" data-action="view-recipe" data-id="'+html(r.id)+'" aria-label="Consulter le plat '+html(r.name)+'">'+recipeImg(r)+'<span class="recipe-preview-copy"><strong class="recipe-preview-name">'+html(r.name)+'</strong><span class="recipe-preview-meta">'+
   r.ingredients.length+' ingrédient'+(r.ingredients.length>1?'s':'')+' · '+r.people+' portions</span>'+
   '<span class="pill gray">'+html(normalRecipeType(r.category)==='legacy'?(r.category||'Autre'):normalRecipeType(r.category))+'</span></span></button>'+
-  '<div class="recipe-actions"><button class="icon-btn" data-action="edit-recipe" data-id="'+html(r.id)+'" aria-label="Modifier '+html(r.name)+'">✎</button>'+
+  '<div class="recipe-actions"><button class="btn tiny v36-recipe-plan" data-action="plan-recipe" data-id="'+html(r.id)+'">＋ Menus</button><button class="icon-btn" data-action="edit-recipe" data-id="'+html(r.id)+'" aria-label="Modifier '+html(r.name)+'">✎</button>'+
   '<button class="btn tiny secondary" data-action="duplicate-recipe" data-id="'+html(r.id)+'">Dupliquer</button></div></div>').join('')||
   emptyView('🍲','Aucun plat trouvé',search||recipeTypeFilter!=='all'?'Essaie un autre nom ou un autre type.':'Commence par ajouter votre premier plat.',
    '<button class="btn" data-action="add-recipe">＋ Ajouter un plat</button>')
@@ -249,7 +321,7 @@ function viewRecipeV33(id){
   html(r.people)+' portion'+(r.people>1?'s':'')+'</span></div>'+
   '<h3>Ingrédients</h3><ul class="recipe-v33-ingredients">'+ingredients+'</ul>'+
   '<p class="helper">Quantités enregistrées pour la recette. La consultation ne modifie ni les menus ni les courses.</p>'+
-  '<button class="btn secondary wide" data-action="edit-recipe" data-id="'+html(r.id)+'">✎ Modifier ce plat</button></div>';
+  '<button class="btn wide v36-recipe-plan-preview" data-action="plan-recipe" data-id="'+html(r.id)+'">＋ Ajouter aux menus</button>'+ '<button class="btn secondary wide" data-action="edit-recipe" data-id="'+html(r.id)+'">✎ Modifier ce plat</button></div>';
  showModal(html(r.name),body);
 }
 function renderPlats(){
@@ -673,6 +745,58 @@ function migrateFrequentProducts(){
  state.favoritesUnifiedV29=true;
  return true
 }
+
+/* V36 : choix multiple sans nouvelle structure de données et un seul enregistrement. */
+function favoriteExtraV36(kind,id){
+ const ingredient=kind==='ingredient',item=ingredient?ingredientById(id):kind==='daily'?productById(id):null;
+ if(!item)return null;
+ const qty=Number(item.qty)||1,unit=units.includes(item.unit)?item.unit:'pièce';
+ return {id:uid(),name:item.name,qty,unit,productId:ingredient?(item.productId||null):item.id,
+  ingredientId:ingredient?item.id:null,fromCatalogue:true}
+}
+function favoriteAlreadyAddedV36(w,extra){
+ return (w.extras||[]).some(x=>(extra.ingredientId&&x.ingredientId===extra.ingredientId)||
+   (extra.productId&&x.productId===extra.productId))
+}
+function bulkFavoritesV36(){
+ const items=frequentCatalogueItems(),w=getWeek();
+ if(!items.length){toast('Aucun achat habituel enregistré.');return}
+ let out='<p class="helper">Coche les achats habituels à ajouter à cette semaine. Les articles déjà ajoutés ne seront pas dupliqués.</p>'+
+ '<div class="v36-bulk-tools"><button class="btn tiny secondary" data-action="bulk-select-all">Tout sélectionner</button>'+
+ '<button class="btn tiny secondary" data-action="bulk-select-none">Tout désélectionner</button></div>'+
+ '<div class="v36-bulk-list">';
+ out+=items.map(x=>{
+  const extra=favoriteExtraV36(x.kind,x.id);
+  const already=extra&&favoriteAlreadyAddedV36(w,extra);
+  return '<label class="v36-bulk-row'+(already?' already':'')+'"><input type="checkbox" data-v36-favorite data-kind="'+x.kind+
+    '" data-id="'+html(x.id)+'" '+(already?'disabled':'')+'><span class="v36-bulk-name"><strong>'+
+    html(x.name)+'</strong><small>'+html(extra?quantity(extra.qty,extra.unit):'')+(already?' · déjà ajouté':'')+
+    '</small></span></label>'
+ }).join('');
+ out+='</div><button class="btn wide v36-bulk-submit" data-action="bulk-add-favorites" disabled>＋ Ajouter les achats sélectionnés</button>';
+ showModal('☑ Mes achats habituels',out)
+}
+function updateBulkFavoritesCountV36(){
+ const selected=document.querySelectorAll('[data-v36-favorite]:checked').length;
+ const button=$('.v36-bulk-submit');if(!button)return;
+ button.disabled=!selected;
+ button.textContent=selected?'＋ Ajouter '+selected+' achat'+(selected>1?'s':''):'＋ Ajouter les achats sélectionnés'
+}
+function addBulkFavoritesV36(){
+ const checkboxes=[...document.querySelectorAll('[data-v36-favorite]:checked')];
+ if(!checkboxes.length){toast('Coche au moins un achat.');return}
+ const w=getWeek(),before=weekBeforeUndo();
+ let added=0,skipped=0;
+ for(const checkbox of checkboxes){
+  const extra=favoriteExtraV36(checkbox.dataset.kind,checkbox.dataset.id);
+  if(!extra||favoriteAlreadyAddedV36(w,extra)){skipped++;continue}
+  w.extras.push(extra);added++
+ }
+ if(!added){toast('Ces achats sont déjà dans la liste.');return}
+ persist();closeModal();render(true);
+ toastWeekUndo(added+' achat'+(added>1?'s':'')+' ajouté'+(added>1?'s':'')+(skipped?' · '+skipped+' déjà présent'+(skipped>1?'s':''):''),before)
+}
+
 function frequentCatalogueItems(){
  const linked=new Set((state.ingredientCatalog||[]).map(i=>i.productId).filter(Boolean));
  return [
@@ -761,7 +885,7 @@ function migrateLegacyGeneratedCourses(){
 function weekSwitcher(){
  const end=offsetDate(currentWeek,6);
  return '<div class="week-control"><button class="icon-btn" aria-label="Semaine précédente" data-action="week-prev">‹</button>'+
- '<div class="week-label">Du '+niceDate(currentWeek)+' au '+niceDate(end)+'</div>'+
+ '<button class="week-label v36-week-label" data-action="open-week-calendar" aria-label="Ouvrir le calendrier des semaines">Du '+niceDate(currentWeek)+' au '+niceDate(end)+'<small>📅 Calendrier</small></button>'+
  '<button class="icon-btn" aria-label="Semaine suivante" data-action="week-next">›</button></div>'+
  (currentWeek!==monday(new Date())?'<div class="week-v33-return"><button class="week-v33-return-btn" data-action="week-current">↩ Revenir à la semaine actuelle</button></div>':'')
 }
@@ -1007,7 +1131,7 @@ function renderCourses(){
  const favorites=frequentCatalogueItems();
  if(favorites.length){
   out+='<details class="course-optional" data-section="favorites" '+(courseOpenSections.has('favorites')?'open':'')+'><summary>☆ Mes achats fréquents <span class="pill gray">'+favorites.length+'</span></summary>'+
-   '<p class="helper">Des produits du catalogue, sans fiche en double. Retrouve-les ici pour les ajouter ponctuellement.</p><div class="favorites">'+
+   '<p class="helper">Ajoute un article d’un geste ou sélectionne plusieurs achats.</p>'+ '<button class="btn secondary wide v36-bulk-open" data-action="bulk-favorites">☑ Ajouter plusieurs achats d’un coup</button><div class="favorites">'+
    favorites.map(x=>'<button class="favorite-chip" data-action="frequent-to-courses" data-kind="'+x.kind+'" data-id="'+html(x.id)+'">＋ '+html(x.name)+'</button>').join('')+'</div></details>'
  }
  function section(store,title,icon,rows){
@@ -1289,9 +1413,10 @@ function pickMeal(index){
  '</select></div></div>';
  out+='<div id="mealRecipeCount" class="meal-picker-count">'+
  Math.max(0,state.recipes.length-dishes.length)+' plat(s) disponibles</div>';
- out+='<div class="recipe-picker meal-picker-scroll">'+
+ const availableRestes=availableLeftoverSources(getWeek(),index).reduce((n,x)=>n+x.available,0);
+  out+='<div class="recipe-picker meal-picker-scroll">'+
  '<button class="picker-item" data-action="choose-leftovers" data-index="'+index+'"><span class="emoji">🍱</span>'+
- '<span class="grow"><strong>Placer des restes ici</strong><small>Choisis leur plat d’origine et les portions disponibles</small></span>'+
+ '<span class="grow"><strong>🍱 '+(availableRestes?availableRestes+' portion'+(availableRestes>1?'s':'')+' de restes disponible'+(availableRestes>1?'s':''):'Placer des restes ici')+'</strong><small>'+(availableRestes?'Touche pour choisir un plat et placer ses restes':'Choisis leur plat d’origine et les portions disponibles')+'</small></span>'+
  '<span class="end">＋</span></button>'+
  '<div id="mealRecipeResults" data-index="'+index+'">'+mealRecipePickerResults(index)+'</div></div>';
  if(!state.recipes.length)out+='<div class="note" style="margin-top:10px">Ajoute d’abord tes plats au catalogue, puis retrouve-les ici.</div>';
@@ -1691,6 +1816,16 @@ document.addEventListener('click',e=>{
    tabScrollV33.menus=0;tabScrollV33.courses=0;tabScrollV33.drive=0;render()
   }
   else if(mode==='week-current')returnToCurrentWeekV33()
+   else if(mode==='open-week-calendar')openCalendarV36()
+   else if(mode==='plan-recipe')planRecipeV36(id)
+   else if(mode==='plan-recipe-to-meal'){
+    const portions=Number($('#v36PlanPortions')?.value);
+    if(!commitPlannedRecipeV36(id,index,portions))
+     toast('Impossible d’ajouter le plat : vérifie les portions ou le repas choisi.');
+   }
+   else if(mode==='calendar-shift')shiftCalendarV36(Number(a.dataset.shift))
+   else if(mode==='calendar-select')selectCalendarV36(a.dataset.date)
+   else if(mode==='calendar-current'){closeModal();returnToCurrentWeekV33()}
   else if(mode==='clear-store-courses'||mode==='clear-all-courses'){
    const target=mode==='clear-all-courses'?'all':a.dataset.store;
    if(!['carrefour','grandfrais','all'].includes(target))return;
@@ -1879,6 +2014,12 @@ document.addEventListener('click',e=>{
   else if(mode==='extra-one-off')extraOneOffModal();
   else if(mode==='select-extra-catalogue')unifiedToCourses(a.dataset.kind,id);
   else if(mode==='frequent-to-courses')unifiedToCourses(a.dataset.kind,id);
+   else if(mode==='bulk-favorites')bulkFavoritesV36();
+   else if(mode==='bulk-select-all'||mode==='bulk-select-none'){
+    document.querySelectorAll('[data-v36-favorite]:not(:disabled)').forEach(cb=>{cb.checked=mode==='bulk-select-all'});
+    updateBulkFavoritesCountV36()
+   }
+   else if(mode==='bulk-add-favorites')addBulkFavoritesV36();
   else if(mode==='edit-manual-row')editManualRowModal(id);
   else if(mode==='edit-manual-extra')editManualExtraModal(id);
   else if(mode==='save-manual-extra'){
@@ -1928,6 +2069,7 @@ document.addEventListener('click',e=>{
   else if(mode==='clear-all'){if(confirm('Effacer toutes les données actuelles ? Une copie locale sera conservée dans les versions précédentes.')){checkpoint('Avant effacement');state=baseState();persist();closeModal();render();toast('Données actuelles effacées.')}}
 });
 document.addEventListener('change',e=>{
+  if(e.target.matches('[data-v36-favorite]')){updateBulkFavoritesCountV36();return}
  if(e.target.id==='catalogueStore'){$('#catalogueReferencePanel')?.toggleAttribute('hidden',e.target.value==='grandfrais');return}
  if(e.target.id==='mealRecipeType'){refreshMealRecipePicker();return}
  if(e.target.id==='recipeSort'||e.target.id==='recipeTypeFilter'){

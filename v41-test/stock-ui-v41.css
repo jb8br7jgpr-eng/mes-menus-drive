@@ -1,0 +1,32 @@
+/* Speedrive V41 — onglet Stock, sans modifier la disposition des autres pages. */
+.bottom-nav.v41-six-tabs{grid-template-columns:repeat(6,minmax(0,1fr))!important;padding-left:4px;padding-right:4px}
+.bottom-nav.v41-six-tabs .nav-item{min-width:0;gap:3px;padding:6px 0;font-size:9px;line-height:1.1}
+.bottom-nav.v41-six-tabs .nav-icon{line-height:22px;font-size:20px}
+.bottom-nav.v41-six-tabs .speedrive-nav-svg{width:21px;height:21px}
+.v41-stock-head{margin:6px 0 17px}.v41-stock-head .muted{font-size:13px}
+.v41-stock-segments{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;padding:5px;background:#e8f0e6;border-radius:17px;margin:0 0 19px}
+.v41-stock-segment{border:0;border-radius:12px;background:transparent;color:#587363;min-width:0;padding:12px 3px;font-size:11px;font-weight:750}
+.v41-stock-segment.is-selected{background:white;color:#245943;box-shadow:0 3px 13px #1b442617}
+.v41-stock-stat{display:flex;align-items:baseline;gap:9px;background:linear-gradient(110deg,#e7f2e9,#f6f1e4);border-radius:17px;padding:17px;margin-bottom:13px;color:#245943}
+.v41-stock-stat strong{font-size:30px;line-height:1}.v41-stock-stat span{font-size:12px;font-weight:650}
+.v41-stock-search{display:grid;gap:6px;margin:14px 0 0}
+.v41-stock-search label{font-size:12px;font-weight:700;color:#315e42}
+.v41-stock-search input{font-size:16px;min-height:46px;border:1px solid #cadcce;border-radius:13px;background:white;padding:10px 12px;width:100%;min-width:0;color:#244334}
+.v41-stock-search input:focus-visible{outline:2px solid #245943;outline-offset:2px}
+.v41-stock-search small{min-height:13px;font-size:11px;color:#6a8070}
+.v41-stock-row[hidden]{display:none!important}
+.v41-stock-list{display:grid;gap:9px;margin-top:16px}
+.v41-stock-row{display:flex;align-items:center;gap:9px;flex-wrap:wrap;background:white;border:1px solid #e4ebe3;border-radius:17px;padding:14px;box-shadow:0 4px 17px #213c2607}
+.v41-stock-row strong{display:block;font-size:13px;color:#253e30;overflow-wrap:anywhere}
+.v41-stock-row small{display:block;margin-top:5px;font-size:11px;color:#758578;line-height:1.4}
+.v41-stock-qty{font-size:12px;font-weight:800;color:#315e42;white-space:nowrap}
+.v41-stock-actions{display:flex;flex-wrap:wrap;gap:6px;justify-content:flex-end}
+.v41-stock-actions .btn{white-space:nowrap;min-height:35px}
+.v41-stock-done{background:#e8f5e7;color:#296c46;border-radius:999px;font-size:11px;padding:7px 9px;font-weight:800;white-space:nowrap}
+.v41-stock-info{background:#f3f5ee;color:#6a8070;border-radius:999px;font-size:11px;padding:7px 9px;font-weight:700;white-space:nowrap}
+.v41-empty{padding:31px 20px;text-align:center;background:white;border:1px dashed #cbdccc;border-radius:18px;color:#6b7e72;font-size:13px;line-height:1.5;margin-top:16px}
+.v41-week-caption{font-size:12px;color:#6a8070;line-height:1.5;margin-bottom:10px}
+.v41-select-list{display:grid;gap:7px;margin-top:12px}
+.v41-select-row{display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;border:1px solid #dce9db;background:white;border-radius:12px;padding:13px;text-align:left;color:#244334;font-weight:700}
+.v41-select-row small{font-size:10px;color:#84958a;font-weight:500}
+@media(max-width:380px){.bottom-nav.v41-six-tabs .nav-item{font-size:8.5px}.bottom-nav.v41-six-tabs .speedrive-nav-svg{width:19px;height:19px}.v41-stock-actions{width:100%;justify-content:flex-start}.v41-stock-segment{font-size:10px}}

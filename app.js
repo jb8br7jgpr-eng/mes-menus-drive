@@ -1124,7 +1124,7 @@ function shopping(){
   const stockAmount=stockQuantityV41(pantryKey,w.pantry[pantryKey],productId,item.ingredientId,stockUnit);
   const grossNeed=item.needed>0?item.needed+item.manualPacks*item.size:item.manualPacks;
   const netNeed=Math.max(0,grossNeed-stockAmount);
-  const count=item.needed>0&&item.size>0?Math.ceil(netNeed/item.size-1e-9):netNeed;
+  const count=netNeed<=0?0:(item.needed>0&&item.size>0?Math.ceil(netNeed/item.size-1e-9):netNeed);
   const id='produit:'+productId+'|achat';
   map.set(id,{id,name:p.name,qty:count,unit:p.unit||'paquet',source:item.source,productId,ingredientId:item.ingredientId,manualExtraIds:item.manualExtraIds,generatedIndexes:item.generatedIndexes,
    needed:netNeed>0?quantity(netNeed,stockUnit):'',grossNeeded:grossNeed>0?quantity(grossNeed,stockUnit):'',

@@ -9,12 +9,14 @@ const norm = text => String(text||'').trim().toLocaleLowerCase('fr-FR');
 
 export function resolveStockArticleV41(line, ingredients=[], products=[]) {
   let ingredient = ingredients.find(i=>line?.ingredientId && i.id===line.ingredientId);
-  const product = products.find(p=>p.id===(ingredient?.productId || line?.productId));
   if (!ingredient && !line?.ingredientId && !line?.productId && line?.name) {
     const matches=ingredients.filter(i=>norm(i.name)===norm(line.name));
     if (matches.length===1) ingredient=matches[0];
   }
   if (line?.ingredientId && !ingredient) return null;
+  // Chercher le conditionnement APRÈS la résolution d'un ingrédient ancien par son nom :
+  // sinon « 1 boîte de 6 œufs » reste une boîte et ne se déduit jamais de 6 pièces.
+  const product = products.find(p=>p.id===(ingredient?.productId || line?.productId));
   if (!ingredient && !product) return null;
   const identity=stockIdentityV41({ingredientId:ingredient?.id||null,productId:product?.id||null},ingredients);
   return {identity,ingredient,product,name:ingredient?.name||product?.name||line.name,

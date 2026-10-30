@@ -94,7 +94,7 @@ export function planFrozenMealV41(weeks,stock,weekId,index,lotId,portions) {
 export function repeatWeekMealsV41(weeks,stock,sourceWeekId,targetWeekId) {
   if(sourceWeekId===targetWeekId || !weeks?.[sourceWeekId]?.meals ||
      !weeks?.[targetWeekId]?.meals ||
-     !/^\\d{4}-\\d{2}-\\d{2}$/.test(targetWeekId))
+     !/^\d{4}-\d{2}-\d{2}$/.test(targetWeekId))
     throw Error('Semaines de planning invalides.');
   let updated=copy(weeks),skippedFrozen=0,copiedFrozen=0;
   updated[targetWeekId].meals=Array(14).fill(null);

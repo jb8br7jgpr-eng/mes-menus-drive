@@ -1,0 +1,22 @@
+name: "V36 — tests ergonomie et calendrier (sans déploiement)"
+on:
+  push:
+    branches: [speedrive-v36-ergonomie-calendrier]
+  pull_request:
+    branches: [developpement-v1]
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Vérifier la syntaxe du code
+        run: node --check app.js
+      - name: Tester V35 et V36 sans accès à Firebase
+        run: node --test tests/v35-portions-courses.test.mjs tests/v36-ergonomie.test.mjs
+      - name: Aucun déploiement et aucune modification des données
+        run: echo "Tests statiques et unitaires uniquement"

@@ -348,3 +348,32 @@ test('Congeler une préparation ne peut pas effacer des restes déjà mangés',(
  assert.equal(availableFreezerV41(f.state.stockV41,'pasta-dinner'),0);
  assert.equal(availableStockV41(f.state.stockV41,'ingredient:pasta','g'),500);
 });
+
+test('Premier ajout au stock : aucune quantité héritée ne disparaît sans choix explicite',()=>{
+ const f=fixture();withInputs(f.inputs);
+ f.week.pantry={'ingredient:pasta|g':300};
+ const before=JSON.stringify(f.state);
+ f.invoke('v41-add-stock');
+ assert.match(f.modals.at(-1).title,/Initialiser mon stock permanent/);
+ assert.match(f.modals.at(-1).body,/Examiner et reprendre mon ancien stock/);
+ assert.match(f.modals.at(-1).body,/Démarrer un stock vide/);
+ assert.equal(JSON.stringify(f.state),before);
+ assert.equal(f.saved,0);
+ f.invoke('v41-add-stock-fresh');
+ assert.ok(f.state.stockV41);
+ assert.equal(f.state.stockV41.version,1);
+ assert.equal(f.week.pantry['ingredient:pasta|g'],300,'l’historique reste conservé');
+ assert.equal(f.saved,1);
+ assert.equal(f.modals.at(-1).title,'Ajouter au stock');
+});
+test('L’ancien stock peut être repris sans création silencieuse de produits',()=>{
+ const f=fixture();withInputs(f.inputs);
+ f.week.pantry={'ingredient:pasta|g':300};
+ f.invoke('v41-preview-migration');
+ assert.match(f.modals.at(-1).body,/300 g/);
+ assert.equal(f.state.stockV41,null);
+ f.invoke('v41-confirm-migration');
+ assert.equal(availableStockV41(f.state.stockV41,'ingredient:pasta','g'),300);
+ assert.equal(f.week.pantry['ingredient:pasta|g'],300);
+ assert.equal(f.state.stockV41MigratedFrom,weekId);
+});

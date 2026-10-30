@@ -2529,6 +2529,18 @@ document.addEventListener('change',e=>{
  }
  }else if(e.target.matches('[data-store-item]')){const item=e.target.dataset.storeItem,store=e.target.value;closeModal();setShoppingStore(item,store)}else if(e.target.matches('[data-check]')){const w=getWeek(),id=e.target.dataset.check;w.checked=e.target.checked?[...new Set([...w.checked,id])]:w.checked.filter(x=>x!==id);persist();render(true)}else if(e.target.id==='importFile')importData(e.target.files?.[0])});
 document.addEventListener('input',e=>{
+  if(e.target.id==='v41StockSearch'){
+   const needle=String(e.target.value||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim().toLocaleLowerCase('fr-FR');
+   let visible=0;
+   document.querySelectorAll('#v41StockResults [data-v41-stock-row]').forEach(row=>{
+    const name=(row.textContent||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase('fr-FR');
+    row.hidden=Boolean(needle)&&!name.includes(needle);
+    if(!row.hidden)visible++;
+   });
+   const count=document.getElementById('v41StockSearchCount');
+   if(count)count.textContent=needle?visible+' résultat'+(visible>1?'s':'')+' trouvé'+(visible>1?'s':''):'';
+   return;
+  }
   if(e.target.id==='catalogueQty'){previewCourseQuantityV38();return}
   if(e.target.id==='cataloguePackAmount'){previewCarrefourPackV38();return}
   if(e.target.id==='v37BulkSearch'){filterBulkV37();return}

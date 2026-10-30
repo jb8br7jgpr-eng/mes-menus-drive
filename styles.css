@@ -831,3 +831,34 @@
  border:1px solid #cfe3d0;border-radius:10px;padding:10px 11px;margin:4px 0 13px}
 .v38-pack-preview.unconfigured{background:#fff6e9;border-color:#f0dfc1;color:#856233}
 @media(max-width:380px){.v38-pack-details,.v38-purchase-unit{padding-left:9px;padding-right:9px}}
+
+/* V38 : stock maison visible d'un seul geste, sans agrandir les cartes de courses.
+   Le magasin est déjà indiqué par l'en-tête Carrefour / Grand Frais. */
+.shopping-row.shopping-clean.v29-shopping-row .grow{min-width:0}
+.v38-stock-chip{
+ display:inline-flex;align-items:center;justify-content:flex-start;
+ max-width:100%;width:max-content;min-width:0;min-height:28px;
+ margin-top:5px;padding:4px 8px;
+ border:1px solid #dce7d9;border-radius:8px;
+ background:#f4f8f1;color:#356a4a;cursor:pointer;
+ font-size:10px;font-weight:750;line-height:1.25;
+ overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.v38-stock-chip.has-stock{background:#e5f2e7;border-color:#bddbc5;color:#245d3e}
+.v38-stock-chip:focus-visible,.v38-stock-stepper button:focus-visible{
+ outline:3px solid #d1b36c;outline-offset:2px
+}
+.v38-stock-stepper{
+ display:grid;grid-template-columns:37px minmax(0,1fr) 37px;gap:5px;
+ min-width:0;align-items:center
+}
+.v38-stock-stepper button{
+ display:grid;place-items:center;min-height:43px;border-radius:10px;
+ border:1px solid #cbdcca;background:#f1f7ef;
+ color:#205e3d;font-size:20px;font-weight:800;cursor:pointer
+}
+.v38-stock-stepper #homeStockAmount{min-width:0;width:100%;text-align:center;font-size:16px}
+@media(max-width:370px){
+ .v38-stock-chip{font-size:9.5px;padding:4px 6px}
+ .v38-stock-stepper{grid-template-columns:33px minmax(0,1fr) 33px;gap:4px}
+}

@@ -22,7 +22,7 @@ jobs:
           node --check stock-ui-v41.mjs
           node --check stock-actions-v41.mjs
       - name: Vérifier le moteur d'inventaire pur
-        run: node --test tests/v41-stock-engine.test.mjs tests/v41-stock-week.test.mjs
+        run: node --test tests/v41-stock-engine.test.mjs tests/v41-stock-week.test.mjs tests/v41-stock-ui-flow.test.mjs
       - name: Vérifier les fonctions existantes V35 à V40
         run: node --test tests/v35-portions-courses.test.mjs tests/v36-ergonomie.test.mjs tests/v37-compact-bulk-courses.test.mjs tests/v38-overlap-default-quantity.test.mjs tests/v38-carrefour-pack-oeufs.test.mjs tests/v38-stock-compact.test.mjs tests/v39-categories-produits.test.mjs tests/v40-filtres-coherents.test.mjs
       - name: Aucun déploiement ni opération Firebase

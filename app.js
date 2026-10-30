@@ -1636,7 +1636,7 @@ function openBulkCatalogueV37(favoritesOnly=false){
  if(!items.length){toast('Ajoute d’abord des produits ou ingrédients dans ton catalogue.');return}
  const categories=[...new Set(items.map(item=>item.category||'Autres'))].sort((a,b)=>
   a.localeCompare(b,'fr',{sensitivity:'base'}));
- let out='<p class="helper v40-bulk-help">Sélectionne les articles et ajuste leur quantité. Les recettes et les fiches produits ne sont pas modifiées.</p>'+
+ let out='<p class="helper v40-bulk-help">Les quantités sont de simples propositions : sélectionne tes articles et ajuste-les sans modifier les recettes.</p>'+
  catalogueFiltersV40({
   prefix:'courses',searchId:'v37BulkSearch',storeId:'v40BulkStore',
   categoryId:'v40BulkCategory',sortId:'v40BulkSort',categories,

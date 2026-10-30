@@ -1119,12 +1119,16 @@ function shopping(){
  );
  w.extras.forEach(x=>add(x.name,x.qty,x.unit,'Ajout manuel',x.productId,Boolean(x.fromCatalogue),x.ingredientId,x.id));
  for(const [productId,item] of packs){
-  const p=item.p,stockUnit=item.needed>0?item.needUnit:(p.unit||'paquet');
+  const p=item.p,hasKnownPack=item.size>0;
+  // Une boîte ajoutée manuellement reste une boîte à acheter, mais son besoin
+  // se calcule en pièces/grammes si le catalogue connaît le conditionnement.
+  // Sinon on conserve l'unité de vente, sans inventer de conversion.
+  const stockUnit=hasKnownPack?item.needUnit:(p.unit||'paquet');
   const pantryKey='produit:'+productId+'|'+stockUnit;
   const stockAmount=stockQuantityV41(pantryKey,w.pantry[pantryKey],productId,item.ingredientId,stockUnit);
-  const grossNeed=item.needed>0?item.needed+item.manualPacks*item.size:item.manualPacks;
+  const grossNeed=item.needed+item.manualPacks*(hasKnownPack?item.size:1);
   const netNeed=Math.max(0,grossNeed-stockAmount);
-  const count=netNeed<=0?0:(item.needed>0&&item.size>0?Math.ceil(netNeed/item.size-1e-9):netNeed);
+  const count=netNeed<=0?0:(hasKnownPack?Math.ceil(netNeed/item.size-1e-9):netNeed);
   const id='produit:'+productId+'|achat';
   map.set(id,{id,name:p.name,qty:count,unit:p.unit||'paquet',source:item.source,productId,ingredientId:item.ingredientId,manualExtraIds:item.manualExtraIds,generatedIndexes:item.generatedIndexes,
    needed:netNeed>0?quantity(netNeed,stockUnit):'',grossNeeded:grossNeed>0?quantity(grossNeed,stockUnit):'',

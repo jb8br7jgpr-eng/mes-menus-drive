@@ -1808,7 +1808,7 @@ function filterBulkV37(){
 function updateBulkV37(){
  const checked=modalRoot.querySelectorAll('[data-v37-row] [data-v37-select]:checked').length;
  const submit=$('#v37BulkSubmit'),label=$('#v37BulkStatus');
- const stockMode=modalRoot.querySelector('.v37-bulk-list')?.dataset.bulkTarget==='stock';
+ const stockMode=modalRoot.querySelector('.v37-bulk-list')?.dataset?.bulkTarget==='stock';
  const target=stockMode?'au stock':'aux courses';
  if(submit){submit.disabled=!checked;submit.textContent=checked?'＋ Ajouter '+checked+' article'+(checked>1?'s':'')+' '+target:'Ajouter '+target}
  if(label)label.textContent=checked+' article'+(checked>1?'s':'')+' sélectionné'+(checked>1?'s':'');

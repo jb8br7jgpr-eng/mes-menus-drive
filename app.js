@@ -502,6 +502,21 @@ function catalogueEditor(kind,id=null,draft=null,linkedIngredientId=null){
  if(id)body+='<button class="btn danger wide" style="margin-top:12px" data-action="'+(isIngredient?'delete-catalog-ingredient':'delete-product')+'" data-id="'+html(id)+'">Supprimer ce produit</button>';
  showModal(isImported?'Importer depuis Carrefour':id?'Gérer le produit':'Nouveau produit',
   (isImported?'<div class="note">Vérifie les informations importées avant d’enregistrer. Aucun panier Carrefour n’est modifié.</div>':'')+body);
+ previewCarrefourPackV38()
+}
+function previewCarrefourPackV38(){
+ const target=$('#v38PackPreview');if(!target)return;
+ const raw=$('#cataloguePackAmount')?.value||'',
+  amount=raw.trim()===''?NaN:Number(raw),contentUnit=$('#cataloguePackUnit')?.value||'',
+  purchaseUnit=$('#catalogueUnit')?.value||'paquet';
+ if(!(Number.isFinite(amount)&&amount>0&&contentUnits.includes(contentUnit))){
+  target.textContent='⚠️ Contenu inconnu : impossible de convertir automatiquement les besoins en pièces ou grammes en nombre de '+purchaseUnit+'.';
+  target.classList.add('unconfigured');return
+ }
+ target.classList.remove('unconfigured');
+ const example=contentUnit==='pièce'?
+  ' Exemple : besoin de 4 pièces → '+Math.ceil(4/amount)+' '+purchaseUnit+(Math.ceil(4/amount)>1?'s':'')+' à acheter.':'';
+ target.textContent='✓ 1 '+purchaseUnit+' = '+quantity(amount,contentUnit)+'.'+example
 }
 function previewCourseQuantityV38(){
  const preview=modalRoot.querySelector('[data-v38-default-preview]');
@@ -1112,6 +1127,10 @@ function shoppingRow(x){
  if(x.grossNeeded)detail=(stock?'Maison : '+quantity(x.stockAmount,x.stockUnit)+' · ':'')+
   'Besoin : '+x.grossNeeded;
  if(p?.packaging)detail+=' · '+p.packaging;
+ if(p?.packAmount>0&&p.packUnit&&x.grossNeeded){
+  const [size,unit]=converted(p.packAmount,p.packUnit);
+  if(size>0&&unit===x.totalNeedUnit)detail+=' · 1 '+(p.unit||'paquet')+' = '+quantity(p.packAmount,p.packUnit)
+ }
  return '<div class="shopping-row shopping-clean v29-shopping-row'+(x.checked?' checked':'')+'">'+
   '<label class="v37-purchase-action"><input class="check" type="checkbox" data-check="'+html(x.id)+'" '+(x.checked?'checked':'')+' aria-label="'+(x.checked?'Remettre ':'Marquer ')+name+(x.checked?' à acheter':' comme acheté')+'"><span>'+(x.checked?'✓ Acheté':'Acheté ?')+'</span></label>'+
   '<div class="grow"><div class="shopping-row-top"><strong class="shopping-name">'+name+'</strong><span class="shopping-qty">'+q+'</span></div>'+
@@ -2219,7 +2238,8 @@ document.addEventListener('click',e=>{
   else if(mode==='clear-all'){if(confirm('Effacer toutes les données actuelles ? Une copie locale sera conservée dans les versions précédentes.')){checkpoint('Avant effacement');state=baseState();persist();closeModal();render();toast('Données actuelles effacées.')}}
 });
 document.addEventListener('change',e=>{
-  if(e.target.id==='catalogueUnit'){previewCourseQuantityV38();return}
+  if(e.target.id==='catalogueUnit'){previewCourseQuantityV38();previewCarrefourPackV38();return}
+  if(e.target.id==='cataloguePackUnit'){previewCarrefourPackV38();return}
   if(e.target.matches('[data-v37-select]')){updateBulkV37();return}
   if(e.target.id==='v37BulkFilter'){filterBulkV37();return}
   if(e.target.matches('[data-v37-unit]')){
@@ -2258,6 +2278,7 @@ document.addEventListener('change',e=>{
  }else if(e.target.matches('[data-store-item]')){const item=e.target.dataset.storeItem,store=e.target.value;closeModal();setShoppingStore(item,store)}else if(e.target.matches('[data-check]')){const w=getWeek(),id=e.target.dataset.check;w.checked=e.target.checked?[...new Set([...w.checked,id])]:w.checked.filter(x=>x!==id);persist();render(true)}else if(e.target.id==='importFile')importData(e.target.files?.[0])});
 document.addEventListener('input',e=>{
   if(e.target.id==='catalogueQty'){previewCourseQuantityV38();return}
+  if(e.target.id==='cataloguePackAmount'){previewCarrefourPackV38();return}
   if(e.target.id==='v37BulkSearch'){filterBulkV37();return}
  if(e.target.id==='courseAddSearch'){const results=$('#courseAddSearchResults');if(results)results.innerHTML=extraSearchResults(e.target.value);return}
  if(e.target.id==='mealRecipeSearch'){refreshMealRecipePicker();return}

@@ -172,6 +172,28 @@ export function handleStockActionV41(ctx) {
    });
   }catch(e){ctx.toast(e.message||'Impossible de retirer les ingrédients.')}return true
  }
+ // Les restes ont déjà été cuisinés. Ne JAMAIS débiter les ingrédients de nouveau.
+ // On exige d'abord la validation de la préparation d'origine.
+ if(mode==='v41-eat-leftovers'){
+  if(!Number.isInteger(index)||index<0||index>13)return true;
+  const sourceIndex=Number(a.dataset.source);
+  const left=ctx.mealLeftovers(w.meals[index]).find(x=>x.recipeId===id&&x.fromIndex===sourceIndex);
+  if(!left||!Number.isInteger(sourceIndex)||sourceIndex<0||sourceIndex>=index){
+   ctx.toast('Ces restes ne correspondent à aucune préparation précédente.');return true;
+  }
+  const key=index+':leftovers:'+sourceIndex+':'+id;
+  if(w.v41MealActions?.[key]){ctx.toast('Ces restes ont déjà été validés.');return true}
+  const origin=w.v41MealActions?.[sourceIndex+':'+id];
+  if(origin?.status!=='eaten'){
+   ctx.toast('Valide d’abord « C’est mangé » pour la préparation d’origine afin de retirer une seule fois les ingrédients.');return true
+  }
+  if(!confirm('Confirmer que '+left.people+' portion'+(left.people>1?'s':'')+' de restes de « '+
+   (ctx.recipeById(id)?.name||'ce plat')+' » ont été mangées ? Aucun ingrédient ne sera retiré deux fois.'))return true;
+  w.v41MealActions=w.v41MealActions||{};
+  w.v41MealActions[key]={status:'eaten',at:new Date().toISOString(),sourceIndex};
+  ctx.persist();ctx.render(true);ctx.toast('Restes mangés · stock déjà déduit à la préparation.');
+  return true;
+ }
  if(mode==='v41-eat-frozen'){
   const meal=w.meals[index],key=index+':frozen';
   if(meal?.type!=='frozen'||w.v41MealActions?.[key])return true;

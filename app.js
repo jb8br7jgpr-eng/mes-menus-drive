@@ -1540,7 +1540,8 @@ function stepBulkV37(row,direction){
  const original=Number(input.value);
  const current=Number.isFinite(original)&&original>0?original:jump;
  const result=Math.round((current+direction*jump)*100)/100;
- input.value=String(Math.max(unit==='g'||unit==='ml'?1:0.01,Math.min(100000,result)));
+ const minimum=['pièce','paquet','boîte','rouleau','bouteille','pot','sachet','g','ml'].includes(unit)?1:0.01;
+ input.value=String(Math.max(minimum,Math.min(100000,result)));
  row.querySelector('[data-v37-select]').checked=true;
  updateBulkV37()
 }

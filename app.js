@@ -1309,7 +1309,7 @@ function renderCourses(){
   '<div class="course-v33-progress-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="'+progressPct+'" aria-valuetext="'+checked.length+' articles sur '+progressTotal+'" aria-label="Articles achetés"><span style="width:'+progressPct+'%"></span></div>'+
   '<p>'+(progressTotal===0?'Aucun article à acheter pour le moment.':progressPct===100?'✓ Tous les achats prévus sont achetés.':
    active.length+' article'+(active.length>1?'s':'')+' restant'+(active.length>1?'s':'')+' à acheter.')+'</p></div>';
- out+='<button class="btn wide v41-courses-faites" data-action="v41-courses-done" '+(!checked.some(x=>!(w.v41ValidatedRows||{})[x.id])?'disabled':'')+'>✓ Courses faites · Enregistrer les achats au stock</button>';
+ out+='<button class="btn wide v41-courses-faites" data-action="v41-courses-done" '+(!checked.length?'disabled':'')+'>✓ Courses faites · Enregistrer les achats au stock</button>';
  out+='<div class="course-summary"><div class="course-shop-count carrefour"><strong>'+carrefour.length+'</strong><span>🛒 Carrefour Drive</span></div>'+
  '<div class="course-shop-count grand"><strong>'+grand.length+'</strong><span>🥬 Grand Frais</span></div></div>';
  out+='<button class="btn wide course-add-btn v37-bulk-main" data-action="v37-open-bulk">☑ Ajouter plusieurs articles aux courses</button>'+ '<p class="helper v37-bulk-intro">Tous tes ingrédients et achats du quotidien · quantités réglables · ajout en une fois.</p>';

@@ -26,8 +26,8 @@ const helpers=runInNewContext(fragment('const catalogueSortChoicesV40=', 'functi
 test('Les mêmes champs apparaissent dans Produits et dans Ajout des courses',()=>{
  const common={searchId:'v37BulkSearch',storeId:'v40BulkStore',
   categoryId:'v40BulkCategory',sortId:'v40BulkSort',categories:['Œufs','Fruits']};
- const modal=helpers.catalogueFiltersV40(common);
- const catalogue=helpers.catalogueFiltersV40({...common,searchId:'productSearch',
+ const modal=helpers.catalogueFiltersV40({...common,prefix:'courses'});
+ const catalogue=helpers.catalogueFiltersV40({...common,prefix:'produits',searchId:'productSearch',
   storeId:'catalogueStoreSelectV40',categoryId:'catalogueCategoryFilter',sortId:'catalogueSortV40'});
  for(const name of ['Rechercher un article','Magasin','Catégorie','Trier par','Carrefour Drive','Grand Frais',
   'Toutes les catégories','Nom : A → Z','Catégorie : A → Z','Magasin : Carrefour / Grand Frais']){

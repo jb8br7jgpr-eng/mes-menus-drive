@@ -208,3 +208,33 @@ test('Le calcul V41 des courses enlève le stock réel avant l’arrondi des bo�
  assert.equal(covered.qty,0);
  assert.equal(covered.covered,true);
 });
+
+test('Stock maison : recherche iPhone sans zoom, six onglets et accès aux articles',()=>{
+ const stock=applyStockTransactionV41(emptyStockV41(),{id:'initial-ui',movements:[
+  {type:'inventory',direction:'add',identity:'ingredient:pasta',name:'Pâtes',amount:500,unit:'g'}
+ ]}).stock;
+ const f=fixture(stock);
+ const view=renderStockV41({state:f.state,week:f.week,weekId,view:'home',
+  recipeById:f.ctx.recipeById,mealDishes});
+ assert.match(view,/id="v41StockSearch"/);
+ assert.match(view,/id="v41StockResults"/);
+ assert.match(view,/data-v41-stock-row/);
+ assert.match(view,/data-action="v41-adjust-stock"/);
+ assert.match(style,/v41-stock-search input\{font-size:16px/);
+ assert.match(app,/e\.target\.id==='v41StockSearch'/);
+ assert.match(style,/\.v41-stock-row\[hidden\]/);
+});
+
+test('Congélateur : affichage des portions libres et prévues dans les menus',()=>{
+ const stock=applyStockTransactionV41(emptyStockV41(),{id:'initial-freezer-ui',movements:[
+  {type:'freezer',direction:'add',lotId:'lot1',name:'Chili',recipeId:'chili',portions:5}
+ ]}).stock;
+ const f=fixture(stock);
+ f.week.meals[3]={type:'frozen',lotId:'lot1',recipeId:'chili',portions:2};
+ const view=renderStockV41({state:f.state,week:f.week,weekId,view:'freezer',
+  recipeById:f.ctx.recipeById,mealDishes});
+ assert.match(view,/5<\/strong>/);
+ assert.match(view,/3 encore libres/);
+ assert.match(view,/3 libres/);
+ assert.match(view,/2 prévues dans les menus/);
+});

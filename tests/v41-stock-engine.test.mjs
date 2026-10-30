@@ -1,5 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {webcrypto} from 'node:crypto';
+import {packState, unpackState} from '../firebase/v34-cloud-codec.js';
+if(!globalThis.crypto)globalThis.crypto=webcrypto;
 import {
  emptyStockV41, normalizeStockV41, stockIdentityV41, stockMeasureV41,
  applyStockTransactionV41, availableStockV41, availableFreezerV41, previewLegacyPantryV41
@@ -139,4 +142,19 @@ test('Les anciennes lignes non reliées au catalogue nécessitent une vérificat
  assert.equal(preview.entries.length,0);
  assert.equal(preview.requiresReview,true);
  assert.equal(preview.warnings.length,2);
+});
+
+test('La sauvegarde Firebase V34 sait transporter le nouvel inventaire optionnel sans modifier schema:1',async()=>{
+ const inventory=applyStockTransactionV41(emptyStockV41(),{id:'test-achats',movements:[
+  {type:'inventory',direction:'add',identity:'ingredient:oeufs',name:'Œufs',amount:2,unit:'pièce'},
+  {type:'freezer',direction:'add',lotId:'chili-lot',recipeId:'chili',name:'Chili',portions:3}
+ ]}).stock;
+ const oldFormat={schema:1,recipes:[],products:[],weeks:{},ingredientCatalog:[],settings:{people:2}};
+ const state={...oldFormat,stockV41:inventory};
+ const packed=await packState(state);
+ const loaded=await unpackState(packed,{});
+ assert.deepEqual(loaded.stockV41,inventory);
+ assert.equal(loaded.schema,1);
+ assert.ok(packed.bytes<8_000_000);
+ assert.deepEqual(oldFormat,{schema:1,recipes:[],products:[],weeks:{},ingredientCatalog:[],settings:{people:2}});
 });

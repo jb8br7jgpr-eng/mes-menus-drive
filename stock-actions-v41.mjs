@@ -152,6 +152,7 @@ export function handleStockActionV41(ctx) {
   const key=index+':'+id;
   if(w.v41MealActions?.[key]){ctx.toast('Ce plat a déjà été validé.');return true}
   const freeze=mode==='v41-confirm-freeze-recipe';
+  if(!freeze&&!confirm('Confirmer que « '+r.name+' » a bien été préparé ('+dish.people+' portions) ? Les ingrédients de toutes les portions seront déduits du Stock maison.'))return true;
   const frozenPortions=freeze?amount('v41FreezePortions'):0;
   if(freeze&&(!Number.isInteger(frozenPortions)||frozenPortions<1||frozenPortions>Number(dish.people))){
    ctx.toast('Choisis un nombre de portions compris entre 1 et '+dish.people+'.');return true
@@ -174,6 +175,7 @@ export function handleStockActionV41(ctx) {
  if(mode==='v41-eat-frozen'){
   const meal=w.meals[index],key=index+':frozen';
   if(meal?.type!=='frozen'||w.v41MealActions?.[key])return true;
+  if(!confirm('Confirmer que '+meal.portions+' portion'+(meal.portions>1?'s':'')+' congelée'+(meal.portions>1?'s':'')+' ont été mangées ?'))return true;
   commit(ctx,tx('Portions congelées mangées',[{type:'freezer',direction:'consume',
    lotId:meal.lotId,recipeId:meal.recipeId,portions:meal.portions}]),()=>{
     w.v41MealActions=w.v41MealActions||{};w.v41MealActions[key]={status:'eaten',at:new Date().toISOString()};

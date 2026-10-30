@@ -540,3 +540,123 @@ test('Les boutons de récupération sont visibles dans Stock et dans le menu du 
  assert.match(app,/undoMealValidationControlsV41\(index,meal\)/);
  assert.match(style,/\.v41-meal-undo-panel/);
 });
+
+test('Une validation orpheline bloque le repas : l’interface propose une réparation explicite',()=>{
+ const f=fixture();withInputs(f.inputs);
+ f.week.meals[0]={type:'recipe',recipeId:'pasta-dinner',people:2};
+ f.week.v41MealActions={'0:ancien-plat':{status:'eaten',at:'2026-10-30T12:00:00.000Z'}};
+ const source=app.slice(app.indexOf('function undoMealValidationControlsV41('),app.indexOf('function pickMeal(index)'));
+ assert.ok(source.startsWith('function undoMealValidationControlsV41('));
+ const controls=runInNewContext(source+';undoMealValidationControlsV41',{
+  getWeek:()=>f.week,mealDishes,mealLeftovers,
+  recipeById:id=>recipes.find(r=>r.id===id),
+  html:x=>String(x)
+ });
+ const panel=controls(0,f.week.meals[0]);
+ assert.match(panel,/v41-review-old-validation/);
+ assert.match(panel,/Examiner 1 ancienne validation bloquante/);
+ f.invoke('v41-review-old-validation',{index:0});
+ assert.match(f.modals.at(-1).title,/Débloquer un ancien repas/);
+ assert.match(f.modals.at(-1).body,/sans changer le stock/);
+ const before=JSON.stringify(f.state.stockV41);
+ f.invoke('v41-confirm-reset-old-validation',{index:0});
+ assert.equal(Object.keys(f.week.v41MealActions).length,0);
+ assert.equal(JSON.stringify(f.state.stockV41),before,'aucun remboursement d’ingrédient inventé');
+ assert.equal(f.saved,1);
+ const saved=f.saved;
+ f.invoke('v41-confirm-reset-old-validation',{index:0});
+ assert.equal(f.saved,saved,'deuxième confirmation sans effet');
+});
+
+test('Une validation encore liée au plat n’est jamais réinitialisée sans inversion de stock',()=>{
+ const f=fixture();withInputs(f.inputs);
+ f.week.meals[0]={type:'recipe',recipeId:'pasta-dinner',people:2};
+ f.week.v41MealActions={'0:pasta-dinner':{status:'eaten',at:'2026-10-30T12:00:00.000Z'}};
+ f.invoke('v41-review-old-validation',{index:0});
+ assert.match(f.message,/Aucune ancienne validation/);
+ f.invoke('v41-confirm-reset-old-validation',{index:0});
+ assert.ok(f.week.v41MealActions['0:pasta-dinner']);
+ assert.equal(f.saved,0);
+});
+
+test('Un ancien verrou de congélation ne peut pas être effacé sans reconstituer le lot',()=>{
+ const f=fixture();withInputs(f.inputs);
+ f.week.meals[0]={type:'ordered'};
+ f.week.v41MealActions={'0:ancien-congelé':{status:'frozen',lotId:'lot:old',frozenPortions:2}};
+ f.invoke('v41-review-old-validation',{index:0});
+ assert.match(f.modals.at(-1).body,/Réinitialisation automatique indisponible/);
+ assert.doesNotMatch(f.modals.at(-1).body,/data-action="v41-confirm-reset-old-validation"/);
+ f.invoke('v41-confirm-reset-old-validation',{index:0});
+ assert.match(f.message,/Congélateur impliqué/);
+ assert.ok(f.week.v41MealActions['0:ancien-congelé']);
+ assert.equal(f.saved,0);
+});
+
+test('Un repas réellement présent mais bloqué offre une réparation sans crédit de stock',()=>{
+ const start=applyStockTransactionV41(emptyStockV41(),{id:'recovery-start',movements:[
+  {type:'inventory',direction:'add',identity:'ingredient:pasta',amount:500,unit:'g'}
+ ]}).stock;
+ const f=fixture(start);withInputs(f.inputs);
+ f.week.meals[2]={type:'recipe',recipeId:'pasta-dinner',people:2};
+ f.invoke('v41-eat-recipe',{index:2,id:'pasta-dinner'});
+ assert.equal(availableStockV41(f.state.stockV41,'ingredient:pasta','g'),250);
+ const source=app.slice(app.indexOf('function undoMealValidationControlsV41('),app.indexOf('function pickMeal(index)'));
+ const controls=runInNewContext(source+';undoMealValidationControlsV41',{
+  getWeek:()=>f.week,mealDishes,mealLeftovers,
+  recipeById:id=>recipes.find(r=>r.id===id),html:x=>String(x)
+ });
+ const shown=controls(2,f.week.meals[2]);
+ assert.match(shown,/v41-review-validation-recovery/,'l’alternative est visible sur le repas validé');
+ assert.match(shown,/Toujours bloqué \? Réparer ce repas/);
+ f.invoke('v41-review-validation-recovery',{index:2,id:'pasta-dinner'});
+ assert.match(f.modals.at(-1).body,/ne sera pas augmenté/);
+ assert.match(f.modals.at(-1).body,/Débloquer ce plat sans changer le stock/);
+ const stockBefore=JSON.stringify(f.state.stockV41);
+ f.invoke('v41-confirm-validation-recovery',{index:2,id:'pasta-dinner'});
+ assert.equal(JSON.stringify(f.state.stockV41),stockBefore);
+ assert.equal(f.week.v41MealActions['2:pasta-dinner'],undefined);
+ assert.equal(f.week.v41RecoveryLog.length,1);
+ assert.equal(f.week.v41RecoveryLog[0].stockAdjusted,false);
+ assert.equal(f.saved,2);
+ // Une suppression après réparation est à nouveau possible.
+ f.ctx.clearMealWithPair(f.week,2);
+ assert.equal(f.week.meals[2],null);
+ const saved=f.saved;
+ f.invoke('v41-confirm-validation-recovery',{index:2,id:'pasta-dinner'});
+ assert.equal(f.saved,saved);
+});
+
+test('La réparation manuelle ne contourne pas les validations de congélation',()=>{
+ const start=applyStockTransactionV41(emptyStockV41(),{id:'recovery-freezer',movements:[
+  {type:'inventory',direction:'add',identity:'ingredient:pasta',amount:500,unit:'g'}
+ ]}).stock;
+ const f=fixture(start);withInputs({...f.inputs,v41FreezePortions:1});
+ f.week.meals[2]={type:'recipe',recipeId:'pasta-dinner',people:2};
+ f.invoke('v41-confirm-freeze-recipe',{index:2,id:'pasta-dinner'});
+ const stockBefore=JSON.stringify(f.state.stockV41);
+ f.invoke('v41-review-validation-recovery',{index:2,id:'pasta-dinner'});
+ assert.match(f.message,/Les congélations doivent être annulées/);
+ f.invoke('v41-confirm-validation-recovery',{index:2,id:'pasta-dinner'});
+ assert.equal(JSON.stringify(f.state.stockV41),stockBefore);
+ assert.ok(f.week.v41MealActions['2:pasta-dinner']);
+ assert.equal(f.saved,1);
+});
+
+test('Une réparation manuelle bloque tant que les restes sont validés',()=>{
+ const initial=applyStockTransactionV41(emptyStockV41(),{id:'recovery-leftover',movements:[
+  {type:'inventory',direction:'add',identity:'ingredient:pasta',amount:500,unit:'g'}
+ ]}).stock;
+ const f=fixture(initial);withInputs(f.inputs);
+ f.week.meals[0]={type:'recipe',recipeId:'pasta-dinner',people:4};
+ f.week.meals[3]={type:'leftovers',recipeId:'pasta-dinner',fromIndex:0,leftoverPortions:2};
+ f.invoke('v41-eat-recipe',{index:0,id:'pasta-dinner'});
+ f.invoke('v41-eat-leftovers',{index:3,id:'pasta-dinner',dataset:{source:'0'}});
+ f.invoke('v41-review-validation-recovery',{index:0,id:'pasta-dinner'});
+ assert.match(f.modals.at(-1).body,/Annule d’abord la validation/);
+ assert.doesNotMatch(f.modals.at(-1).body,/data-action="v41-confirm-validation-recovery"/);
+ const stockBefore=JSON.stringify(f.state.stockV41);
+ f.invoke('v41-confirm-validation-recovery',{index:0,id:'pasta-dinner'});
+ assert.match(f.message,/Annule d’abord les restes/);
+ assert.equal(JSON.stringify(f.state.stockV41),stockBefore);
+ assert.ok(f.week.v41MealActions['0:pasta-dinner']);
+});

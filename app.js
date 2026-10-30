@@ -1572,21 +1572,37 @@ function refreshMealRecipePicker(){
 }
 // V41.1 : rendre une validation accidentelle réversible depuis le repas lui-même.
 function undoMealValidationControlsV41(index,meal){
- const w=getWeek(),actions=w.v41MealActions||{},buttons=[];
+ const w=getWeek(),actions=w.v41MealActions||{},buttons=[],recognizedKeys=new Set();
  const make=(kind,recipeId=null,sourceIndex=null,label='')=>{
   buttons.push('<button class="btn secondary wide v41-meal-undo" data-action="v41-undo-validation" data-kind="'+kind+
    '" data-index="'+index+'"'+(recipeId?' data-id="'+html(recipeId)+'"':'')+
    (sourceIndex!==null?' data-source="'+sourceIndex+'"':'')+
    '>↩ Annuler la validation'+(label?' · '+html(label):'')+'</button>')
  };
- if(meal?.type==='frozen'&&actions[index+':frozen'])make('frozen',null,null,'Congélateur');
+ if(meal?.type==='frozen'&&actions[index+':frozen']){
+  recognizedKeys.add(index+':frozen');
+  make('frozen',null,null,'Congélateur')
+ }
  for(const dish of mealDishes(meal)){
-  if(actions[index+':'+dish.recipeId])make('recipe',dish.recipeId,null,recipeById(dish.recipeId)?.name||'Plat')
+  const key=index+':'+dish.recipeId;
+  if(actions[key]){
+   recognizedKeys.add(key);
+   make('recipe',dish.recipeId,null,recipeById(dish.recipeId)?.name||'Plat');
+   if(actions[key].status==='eaten')buttons.push(
+    '<button class="btn secondary wide v41-meal-undo" data-action="v41-review-validation-recovery" data-index="'+index+
+    '" data-id="'+html(dish.recipeId)+'">Toujours bloqué ? Réparer ce repas</button>');
+  }
  }
  for(const leftover of mealLeftovers(meal)){
-  if(actions[index+':leftovers:'+leftover.fromIndex+':'+leftover.recipeId])
-   make('leftovers',leftover.recipeId,leftover.fromIndex,'Restes');
+  const key=index+':leftovers:'+leftover.fromIndex+':'+leftover.recipeId;
+  if(actions[key]){
+   recognizedKeys.add(key);
+   make('leftovers',leftover.recipeId,leftover.fromIndex,'Restes')
+  }
  }
+ const orphaned=Object.keys(actions).filter(k=>k.startsWith(index+':')&&!recognizedKeys.has(k));
+ if(orphaned.length)buttons.push('<button class="btn secondary wide v41-meal-undo" data-action="v41-review-old-validation" data-index="'+index+'">'+
+  '⚠ Examiner '+orphaned.length+' ancienne'+(orphaned.length>1?'s validations':' validation')+' bloquante'+(orphaned.length>1?'s':'')+'</button>');
  return buttons.length?'<div class="v41-meal-undo-panel"><p class="helper">Un repas validé par erreur ? Annule d’abord la validation pour corriger le stock, puis modifie ou supprime le repas.</p>'+
   buttons.join('')+'</div>':'';
 }

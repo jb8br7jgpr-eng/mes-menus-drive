@@ -69,6 +69,17 @@ function selection(ctx,forFrozen=false) {
    '<span>'+esc(x.name)+'<small>'+esc(x.category||'Autres')+'</small></span><span>＋</span></button>').join('')+'</div>':
    '<div class="note">Ajoute d’abord tes ingrédients et produits habituels dans Produits.</div>'));
 }
+// A validation marker may survive a recipe deletion or an earlier migration.
+function orphanValidationKeys(ctx,week,index) {
+ if(!Number.isInteger(index)||index<0||index>13)return [];
+ const meal=week.meals[index],known=new Set();
+ if(meal?.type==='frozen')known.add(index+':frozen');
+ for(const d of ctx.mealDishes(meal))known.add(index+':'+d.recipeId);
+ for(const d of ctx.mealLeftovers(meal))
+  known.add(index+':leftovers:'+d.fromIndex+':'+d.recipeId);
+ return Object.keys(week.v41MealActions||{}).filter(k=>
+  k.startsWith(index+':')&&!known.has(k));
+}
 function replaceModal(ctx,index) {
  const meal=ctx.getWeek().meals[index],actions=ctx.getWeek().v41MealActions||{};
  if(Object.keys(actions).some(k=>k.startsWith(index+':'))){ctx.toast('Repas déjà terminé : corrige le stock si nécessaire.');return}
@@ -243,6 +254,56 @@ export function handleStockActionV41(ctx) {
     meal.consumed=true;
   });return true
  }
+ // Plan B explicite lorsque les données historiques ne permettent plus de
+ // reconstruire exactement les ingrédients : déverrouiller SANS remboursement.
+ // L'utilisateur doit alors corriger les quantités dans Stock → Maison.
+ if(mode==='v41-review-validation-recovery'){
+  if(!Number.isInteger(index)||index<0||index>13||!id)return true;
+  const key=index+':'+id,action=w.v41MealActions?.[key];
+  const dish=ctx.mealDishes(w.meals[index]).find(x=>x.recipeId===id);
+  if(!action||!dish){ctx.toast('Ce repas ne comporte plus de validation liée à ce plat.');return true}
+  if(action.status!=='eaten'){
+   ctx.toast('Les congélations doivent être annulées avec leurs portions : réinitialisation sans stock interdite.');return true
+  }
+  const descendants=w.meals.some((meal,i)=>ctx.mealLeftovers(meal).some(left=>
+   left.fromIndex===index&&left.recipeId===id&&w.v41MealActions?.[i+':leftovers:'+index+':'+id]));
+  ctx.showModal('Réparer une validation bloquée',
+   '<p class="helper">La validation de « '+esc(ctx.recipeById(id)?.name||'ce plat')+
+   ' » est encore enregistrée. Si le bouton normal ne fonctionne pas, tu peux retirer uniquement ce verrou.</p>'+
+   '<p class="note">⚠ Le stock maison ne sera pas augmenté : il peut déjà contenir une consommation réelle. Après déblocage, vérifie tes quantités dans Stock → Maison et corrige-les manuellement si ton test les avait diminuées.</p>'+
+   (descendants?'<p class="note">Des restes de ce plat ont aussi été validés. Annule d’abord la validation de ces restes.</p>':
+    '<button class="btn wide" data-action="v41-confirm-validation-recovery" data-index="'+index+
+    '" data-id="'+esc(id)+'">Débloquer ce plat sans changer le stock</button>'));
+  return true
+ }
+ if(mode==='v41-confirm-validation-recovery'){
+  if(!Number.isInteger(index)||index<0||index>13||!id)return true;
+  const key=index+':'+id,action=w.v41MealActions?.[key];
+  const dish=ctx.mealDishes(w.meals[index]).find(x=>x.recipeId===id);
+  if(!action||action.status!=='eaten'||!dish){
+   ctx.toast('Validation absente ou non réinitialisable.');return true
+  }
+  if(w.meals.some((meal,i)=>ctx.mealLeftovers(meal).some(left=>
+   left.fromIndex===index&&left.recipeId===id&&w.v41MealActions?.[i+':leftovers:'+index+':'+id]))){
+   ctx.toast('Annule d’abord les restes déjà validés.');return true
+  }
+  if(!confirm('Débloquer la validation du plat sans modifier le Stock maison ? Il faudra vérifier les quantités du stock et les corriger si des ingrédients ont été déduits pendant ton essai. Cette action ne restaure aucun ingrédient.'))return true;
+  const previousWeeks=JSON.parse(JSON.stringify(state.weeks));
+  try{
+   w.v41RecoveryLog=w.v41RecoveryLog||[];
+   w.v41RecoveryLog.push({key,at:new Date().toISOString(),
+    status:action.status,original:JSON.parse(JSON.stringify(action)),stockAdjusted:false});
+   if(w.v41RecoveryLog.length>30)w.v41RecoveryLog=w.v41RecoveryLog.slice(-30);
+   delete w.v41MealActions[key];
+   if(Array.isArray(w.generatedIngredients))ctx.generateWeekCourses(w);
+   ctx.persist();ctx.closeModal();ctx.render(true);
+   ctx.toast('Repas débloqué. Vérifie les quantités dans Stock maison.');
+  }catch(err){
+   state.weeks=previousWeeks;
+   ctx.toast('Réparation impossible : '+(err.message||err));
+  }
+  return true
+ }
  // Annulation d'une validation accidentelle : jamais un simple retrait du verrou.
  // Le mouvement inverse de stock est atomique, enregistré et conservé dans Firebase.
  // Les validations V41 antérieures à ce correctif n'avaient pas conservé leurs
@@ -329,6 +390,35 @@ export function handleStockActionV41(ctx) {
    delete w.v41MealActions[key];
    if(Array.isArray(w.generatedIngredients))ctx.generateWeekCourses(w);
   });
+  return true
+ }
+ // Réparation contrôlée des anciennes validations dont le plat d'origine
+ // n'est plus présent dans cette case. Ne JAMAIS inventer un remboursement
+ // d'ingrédients : le stock doit être corrigé séparément si nécessaire.
+ if(mode==='v41-review-old-validation'){
+  const old=orphanValidationKeys(ctx,w,index);
+  if(!old.length){ctx.toast('Aucune ancienne validation bloquante sur ce repas.');return true}
+  const unsafe=old.some(key=>w.v41MealActions[key]?.status==='frozen'||
+    w.v41MealActions[key]?.movements?.some(m=>m.type==='freezer'));
+  ctx.showModal('Débloquer un ancien repas',
+   '<p class="helper">Cette case contient '+old.length+' validation'+(old.length>1?'s':'')+
+   ' d’un ancien plat qui n’apparaît plus ici. Elles empêchent de modifier ou supprimer le repas.</p>'+
+   '<p class="note">Pour éviter de doubler le stock, Speedrive ne rétablit PAS automatiquement les ingrédients associés à un plat qui n’est plus identifiable. Vérifie tes quantités dans Stock → Maison.</p>'+
+   (unsafe?'<p class="note">Une ancienne congélation est également concernée : corrige d’abord manuellement ce lot avant de débloquer la case. Réinitialisation automatique indisponible.</p>':
+   '<button class="btn wide" data-action="v41-confirm-reset-old-validation" data-index="'+index+'">↩ Retirer les anciens verrous (sans changer le stock)</button>'));
+  return true
+ }
+ if(mode==='v41-confirm-reset-old-validation'){
+  const old=orphanValidationKeys(ctx,w,index);
+  if(!old.length){ctx.toast('Aucune validation orpheline à retirer.');return true}
+  if(old.some(key=>w.v41MealActions[key]?.status==='frozen'||
+    w.v41MealActions[key]?.movements?.some(m=>m.type==='freezer'))){
+   ctx.toast('Congélateur impliqué : annulation automatique refusée.');return true
+  }
+  if(!confirm('Retirer '+old.length+' ancien(s) verrou(s) de ce repas ? Cela permettra de le supprimer ou le modifier. ATTENTION : le Stock maison ne sera pas modifié ; corrige manuellement les quantités si elles ont été déduites lors du test.'))return true;
+  for(const key of old)delete w.v41MealActions[key];
+  ctx.persist();ctx.closeModal();ctx.render(true);
+  ctx.toast('Anciennes validations retirées. Vérifie les quantités du Stock maison.');
   return true
  }
  if(mode==='v41-courses-done'){

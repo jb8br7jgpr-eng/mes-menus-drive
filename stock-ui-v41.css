@@ -23,6 +23,7 @@
 .v41-stock-actions{display:flex;flex-wrap:wrap;gap:6px;justify-content:flex-end}
 .v41-stock-actions .btn{white-space:nowrap;min-height:35px}
 .v41-stock-done{background:#e8f5e7;color:#296c46;border-radius:999px;font-size:11px;padding:7px 9px;font-weight:800;white-space:nowrap}
+.v41-stock-info{background:#f3f5ee;color:#6a8070;border-radius:999px;font-size:11px;padding:7px 9px;font-weight:700;white-space:nowrap}
 .v41-empty{padding:31px 20px;text-align:center;background:white;border:1px dashed #cbdccc;border-radius:18px;color:#6b7e72;font-size:13px;line-height:1.5;margin-top:16px}
 .v41-week-caption{font-size:12px;color:#6a8070;line-height:1.5;margin-bottom:10px}
 .v41-select-list{display:grid;gap:7px;margin-top:12px}

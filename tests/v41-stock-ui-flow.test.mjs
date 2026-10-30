@@ -1,12 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {emptyStockV41,applyStockTransactionV41,availableStockV41,availableFreezerV41} from '../stock-engine-v41.mjs';
+import {emptyStockV41,applyStockTransactionV41,availableStockV41,availableFreezerV41,stockIdentityV41} from '../stock-engine-v41.mjs';
 import {freezerReservationsV41} from '../stock-week-v41.mjs';
 import {renderStockV41} from '../stock-ui-v41.mjs';
 import {handleStockActionV41} from '../stock-actions-v41.mjs';
 import {packState,unpackState} from '../firebase/v34-cloud-codec.js';
 import {webcrypto} from 'node:crypto';
+import {runInNewContext} from 'node:vm';
 if(!globalThis.crypto)globalThis.crypto=webcrypto;
 
 const app=readFileSync(new URL('../app.js',import.meta.url),'utf8');
@@ -173,4 +174,37 @@ test('Sauvegarde Firebase : les portions congelées, menus, achats et anciens st
  assert.equal(result.weeks[weekId].v41MealActions['2:pasta-dinner'].status,'eaten');
  assert.equal(result.weeks[weekId].pantry['ingredient:pasta|g'],200);
  assert.ok(packed.bytes<8_000_000);
+});
+
+test('Le calcul V41 des courses enlève le stock réel avant l’arrondi des boîtes Carrefour',()=>{
+ const eggs={id:'eggsbox',name:'Œufs boîte de 6',unit:'boîte',packAmount:6,packUnit:'pièce',store:'carrefour'};
+ const ing={id:'eggs',name:'Œufs',productId:'eggsbox',store:'carrefour'};
+ const stock=applyStockTransactionV41(emptyStockV41(),{id:'stock-eggs',movements:[
+  {type:'inventory',direction:'add',identity:'ingredient:eggs',name:'Œufs',amount:4,unit:'pièce'}
+ ]}).stock;
+ const week={meals:[],generatedIngredients:[{ingredientId:'eggs',productId:'eggsbox',
+  name:'Œufs',qty:8,unit:'pièce'}],pantry:{'produit:eggsbox|pièce':99},
+  extras:[],checked:[],excluded:[]};
+ const source=app.slice(app.indexOf('function shopping(){'),app.indexOf('function stockUnitChoices('));
+ assert.ok(source.startsWith('function shopping(){'));
+ const state={stockV41:stock,ingredientCatalog:[ing]};
+ const context={state,getWeek:()=>week,productById:id=>id===eggs.id?eggs:null,
+  ingredientById:id=>id===ing.id?ing:null,
+  converted:(q,u)=>[Number(q)||0,u],quantity:(q,u)=>q+' '+u,
+  norm:s=>String(s).toLowerCase(),productGroup:()=> 'Produits frais',
+  groupFor:()=> 'Produits frais',shoppingStore:()=> 'carrefour',
+  stockModulesV41:{core:{availableStockV41,stockIdentityV41}}};
+ const shopping=runInNewContext(source+';shopping',context);
+ const result=shopping();
+ assert.equal(result.length,1);
+ assert.equal(result[0].qty,1,'8 œufs − 4 en stock = 1 boîte de 6 à acheter');
+ assert.equal(result[0].stockAmount,4,'ne jamais additionner le stock historique de 99');
+ assert.equal(result[0].covered,false);
+ state.stockV41=applyStockTransactionV41(stock,{id:'additional-eggs',movements:[
+  {type:'inventory',direction:'add',identity:'ingredient:eggs',amount:1,unit:'boîte',product:eggs}
+ ]}).stock;
+ const covered=shopping()[0];
+ assert.equal(covered.stockAmount,10);
+ assert.equal(covered.qty,0);
+ assert.equal(covered.covered,true);
 });

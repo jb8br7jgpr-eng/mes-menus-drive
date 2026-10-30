@@ -298,12 +298,17 @@ function visibleRecipes(){
 }
 function recipeRows(){
  const list=visibleRecipes();
- return list.map(r=>'<div class="recipe-card"><button class="recipe-preview-trigger" data-action="view-recipe" data-id="'+html(r.id)+'" aria-label="Consulter le plat '+html(r.name)+'">'+recipeImg(r)+'<span class="recipe-preview-copy"><strong class="recipe-preview-name">'+html(r.name)+'</strong><span class="recipe-preview-meta">'+
-  r.ingredients.length+' ingrédient'+(r.ingredients.length>1?'s':'')+' · '+r.people+' portions</span>'+
+ return list.map(r=>'<article class="recipe-card v37-recipe-card">'+
+  '<button class="recipe-preview-trigger" data-action="view-recipe" data-id="'+html(r.id)+'" aria-label="Consulter le plat '+html(r.name)+'">'+
+  recipeImg(r)+'<span class="recipe-preview-copy"><strong class="recipe-preview-name">'+html(r.name)+'</strong>'+
+  '<span class="recipe-preview-meta">'+r.ingredients.length+' ingrédient'+(r.ingredients.length>1?'s':'')+' · '+r.people+' portions</span>'+
   '<span class="pill gray">'+html(normalRecipeType(r.category)==='legacy'?(r.category||'Autre'):normalRecipeType(r.category))+'</span></span></button>'+
-  '<div class="recipe-actions"><button class="btn tiny v36-recipe-plan" data-action="plan-recipe" data-id="'+html(r.id)+'">＋ Menus</button><button class="icon-btn" data-action="edit-recipe" data-id="'+html(r.id)+'" aria-label="Modifier '+html(r.name)+'">✎</button>'+
-  '<button class="btn tiny secondary" data-action="duplicate-recipe" data-id="'+html(r.id)+'">Dupliquer</button></div></div>').join('')||
-  emptyView('🍲','Aucun plat trouvé',search||recipeTypeFilter!=='all'?'Essaie un autre nom ou un autre type.':'Commence par ajouter votre premier plat.',
+  '<div class="recipe-actions v37-recipe-actions" role="group" aria-label="Actions pour '+html(r.name)+'">'+
+  '<button class="btn tiny v36-recipe-plan" data-action="plan-recipe" data-id="'+html(r.id)+'">＋ Menus</button>'+
+  '<button class="btn tiny secondary" data-action="duplicate-recipe" data-id="'+html(r.id)+'">Dupliquer</button>'+
+  '<button class="btn tiny secondary v37-recipe-edit" data-action="edit-recipe" data-id="'+html(r.id)+'" aria-label="Modifier '+html(r.name)+'">✎ Modifier</button>'+
+  '</div></article>').join('')||
+  emptyView('🍲','Aucun plat trouvé',search||recipeTypeFilter!=='all'?'Essaie un autre nom ou un autre type.':'Commence par ajouter ton premier plat.',
    '<button class="btn" data-action="add-recipe">＋ Ajouter un plat</button>')
 }
 function viewRecipeV33(id){

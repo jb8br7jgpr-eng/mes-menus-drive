@@ -8,6 +8,22 @@ const qty=n=>Number(n||0).toLocaleString('fr-FR',{maximumFractionDigits:3});
 const input=(id,label,amount=1,min=0.001,max=100000)=>'<div class="field"><label for="'+id+'">'+esc(label)+'</label><input type="number" inputmode="decimal" id="'+id+'" step="any" min="'+min+'" max="'+max+'" value="'+amount+'"></div>';
 const amount=id=>{const el=document.getElementById(id);return el?.value.trim()===''?NaN:Number(el?.value)};
 const stockOf=state=>state.stockV41||emptyStockV41();
+const legacyPantryWeeks=state=>Object.entries(state.weeks||{})
+ .filter(([_,week])=>Object.values(week?.pantry||{}).some(value=>Number(value)>0))
+ .map(([id])=>id).sort().reverse();
+function migrationGate(ctx) {
+ if(ctx.state.stockV41 || !legacyPantryWeeks(ctx.state).length)return false;
+ const weeks=legacyPantryWeeks(ctx.state);
+ ctx.showModal('Initialiser mon stock permanent',
+  '<p class="helper">Du stock est déjà renseigné dans '+weeks.length+
+  ' ancienne'+(weeks.length>1?'s semaines':' semaine')+
+  '. Le nouvel inventaire remplace les quantités par semaine pour calculer les achats. Choisis UNE semaine de référence : les anciennes données resteront conservées.</p>'+
+  '<div class="v41-select-list">'+weeks.map(weekId=>
+    '<button class="v41-select-row" data-action="v41-preview-migration" data-week="'+esc(weekId)+'">'+
+    'Examiner le stock du '+esc(weekId)+' <span>→</span></button>').join('')+'</div>'+
+  '<button class="btn secondary wide" data-action="v41-add-stock-fresh">Démarrer un stock vide à la place</button>');
+ return true;
+}
 function commit(ctx,transaction,done) {
  try {
   const res=applyStockTransactionV41(stockOf(ctx.state),transaction);
@@ -75,17 +91,11 @@ function replaceModal(ctx,index) {
 export function handleStockActionV41(ctx) {
  const {mode,a,id,index}=ctx,w=ctx.getWeek(),state=ctx.state,stock=stockOf(state);
  const tx=(label,movements)=>({id:'v41:'+ctx.uid(),label,movements});
- if(mode==='v41-add-stock'){
-  const hasOldStock=Object.values(w.pantry||{}).some(q=>Number(q)>0);
-  if(!state.stockV41 && hasOldStock){
-   ctx.showModal('Initialiser mon stock permanent',
-    '<p class="helper">Tu as déjà renseigné du stock dans les anciennes courses. Le nouvel inventaire devient la référence unique pour toutes les semaines : il ne faut pas masquer tes anciennes quantités sans ton accord.</p>'+
-    '<button class="btn wide" data-action="v41-preview-migration">Examiner et reprendre mon ancien stock</button>'+
-    '<button class="btn secondary wide" data-action="v41-add-stock-fresh">Démarrer un stock vide à la place</button>');
-   return true;
-  }
-  selection(ctx);return true
- }
+ const requiresInventory=['v41-add-stock','v41-add-frozen','v41-save-stock','v41-save-frozen',
+  'v41-courses-done','v41-eat-recipe','v41-confirm-freeze-recipe',
+  'v41-adjust-stock','v41-confirm-stock','v41-correct-freezer','v41-confirm-freezer'];
+ if(requiresInventory.includes(mode)&&migrationGate(ctx))return true;
+ if(mode==='v41-add-stock'){selection(ctx);return true}
  if(mode==='v41-add-stock-fresh'){
   if(state.stockV41){selection(ctx);return true}
   if(!confirm('Commencer un nouvel inventaire vide ? Les quantités indiquées dans les anciennes courses resteront enregistrées dans leur historique, mais ne seront plus utilisées pour calculer les achats.'))return true;
@@ -253,22 +263,29 @@ export function handleStockActionV41(ctx) {
   return true
  }
  if(mode==='v41-preview-migration'){
-  const preview=previewLegacyPantryV41(w,state.ingredientCatalog,state.products);
+  const selectedWeek=a.dataset.week||legacyPantryWeeks(state)[0]||ctx.currentWeek;
+  const candidate=state.weeks?.[selectedWeek];
+  if(!candidate){ctx.toast('Semaine introuvable.');return true}
+  const preview=previewLegacyPantryV41(candidate,state.ingredientCatalog,state.products);
   if(!preview.entries.length){ctx.toast('Aucun ancien stock de cette semaine à reprendre.');return true}
-  const body='<p class="helper">Une seule semaine est examinée. Aucun stock n’est transféré sans confirmation.</p>'+
+  const body='<p class="helper">Stock de la semaine du '+esc(selectedWeek)+
+   '. Une seule semaine est examinée. Aucun stock n’est transféré sans confirmation.</p>'+
    preview.entries.map(x=>'<div class="shopping-row"><div class="grow"><strong>'+esc(x.name)+'</strong><div class="helper">'+esc(x.identity)+'</div></div><b>'+qty(x.amount)+' '+esc(x.unit)+'</b></div>').join('')+
    (preview.warnings.length?'<div class="note">'+preview.warnings.map(esc).join(' · ')+'</div>':'')+
    (preview.requiresReview?'<p class="helper">Certaines lignes sont ambiguës : saisis ton stock manuellement pour éviter un double comptage.</p>':
-    '<button class="btn wide" data-action="v41-confirm-migration">Reprendre ce stock comme inventaire initial</button>');
+    '<button class="btn wide" data-action="v41-confirm-migration" data-week="'+esc(selectedWeek)+'">Reprendre ce stock comme inventaire initial</button>');
   ctx.showModal('Reprise de mon ancien stock',body);return true
  }
  if(mode==='v41-confirm-migration'){
-  const preview=previewLegacyPantryV41(w,state.ingredientCatalog,state.products);
+  const selectedWeek=a.dataset.week||legacyPantryWeeks(state)[0]||ctx.currentWeek;
+  const candidate=state.weeks?.[selectedWeek];
+  if(!candidate){ctx.toast('Semaine introuvable.');return true}
+  const preview=previewLegacyPantryV41(candidate,state.ingredientCatalog,state.products);
   if(preview.requiresReview||!preview.entries.length||state.stockV41){ctx.toast('Reprise indisponible : examine les quantités manuellement.');return true}
-  commit(ctx,tx('Reprise du stock initial · '+ctx.currentWeek,preview.entries.map(x=>({
+  commit(ctx,tx('Reprise du stock initial · '+selectedWeek,preview.entries.map(x=>({
    type:'inventory',direction:'add',identity:x.identity,name:x.name,category:x.category,
    store:x.store,amount:x.amount,unit:x.unit
-  }))),()=>{state.stockV41MigratedFrom=ctx.currentWeek});return true
+  }))),()=>{state.stockV41MigratedFrom=selectedWeek});return true
  }
  if(mode==='v41-replace-meal'){replaceModal(ctx,index);return true}
  if(['v41-replace-recipe','v41-replace-frozen','v41-replace-ordered'].includes(mode)){

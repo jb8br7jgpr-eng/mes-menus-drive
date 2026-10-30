@@ -1,0 +1,22 @@
+name: "V39 — catégories produits complètes (sans déploiement)"
+on:
+  push:
+    branches: [speedrive-v39-categories-produits]
+  pull_request:
+    branches: [developpement-v1]
+permissions:
+  contents: read
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Vérification de syntaxe
+        run: node --check app.js
+      - name: Tests de non-régression V35 à V39
+        run: node --test tests/v35-portions-courses.test.mjs tests/v36-ergonomie.test.mjs tests/v37-compact-bulk-courses.test.mjs tests/v38-overlap-default-quantity.test.mjs tests/v38-carrefour-pack-oeufs.test.mjs tests/v38-stock-compact.test.mjs tests/v39-categories-produits.test.mjs
+      - name: Tests uniquement, aucune connexion Firebase
+        run: echo "No deployment, no server mutation"

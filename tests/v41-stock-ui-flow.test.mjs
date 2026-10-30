@@ -5,6 +5,9 @@ import {emptyStockV41,applyStockTransactionV41,availableStockV41,availableFreeze
 import {freezerReservationsV41} from '../stock-week-v41.mjs';
 import {renderStockV41} from '../stock-ui-v41.mjs';
 import {handleStockActionV41} from '../stock-actions-v41.mjs';
+import {packState,unpackState} from '../firebase/v34-cloud-codec.js';
+import {webcrypto} from 'node:crypto';
+if(!globalThis.crypto)globalThis.crypto=webcrypto;
 
 const app=readFileSync(new URL('../app.js',import.meta.url),'utf8');
 const index=readFileSync(new URL('../index.html',import.meta.url),'utf8');
@@ -147,4 +150,27 @@ test('Repas congelé : réservation sans courses ni décompte, consommation une 
  const saved=f.saved;
  f.invoke('v41-eat-frozen',{index:4});
  assert.equal(f.saved,saved);
+});
+
+test('Sauvegarde Firebase : les portions congelées, menus, achats et anciens stocks survivent à un aller-retour',async()=>{
+ const f=fixture();
+ const initial=applyStockTransactionV41(emptyStockV41(),{id:'purchase-once',movements:[
+  {type:'inventory',direction:'add',identity:'ingredient:pasta',name:'Pâtes',amount:500,unit:'g'},
+  {type:'freezer',direction:'add',lotId:'l1',recipeId:'pasta-dinner',name:'Pâtes',portions:2}
+ ]}).stock;
+ f.state.stockV41=initial;
+ f.week.meals[1]={type:'frozen',lotId:'l1',recipeId:'pasta-dinner',portions:1};
+ f.week.meals[2]={type:'recipe',recipeId:'pasta-dinner',people:2};
+ f.week.v41MealActions={'2:pasta-dinner':{status:'eaten',at:'2026-10-30T12:00:00.000Z'}};
+ f.week.v41ValidatedRows={'produit:pack|achat':{qty:1,unit:'paquet'}};
+ f.week.pantry={'ingredient:pasta|g':200};
+ const before=JSON.parse(JSON.stringify(f.state));
+ const packed=await packState(f.state);
+ const result=await unpackState(packed,{});
+ assert.deepEqual(result,before,'les métadonnées V41 restent présentes et intactes');
+ assert.equal(availableFreezerV41(result.stockV41,'pasta-dinner'),2);
+ assert.equal(result.weeks[weekId].meals[1].portions,1);
+ assert.equal(result.weeks[weekId].v41MealActions['2:pasta-dinner'].status,'eaten');
+ assert.equal(result.weeks[weekId].pantry['ingredient:pasta|g'],200);
+ assert.ok(packed.bytes<8_000_000);
 });

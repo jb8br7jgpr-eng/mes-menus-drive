@@ -1,0 +1,57 @@
+name: "V41 préversion — vérification sans Firebase"
+on:
+  push:
+    branches: [developpement-v1]
+    paths:
+      - "v41-test/**"
+      - ".github/workflows/v41-preview-smoke.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Syntaxe de la préversion
+        run: |
+          node --check v41-test/app.js
+          node --check v41-test/stock-engine-v41.mjs
+          node --check v41-test/stock-week-v41.mjs
+          node --check v41-test/stock-ui-v41.mjs
+          node --check v41-test/stock-actions-v41.mjs
+      - name: Isolation de la base et des ressources
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from "node:fs";
+          import assert from "node:assert/strict";
+          const html=fs.readFileSync("v41-test/index.html","utf8");
+          const app=fs.readFileSync("v41-test/app.js","utf8");
+          assert.match(html,/V41 · VERSION DE TEST/);
+          assert.match(html,/data-tab="stock"/);
+          assert.match(app,/const V34_CLOUD_ACTIVE = false/);
+          assert.match(app,/indexedDB.open\('speedrive-v41-preview-only',2\)/);
+          assert.doesNotMatch(app,/indexedDB.open\('menus-drive-v1'/);
+          assert.doesNotMatch(app,/register\('\.\/sw\.js'\)/);
+          assert.doesNotMatch(html,/src="\.\/firebase\/v34-ui.js/);
+          assert.match(app,/createV41PreviewDemo/);
+          for(const name of ["stock-engine-v41.mjs","stock-week-v41.mjs","stock-ui-v41.mjs","stock-actions-v41.mjs","stock-ui-v41.css","app.js"])
+            assert.ok(fs.existsSync("v41-test/"+name),name);
+          for(const name of ["styles.css","speedrive-icon-v2.PNG","speedrive-logo-v2.PNG"])
+            assert.ok(fs.existsSync(name),name);
+          NODE
+      - name: Moteur autonome en préversion
+        run: |
+          node --input-type=module <<'NODE'
+          import assert from "node:assert/strict";
+          import {emptyStockV41,applyStockTransactionV41,availableStockV41} from "./v41-test/stock-engine-v41.mjs";
+          import {freezerReservationsV41} from "./v41-test/stock-week-v41.mjs";
+          const stock=applyStockTransactionV41(emptyStockV41(),{
+            id:"staging-only",movements:[{type:"inventory",direction:"add",identity:"ingredient:preview-pasta",amount:500,unit:"g"}]
+          }).stock;
+          assert.equal(availableStockV41(stock,"ingredient:preview-pasta","g"),500);
+          assert.deepEqual(freezerReservationsV41({}),{});
+          NODE

@@ -181,13 +181,22 @@ export function handleStockActionV41(ctx) {
   });return true
  }
  if(mode==='v41-courses-done'){
-  const selected=ctx.shopping().filter(x=>x.checked&&!x.excluded&&!x.covered&&!(w.v41ValidatedRows||{})[x.id]);
+  const selected=ctx.shopping().filter(x=>x.checked&&!x.excluded&&!x.covered);
   const result=purchasedMovementsV41(selected,state.ingredientCatalog,state.products);
   if(!result.movements.length){ctx.toast(result.warnings.length?'Relie ces achats à une fiche Produit avant de les enregistrer.':'Aucun nouvel achat coché à valider.');return true}
   if(!confirm('Ajouter '+result.movements.length+' achat(s) réellement effectués au Stock maison ?'))return true;
   commit(ctx,tx('Courses faites · '+ctx.currentWeek,result.movements),()=>{
    w.v41ValidatedRows=w.v41ValidatedRows||{};
-   selected.filter(x=>x.productId||x.ingredientId).forEach(x=>{w.v41ValidatedRows[x.id]={qty:x.qty,unit:x.unit,at:new Date().toISOString()}});
+   const registered=selected.filter(x=>x.productId||x.ingredientId);
+   const registeredIds=new Set(registered.map(x=>x.id));
+   const manualIds=new Set(registered.flatMap(x=>x.manualExtraIds||[]));
+   registered.forEach(x=>{w.v41ValidatedRows[x.id]={
+    qty:x.qty,unit:x.unit,at:new Date().toISOString()
+   }});
+   // La coche « Acheté » devient un achat enregistré, non une commande en attente.
+   // Permettre un nouvel achat du même article lorsque le stock baisse.
+   w.checked=w.checked.filter(id=>!registeredIds.has(id));
+   w.extras=w.extras.filter(extra=>!manualIds.has(extra.id));
   });
   if(result.warnings.length)ctx.toast('Achats connus enregistrés. '+result.warnings.length+' article(s) sans fiche à vérifier.');
   return true

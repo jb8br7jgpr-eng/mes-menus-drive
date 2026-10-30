@@ -203,7 +203,8 @@ export function handleStockActionV41(ctx) {
    }
    commit(ctx,tx(freeze?'Plat préparé et congelé':'Plat préparé et mangé',movements),()=>{
     w.v41MealActions=w.v41MealActions||{};
-    w.v41MealActions[key]={status:freeze?'frozen':'eaten',lotId,frozenPortions,at:new Date().toISOString()};
+    w.v41MealActions[key]={status:freeze?'frozen':'eaten',lotId,frozenPortions,at:new Date().toISOString(),
+     movements:JSON.parse(JSON.stringify(movements))};
     if(freeze)ctx.reconcileLeftovers(w,index);
     if(Array.isArray(w.generatedIngredients))ctx.generateWeekCourses(w);
    });
@@ -237,9 +238,98 @@ export function handleStockActionV41(ctx) {
   if(!confirm('Confirmer que '+meal.portions+' portion'+(meal.portions>1?'s':'')+' congelée'+(meal.portions>1?'s':'')+' ont été mangées ?'))return true;
   commit(ctx,tx('Portions congelées mangées',[{type:'freezer',direction:'consume',
    lotId:meal.lotId,recipeId:meal.recipeId,portions:meal.portions}]),()=>{
-    w.v41MealActions=w.v41MealActions||{};w.v41MealActions[key]={status:'eaten',at:new Date().toISOString()};
+    w.v41MealActions=w.v41MealActions||{};w.v41MealActions[key]={status:'eaten',at:new Date().toISOString(),
+     movements:[{type:'freezer',direction:'consume',lotId:meal.lotId,recipeId:meal.recipeId,portions:meal.portions}]};
     meal.consumed=true;
   });return true
+ }
+ // Annulation d'une validation accidentelle : jamais un simple retrait du verrou.
+ // Le mouvement inverse de stock est atomique, enregistré et conservé dans Firebase.
+ // Les validations V41 antérieures à ce correctif n'avaient pas conservé leurs
+ // mouvements détaillés : elles sont reconstituées d'après la recette actuelle,
+ // avec un avertissement explicite au moment de confirmer.
+ if(mode==='v41-undo-validation'){
+  if(!Number.isInteger(index)||index<0||index>13)return true;
+  const kind=a.dataset.kind;
+  const sourceIndex=Number(a.dataset.source);
+  const key=kind==='frozen'?index+':frozen':
+   kind==='leftovers'?index+':leftovers:'+sourceIndex+':'+id:index+':'+id;
+  const action=w.v41MealActions?.[key];
+  if(!action){ctx.toast('Aucune validation à annuler pour ce repas.');return true}
+  if(kind==='leftovers'){
+   const leftover=ctx.mealLeftovers(w.meals[index]).some(x=>x.recipeId===id&&x.fromIndex===sourceIndex);
+   if(!leftover){ctx.toast('Ces restes ne sont plus présents dans le planning.');return true}
+   if(!confirm('Annuler la validation « Restes mangés » ? Aucun ingrédient ne sera modifié.'))return true;
+   delete w.v41MealActions[key];
+   ctx.persist();ctx.closeModal();ctx.render(true);
+   ctx.toast('Validation des restes annulée.');return true
+  }
+  if(kind==='frozen'){
+   const meal=w.meals[index];
+   if(meal?.type!=='frozen'||!meal.consumed){
+    ctx.toast('Repas congelé introuvable ou état incohérent.');return true
+   }
+   const lot=stock.freezer?.[meal.lotId];
+   if(!lot||lot.recipeId!==meal.recipeId){ctx.toast('Lot congelé introuvable.');return true}
+   if(!confirm('Annuler « C’est mangé » pour les '+meal.portions+
+    ' portions du congélateur ? Les portions seront remises dans le lot et le repas pourra être modifié.'))return true;
+   const original=action.movements?.find(x=>x.type==='freezer'&&x.direction==='consume');
+   if(original&&(original.lotId!==meal.lotId||original.portions!==meal.portions)){
+    ctx.toast('Le lot ou les portions ont changé. Annulation automatique impossible.');return true
+   }
+   commit(ctx,tx('Annulation du repas congelé',[{type:'freezer',direction:'add',
+    lotId:meal.lotId,recipeId:meal.recipeId,name:lot.name,portions:meal.portions}]),()=>{
+    delete w.v41MealActions[key];delete meal.consumed;
+   });
+   return true
+  }
+  if(kind!=='recipe'){ctx.toast('Type de validation inconnu.');return true}
+  const dish=ctx.mealDishes(w.meals[index]).find(x=>x.recipeId===id);
+  if(!dish||!['eaten','frozen'].includes(action.status)){
+   ctx.toast('Plat validé introuvable dans ce repas.');return true
+  }
+  if(w.meals.some((meal,i)=>ctx.mealLeftovers(meal).some(x=>
+   x.fromIndex===index&&x.recipeId===id&&w.v41MealActions?.[i+':leftovers:'+index+':'+id]))){
+   ctx.toast('Annule d’abord la validation des restes déjà mangés avant celle du plat.');return true
+  }
+  const legacy=!Array.isArray(action.movements);
+  let original;
+  try{
+   original=legacy?kitchenMovementsV41(ctx.recipeById(id),Number(dish.people),
+    state.ingredientCatalog,state.products):JSON.parse(JSON.stringify(action.movements));
+  }catch(err){ctx.toast('Impossible de reconstituer les ingrédients : '+(err.message||err));return true}
+  if(!original.length || original.some(x=>
+   !((x.type==='inventory'&&x.direction==='consume')||
+   (x.type==='freezer'&&x.direction==='add'&&action.status==='frozen')))){
+   ctx.toast('Mouvements d’origine non reconnus. Aucun stock modifié.');return true
+  }
+  const inverse=original.map(x=>({...x,direction:x.direction==='add'?'consume':'add'}));
+  if(action.status==='frozen'){
+   const lotId=action.lotId;
+   const lot=stock.freezer?.[lotId];
+   const expected=Number(action.frozenPortions);
+   const record=original.find(x=>x.type==='freezer'&&x.direction==='add');
+   if(!lot||!Number.isInteger(expected)||expected<1||lot.recipeId!==id||
+      lot.portions!==expected||(ctx.freezerReservationsV41(state.weeks)[lotId]||0)>0||
+      (record&&(record.lotId!==lotId||record.portions!==expected))){
+    ctx.toast('Des portions de ce lot ont été utilisées, modifiées ou réservées. Annulation automatique refusée.');return true
+   }
+   if(legacy) inverse.push({type:'freezer',direction:'consume',lotId,
+    recipeId:id,portions:expected,name:lot.name});
+  }
+  const details=original.filter(x=>x.type==='inventory')
+   .map(x=>Number(x.amount).toLocaleString('fr-FR',{maximumFractionDigits:3})+' '+x.unit+
+    ' de '+(x.name||x.identity)).join(' ; ');
+  const legacyNotice=legacy?'\n\nAttention : cette validation est antérieure au correctif. Les quantités ont été recalculées à partir de la recette ACTUELLE. Vérifie-les avant de confirmer.':'';
+  if(!confirm('Annuler la validation du plat « '+(ctx.recipeById(id)?.name||'recette')+
+   ' » ? Les ingrédients seront remis au Stock maison : '+details+
+   (action.status==='frozen'?' ; les portions congelées de ce lot seront également annulées.':'')+
+   legacyNotice+'\n\nAprès cela, tu pourras modifier ou supprimer le repas.'))return true;
+  commit(ctx,tx('Annulation de validation · '+(ctx.recipeById(id)?.name||id),inverse),()=>{
+   delete w.v41MealActions[key];
+   if(Array.isArray(w.generatedIngredients))ctx.generateWeekCourses(w);
+  });
+  return true
  }
  if(mode==='v41-courses-done'){
   const selected=ctx.shopping().filter(x=>x.checked&&!x.excluded&&!x.covered);

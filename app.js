@@ -1971,7 +1971,7 @@ document.addEventListener('click',e=>{
   else if(mode==='generate-week-courses'){
    const w=getWeek(),status=coursesStatus(w);
    if(!hasCookedMeals(w)){toast('Ajoute d’abord un plat aux menus de cette semaine.');return}
-   if(status!=='not-generated'&&!confirm('Régénérer les ingrédients des recettes pour cette semaine ? Les nouveaux menus remplaceront les anciens besoins de recettes dans Courses. Les ajouts manuels, le stock maison, les articles cochés et les exclusions seront conservés.'))return;
+   if(status!=='not-generated'&&!confirm('Régénérer les ingrédients des recettes pour cette semaine ? Les nouveaux menus remplaceront les anciens besoins de recettes dans Courses. Les ajouts manuels, le stock maison, les articles marqués achetés et les articles retirés seront conservés.'))return;
    checkpoint('Avant génération des courses de la semaine');
    generateWeekCourses(w);persist();tabScrollV33.courses=0;switchTabV33('courses');
    toast('Courses de la semaine générées : Carrefour et Grand Frais sont prêts !')
@@ -2212,8 +2212,9 @@ document.addEventListener('change',e=>{
   if(e.target.matches('[data-v37-select]')){updateBulkV37();return}
   if(e.target.id==='v37BulkFilter'){filterBulkV37();return}
   if(e.target.matches('[data-v37-unit]')){
-   e.target.closest('[data-v37-row]')?.querySelector('[data-v37-select]')?.click();
-   return
+   const box=e.target.closest('[data-v37-row]')?.querySelector('[data-v37-select]');
+   if(box)box.checked=true;
+   updateBulkV37();return
   }
   if(e.target.matches('[data-v37-qty]')){const row=e.target.closest('[data-v37-row]');if(row)row.querySelector('[data-v37-select]').checked=true;updateBulkV37();return}
   if(e.target.matches('[data-v36-favorite]')){updateBulkFavoritesCountV36();return}

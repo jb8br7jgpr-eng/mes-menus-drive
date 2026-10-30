@@ -123,23 +123,38 @@ export function handleStockActionV41(ctx) {
   commit(ctx,tx('Correction du congélateur',[{type:'freezer',direction:diff>0?'add':'consume',
    lotId:id,recipeId:lot.recipeId,name:lot.name,portions:Math.abs(diff)}]));return true
  }
- if(mode==='v41-eat-recipe'||mode==='v41-freeze-recipe'){
+ if(mode==='v41-freeze-recipe'){
+  if(!Number.isInteger(index)||index<0||index>13)return true;
+  const dish=ctx.mealDishes(w.meals[index]).find(x=>x.recipeId===id),r=ctx.recipeById(id);
+  if(!dish||!r||w.v41MealActions?.[index+':'+id])return true;
+  ctx.showModal('Congeler · '+r.name,
+   '<p class="helper">Les ingrédients de la recette seront retirés du stock pour les '+dish.people+' portions préparées. Indique combien tu en mets au congélateur ; les autres portions sont considérées comme mangées.</p>'+
+   input('v41FreezePortions','Portions à congeler',dish.people,1,dish.people)+
+   '<button class="btn wide" data-action="v41-confirm-freeze-recipe" data-index="'+index+'" data-id="'+esc(id)+'">❄️ Confirmer la préparation</button>');
+  return true
+ }
+ if(mode==='v41-eat-recipe'||mode==='v41-confirm-freeze-recipe'){
   if(!Number.isInteger(index)||index<0||index>13)return true;
   const dish=ctx.mealDishes(w.meals[index]).find(x=>x.recipeId===id),r=ctx.recipeById(id);
   if(!dish||!r)return true;
   const key=index+':'+id;
   if(w.v41MealActions?.[key]){ctx.toast('Ce plat a déjà été validé.');return true}
+  const freeze=mode==='v41-confirm-freeze-recipe';
+  const frozenPortions=freeze?amount('v41FreezePortions'):0;
+  if(freeze&&(!Number.isInteger(frozenPortions)||frozenPortions<1||frozenPortions>Number(dish.people))){
+   ctx.toast('Choisis un nombre de portions compris entre 1 et '+dish.people+'.');return true
+  }
   try{
    const movements=kitchenMovementsV41(r,Number(dish.people),state.ingredientCatalog,state.products);
    let lotId=null;
-   if(mode==='v41-freeze-recipe'){
+   if(freeze){
     lotId='lot:'+ctx.uid();
-    movements.push({type:'freezer',direction:'add',lotId,recipeId:id,name:r.name,portions:Number(dish.people),preparedAt:new Date().toISOString()});
+    movements.push({type:'freezer',direction:'add',lotId,recipeId:id,name:r.name,portions:frozenPortions,preparedAt:new Date().toISOString()});
    }
-   commit(ctx,tx(mode==='v41-freeze-recipe'?'Plat préparé et congelé':'Plat préparé et mangé',movements),()=>{
+   commit(ctx,tx(freeze?'Plat préparé et congelé':'Plat préparé et mangé',movements),()=>{
     w.v41MealActions=w.v41MealActions||{};
-    w.v41MealActions[key]={status:mode==='v41-freeze-recipe'?'frozen':'eaten',lotId,at:new Date().toISOString()};
-    if(mode==='v41-freeze-recipe')ctx.reconcileLeftovers(w,index);
+    w.v41MealActions[key]={status:freeze?'frozen':'eaten',lotId,frozenPortions,at:new Date().toISOString()};
+    if(freeze)ctx.reconcileLeftovers(w,index);
     if(Array.isArray(w.generatedIngredients))ctx.generateWeekCourses(w);
    });
   }catch(e){ctx.toast(e.message||'Impossible de retirer les ingrédients.')}return true

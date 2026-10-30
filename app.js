@@ -9,7 +9,7 @@ const icons={'Pâtes':'🍝','Viande':'🥩','Poisson':'🐟','Légumes':'🥦',
 const units=['g','kg','ml','cl','l','pièce','paquet','boîte','rouleau','bouteille','pot','sachet'];
 const contentUnits=['g','kg','ml','cl','l','pièce','rouleau'];
 const baseState=()=>({schema:1,recipes:[],products:[],weeks:{},staples:[],storePreferences:{},ingredientCatalog:[],favoritesUnifiedV29:false,coursesExplicitGenerationV1:false,settings:{people:2}});
-let state=baseState(), currentTab='menus', currentWeek='', search='', recipeSort='az', recipeTypeFilter='all', productSearch='', productCategory='Toutes', ingredientStoreTab='carrefour', catalogueTypeFilter='all', catalogueStoreFilter='all', catalogueCategoryFilter='all', db=null, usingFallback=false;
+let state=baseState(), currentTab='menus', currentWeek='', search='', recipeSort='az', recipeTypeFilter='all', productSearch='', productCategory='Toutes', ingredientStoreTab='carrefour', catalogueTypeFilter='all', catalogueStoreFilter='all', catalogueCategoryFilter='all', catalogueSortV40='name', db=null, usingFallback=false;
 let pendingRecipeDraftImage='',pendingIngredientLinkId=null;
 let independentProductsOpen=false;const courseOpenSections=new Set();
 let calendarMonthV36='';
@@ -383,6 +383,50 @@ function productCategoryChoices(){
 function productCategoryGroupName(value){
  return productCategoryGroups.find(([,values])=>values.includes(value))?.[0]||'Ancienne catégorie'
 }
+/* V40 : mêmes options et ordre de tri dans Produits et Ajout aux courses.
+   Les catégories filtrent des références existantes, sans créer de nouvelles catégories. */
+const catalogueSortChoicesV40=[
+ ['name','Nom : A → Z'],['category','Catégorie : A → Z'],['store','Magasin : Carrefour / Grand Frais']
+];
+function catalogueStoreLabelV40(store){return store==='grandfrais'?'Grand Frais':'Carrefour Drive'}
+function catalogueCategoryV40(item,linkedProductId=null){
+ const saved=String(item?.category||'').trim();
+ if(saved&&saved!=='Autres')return saved;
+ const linked=linkedProductId?productById(linkedProductId):null;
+ const fallback=String(linked?.category||'').trim();
+ return fallback&&fallback!=='Autres'?fallback:(saved||'Autres')
+}
+function catalogueSortCompareV40(a,b,sort='name'){
+ const storeA=a.store||'',storeB=b.store||'',
+  categoryA=a.category||'Autres',categoryB=b.category||'Autres';
+ const compare=(x,y)=>String(x).localeCompare(String(y),'fr',{sensitivity:'base'});
+ const first=sort==='category'?compare(categoryA,categoryB):
+  sort==='store'?compare(catalogueStoreLabelV40(storeA),catalogueStoreLabelV40(storeB)):0;
+ return first||compare(a.name,b.name)||compare(a.kind||a.type||'',b.kind||b.type||'')
+}
+function catalogueCategoryOptionsV40(categories,chosen='all'){
+ return '<option value="all">Toutes les catégories</option>'+
+  categories.map(category=>'<option value="'+html(category)+'" '+(chosen===category?'selected':'')+'>'+html(category)+'</option>').join('')
+}
+function catalogueStoreOptionsV40(chosen='all'){
+ return [['all','Tous les magasins'],['carrefour','Carrefour Drive'],['grandfrais','Grand Frais']].
+  map(([value,label])=>'<option value="'+value+'" '+(chosen===value?'selected':'')+'>'+label+'</option>').join('')
+}
+function catalogueSortOptionsV40(chosen='name'){
+ return catalogueSortChoicesV40.map(([value,label])=>'<option value="'+value+'" '+(chosen===value?'selected':'')+'>'+label+'</option>').join('')
+}
+function catalogueFiltersV40({prefix,searchId,searchValue='',storeId,storeValue='all',categoryId,
+  categoryValue='all',sortId,sortValue='name',categories=[],extra=''}) {
+ return '<div class="v40-filter-panel" role="group" aria-label="Rechercher et filtrer les produits">'+
+  '<div class="field v40-filter-search"><label for="'+searchId+'">Rechercher un article</label>'+
+  '<input id="'+searchId+'" type="search" autocomplete="off" value="'+html(searchValue)+'" placeholder="Ex. lait, pâtes, sopalin…" aria-label="Rechercher un article"></div>'+
+  '<div class="v40-filter-controls">'+
+  '<div class="field"><label for="'+storeId+'">Magasin</label><select id="'+storeId+'">'+catalogueStoreOptionsV40(storeValue)+'</select></div>'+
+  '<div class="field"><label for="'+categoryId+'">Catégorie</label><select id="'+categoryId+'">'+catalogueCategoryOptionsV40(categories,categoryValue)+'</select></div>'+
+  '<div class="field v40-filter-sort"><label for="'+sortId+'">Trier par</label><select id="'+sortId+'">'+catalogueSortOptionsV40(sortValue)+'</select></div>'+
+  '</div>'+extra+'</div>'
+}
+
 function productById(id){return (state.products||[]).find(p=>p.id===id)}
 function validCarrefourLink(raw){
   const value=String(raw||'').trim();if(!value)return '';

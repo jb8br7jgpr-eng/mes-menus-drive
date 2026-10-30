@@ -116,7 +116,7 @@ test('Les cartes Plats ont une seule rangée d’actions regroupées, sans ancie
  const markup=between('recipeRows','viewRecipeV33');
  assert.match(markup,/v37-recipe-card/);
  assert.match(markup,/v37-recipe-actions/);
- assert.match(markup,/\+ Menus/);
+ assert.match(markup,/[+＋] Menus/);
  assert.match(markup,/Dupliquer/);
  assert.match(markup,/✎ Modifier/);
  assert.match(css,/\.v37-recipe-actions\s*\.btn/);

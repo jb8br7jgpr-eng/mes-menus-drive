@@ -1,5 +1,5 @@
-const CACHE='menus-drive-v39-ui-20261030';
-const ASSETS=['./','./index.html','./styles.css?v=20261030-39','./app.js?v=20261030-39','./manifest.webmanifest?v=20261029-31','./speedrive-logo-v2.PNG?v=20261029-31','./speedrive-icon-v2.PNG?v=20261029-31'];
+const CACHE='menus-drive-v40-ui-20261030';
+const ASSETS=['./','./index.html','./styles.css?v=20261030-40','./app.js?v=20261030-40','./manifest.webmanifest?v=20261029-31','./speedrive-logo-v2.PNG?v=20261029-31','./speedrive-icon-v2.PNG?v=20261029-31'];
 self.addEventListener('install',event=>{
   event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(ASSETS)).then(()=>self.skipWaiting()));
 });

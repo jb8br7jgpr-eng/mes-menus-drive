@@ -2137,7 +2137,16 @@ document.addEventListener('click',e=>{
    ingredientEditor(null,x.name)
   }
   else if(mode==='edit-shopping-item')editShoppingItemModal(id);
-  else if(mode==='home-stock')homeStockModal(id);
+  else if(mode==='home-stock'){
+   if(stockModulesV41&&!state.stockV41){
+    // Ne jamais transformer silencieusement un ancien stock par semaine en
+    // inventaire global partiel : la reprise doit être examinée explicitement.
+    closeModal();stockViewV41='home';switchTabV33('stock');
+    toast('Initialise d’abord le stock permanent dans cet onglet : tu peux reprendre tes anciennes quantités avant de les modifier.');
+    return;
+   }
+   homeStockModal(id)
+  }
   else if(mode==='stock-decrease'||mode==='stock-increase'){
    const field=$('#homeStockAmount'),unit=$('#homeStockUnit')?.value;
    if(!field)return;

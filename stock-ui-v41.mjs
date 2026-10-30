@@ -43,12 +43,16 @@ export function renderStockV41({state,week,weekId,view='home',recipeById,mealDis
     const completed=Boolean(actions[i+':frozen']);
     entries.push(row('❄️ '+(recipeById(meal.recipeId)?.name||lot?.name||'Plat congelé'),
      days[Math.floor(i/2)]+' '+(i%2?'soir':'midi')+' · '+meal.portions+' portion'+(meal.portions>1?'s':'')+' · congélateur',
-     completed?'<span class="v41-stock-done">✓ Mangé</span>':'<button class="btn tiny" data-action="v41-eat-frozen" data-index="'+i+'">C’est mangé</button>'));
+     completed?'<div class="v41-stock-actions"><span class="v41-stock-done">✓ Mangé</span>'+
+      '<button class="btn tiny secondary" data-action="v41-undo-validation" data-kind="frozen" data-index="'+i+'">Annuler la validation</button></div>':
+      '<button class="btn tiny" data-action="v41-eat-frozen" data-index="'+i+'">C’est mangé</button>'));
    }
    for(const dish of mealDishes(meal)){
     const recipe=recipeById(dish.recipeId),status=actions[i+':'+dish.recipeId];
     entries.push(row(recipe?.name||'Plat supprimé',days[Math.floor(i/2)]+' '+(i%2?'soir':'midi')+' · '+dish.people+' portion'+(dish.people>1?'s':''),
-      status?'<span class="v41-stock-done">✓ '+(status.status==='frozen'?'Congelé':'Mangé')+'</span>':
+      status?'<div class="v41-stock-actions"><span class="v41-stock-done">✓ '+(status.status==='frozen'?'Congelé':'Mangé')+'</span>'+
+      '<button class="btn tiny secondary" data-action="v41-undo-validation" data-kind="recipe" data-index="'+i+
+      '" data-id="'+escape(dish.recipeId)+'">Annuler la validation</button></div>':
       '<div class="v41-stock-actions"><button class="btn tiny" data-action="v41-eat-recipe" data-index="'+i+'" data-id="'+escape(dish.recipeId)+'">C’est mangé</button>'+
       '<button class="btn tiny secondary" data-action="v41-freeze-recipe" data-index="'+i+'" data-id="'+escape(dish.recipeId)+'">❄️ Au congélateur</button></div>'));
    }
@@ -59,7 +63,9 @@ export function renderStockV41({state,week,weekId,view='home',recipeById,mealDis
     entries.push(row('🍱 Restes : '+(source?.name||'Plat préparé'),
       days[Math.floor(i/2)]+' '+(i%2?'soir':'midi')+' · '+leftover.people+' portion'+(leftover.people>1?'s':'')+
       ' · sans nouvelle déduction d’ingrédients',
-      completed?'<span class="v41-stock-done">✓ Mangé</span>':
+      completed?'<div class="v41-stock-actions"><span class="v41-stock-done">✓ Mangé</span>'+
+      '<button class="btn tiny secondary" data-action="v41-undo-validation" data-kind="leftovers" data-index="'+i+
+      '" data-source="'+leftover.fromIndex+'" data-id="'+escape(leftover.recipeId)+'">Annuler la validation</button></div>':
       '<div class="v41-stock-actions"><span class="v41-stock-info">'+
       (prepared?.status==='eaten'?'Déjà cuisinés':'À préparer')+'</span>'+
       '<button class="btn tiny" data-action="v41-eat-leftovers" data-index="'+i+

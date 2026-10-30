@@ -30,3 +30,8 @@
 .v41-select-row{display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;border:1px solid #dce9db;background:white;border-radius:12px;padding:13px;text-align:left;color:#244334;font-weight:700}
 .v41-select-row small{font-size:10px;color:#84958a;font-weight:500}
 @media(max-width:380px){.bottom-nav.v41-six-tabs .nav-item{font-size:8.5px}.bottom-nav.v41-six-tabs .speedrive-nav-svg{width:19px;height:19px}.v41-stock-actions{width:100%;justify-content:flex-start}.v41-stock-segment{font-size:10px}}
+
+/* V41.1 — validation annulable, visible sans masquer les commandes du repas. */
+.v41-meal-undo-panel{display:grid;gap:7px;margin:0 0 13px;padding:12px;border:1px solid #e7d6af;border-radius:14px;background:#fff9ed}
+.v41-meal-undo-panel .helper{font-size:12px;margin:0 0 2px;line-height:1.45;color:#745b32}
+.v41-meal-undo{white-space:normal;min-height:40px;text-align:center}

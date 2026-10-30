@@ -419,3 +419,124 @@ test('La déduction d’une recette attend également le choix de migration',()=
  assert.equal(f.state.stockV41,null);
  assert.equal(f.week.v41MealActions,undefined);
 });
+
+test('Annuler un repas validé remet ses ingrédients en stock et débloque sa suppression',()=>{
+ const initial=applyStockTransactionV41(emptyStockV41(),{id:'undo-start',movements:[
+  {type:'inventory',direction:'add',identity:'ingredient:pasta',name:'Pâtes',amount:500,unit:'g'}
+ ]}).stock;
+ const f=fixture(initial);withInputs(f.inputs);
+ f.week.meals[0]={type:'recipe',recipeId:'pasta-dinner',people:2};
+ f.invoke('v41-eat-recipe',{index:0,id:'pasta-dinner'});
+ assert.equal(availableStockV41(f.state.stockV41,'ingredient:pasta','g'),250);
+ assert.ok(Array.isArray(f.week.v41MealActions['0:pasta-dinner'].movements),
+  'les validations récentes sauvegardent la quantité exacte à annuler');
+ const before=f.saved;
+ f.invoke('v41-undo-validation',{index:0,id:'pasta-dinner',dataset:{kind:'recipe'}});
+ assert.equal(availableStockV41(f.state.stockV41,'ingredient:pasta','g'),500);
+ assert.equal(f.week.v41MealActions['0:pasta-dinner'],undefined);
+ assert.equal(f.saved,before+1);
+ const history=f.state.stockV41.history.at(-1);
+ assert.match(history.label,/Annulation de validation/);
+ f.ctx.clearMealWithPair(f.week,0);
+ assert.equal(f.week.meals[0],null);
+ const saved=f.saved;
+ f.invoke('v41-undo-validation',{index:0,id:'pasta-dinner',dataset:{kind:'recipe'}});
+ assert.equal(f.saved,saved,'impossible de créditer deux fois la même annulation');
+ assert.equal(availableStockV41(f.state.stockV41,'ingredient:pasta','g'),500);
+});
+
+test('V41 déjà utilisée : une validation ancienne reste annulable avec quantités reconstituées',()=>{
+ const initial=applyStockTransactionV41(emptyStockV41(),{id:'undo-legacy',movements:[
+  {type:'inventory',direction:'add',identity:'ingredient:pasta',amount:500,unit:'g'}
+ ]}).stock;
+ const f=fixture(initial);withInputs(f.inputs);
+ f.week.meals[2]={type:'recipe',recipeId:'pasta-dinner',people:2};
+ f.invoke('v41-eat-recipe',{index:2,id:'pasta-dinner'});
+ delete f.week.v41MealActions['2:pasta-dinner'].movements;
+ assert.equal(availableStockV41(f.state.stockV41,'ingredient:pasta','g'),250);
+ let prompt='';
+ globalThis.confirm=message=>{prompt=message;return true};
+ f.invoke('v41-undo-validation',{index:2,id:'pasta-dinner',dataset:{kind:'recipe'}});
+ assert.match(prompt,/recette ACTUELLE/);
+ assert.match(prompt,/250 g de Pâtes/);
+ assert.equal(availableStockV41(f.state.stockV41,'ingredient:pasta','g'),500);
+ assert.equal(f.week.v41MealActions['2:pasta-dinner'],undefined);
+});
+
+test('La validation de restes se retire sans ajouter d’ingrédients',()=>{
+ const initial=applyStockTransactionV41(emptyStockV41(),{id:'undo-leftovers-start',movements:[
+  {type:'inventory',direction:'add',identity:'ingredient:pasta',amount:500,unit:'g'}
+ ]}).stock;
+ const f=fixture(initial);withInputs(f.inputs);
+ f.week.meals[0]={type:'recipe',recipeId:'pasta-dinner',people:2};
+ f.week.meals[3]={type:'leftovers',recipeId:'pasta-dinner',fromIndex:0,leftoverPortions:2};
+ f.invoke('v41-eat-recipe',{index:0,id:'pasta-dinner'});
+ f.invoke('v41-eat-leftovers',{index:3,id:'pasta-dinner',dataset:{source:'0'}});
+ const stockBefore=JSON.stringify(f.state.stockV41);
+ f.invoke('v41-undo-validation',{index:0,id:'pasta-dinner',dataset:{kind:'recipe'}});
+ assert.match(f.message,/Annule d’abord la validation des restes/);
+ assert.equal(JSON.stringify(f.state.stockV41),stockBefore);
+ f.invoke('v41-undo-validation',{index:3,id:'pasta-dinner',dataset:{kind:'leftovers',source:'0'}});
+ assert.equal(f.week.v41MealActions['3:leftovers:0:pasta-dinner'],undefined);
+ assert.equal(JSON.stringify(f.state.stockV41),stockBefore);
+ f.invoke('v41-undo-validation',{index:0,id:'pasta-dinner',dataset:{kind:'recipe'}});
+ assert.equal(availableStockV41(f.state.stockV41,'ingredient:pasta','g'),500);
+});
+
+test('Annuler la mise au congélateur rétablit ingrédients et portions uniquement si le lot est intact',()=>{
+ const initial=applyStockTransactionV41(emptyStockV41(),{id:'undo-freeze-start',movements:[
+  {type:'inventory',direction:'add',identity:'ingredient:pasta',amount:1000,unit:'g'}
+ ]}).stock;
+ const f=fixture(initial);withInputs({...f.inputs,v41FreezePortions:2});
+ f.week.meals[1]={type:'recipe',recipeId:'pasta-dinner',people:4};
+ f.invoke('v41-confirm-freeze-recipe',{index:1,id:'pasta-dinner'});
+ const action=f.week.v41MealActions['1:pasta-dinner'];
+ assert.equal(availableFreezerV41(f.state.stockV41,'pasta-dinner'),2);
+ assert.equal(availableStockV41(f.state.stockV41,'ingredient:pasta','g'),500);
+ f.week.meals[3]={type:'frozen',lotId:action.lotId,recipeId:'pasta-dinner',portions:2};
+ const frozenBefore=JSON.stringify(f.state.stockV41);
+ f.invoke('v41-undo-validation',{index:1,id:'pasta-dinner',dataset:{kind:'recipe'}});
+ assert.match(f.message,/portions.*utilisées, modifiées ou réservées/);
+ assert.equal(JSON.stringify(f.state.stockV41),frozenBefore);
+ delete f.week.meals[3];
+ f.invoke('v41-undo-validation',{index:1,id:'pasta-dinner',dataset:{kind:'recipe'}});
+ assert.equal(availableFreezerV41(f.state.stockV41,'pasta-dinner'),0);
+ assert.equal(availableStockV41(f.state.stockV41,'ingredient:pasta','g'),1000);
+ assert.equal(f.week.v41MealActions['1:pasta-dinner'],undefined);
+});
+
+test('Une portion de plat congelé mangée par erreur peut être rétablie dans le même lot',()=>{
+ const stock=applyStockTransactionV41(emptyStockV41(),{id:'undo-eat-frozen',movements:[
+  {type:'freezer',direction:'add',lotId:'lot-pasta',recipeId:'pasta-dinner',name:'Pâtes',portions:3}
+ ]}).stock;
+ const f=fixture(stock);withInputs(f.inputs);
+ f.week.meals[4]={type:'frozen',lotId:'lot-pasta',recipeId:'pasta-dinner',portions:2};
+ f.invoke('v41-eat-frozen',{index:4});
+ assert.equal(availableFreezerV41(f.state.stockV41,'pasta-dinner'),1);
+ const saved=f.saved;
+ f.invoke('v41-undo-validation',{index:4,dataset:{kind:'frozen'}});
+ assert.equal(f.saved,saved+1);
+ assert.equal(availableFreezerV41(f.state.stockV41,'pasta-dinner'),3);
+ assert.equal(f.week.meals[4].consumed,undefined);
+ assert.equal(f.week.v41MealActions['4:frozen'],undefined);
+ f.invoke('v41-undo-validation',{index:4,dataset:{kind:'frozen'}});
+ assert.equal(f.saved,saved+1);
+ assert.equal(availableFreezerV41(f.state.stockV41,'pasta-dinner'),3);
+});
+
+test('Les boutons de récupération sont visibles dans Stock et dans le menu du repas',()=>{
+ const initial=applyStockTransactionV41(emptyStockV41(),{id:'undo-display-stock',movements:[
+  {type:'inventory',direction:'add',identity:'ingredient:pasta',amount:500,unit:'g'}
+ ]}).stock;
+ const f=fixture(initial);withInputs(f.inputs);
+ f.week.meals[0]={type:'recipe',recipeId:'pasta-dinner',people:2};
+ f.invoke('v41-eat-recipe',{index:0,id:'pasta-dinner'});
+ const page=renderStockV41({state:f.state,week:f.week,weekId,view:'week',
+  recipeById:f.ctx.recipeById,mealDishes,mealLeftovers});
+ assert.match(page,/data-action="v41-undo-validation"/);
+ assert.match(page,/data-kind="recipe"/);
+ assert.match(page,/Annuler la validation/);
+ assert.match(app,/function undoMealValidationControlsV41\(/);
+ assert.match(app,/undoMealValidationControlsV41\(index,meal\)/);
+ assert.match(style,/\.v41-meal-undo-panel/);
+});

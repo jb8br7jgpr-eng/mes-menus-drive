@@ -1570,11 +1570,33 @@ function refreshMealRecipePicker(){
  const n=state.recipes.filter(r=>!used.has(r.id)&&norm(r.name).includes(norm(term))&&(type==='all'||normalRecipeType(r.category)===type)).length;
  if(count)count.textContent=n+' plat'+(n>1?'s':'')+' disponible'+(n>1?'s':'')
 }
+// V41.1 : rendre une validation accidentelle réversible depuis le repas lui-même.
+function undoMealValidationControlsV41(index,meal){
+ const w=getWeek(),actions=w.v41MealActions||{},buttons=[];
+ const make=(kind,recipeId=null,sourceIndex=null,label='')=>{
+  buttons.push('<button class="btn secondary wide v41-meal-undo" data-action="v41-undo-validation" data-kind="'+kind+
+   '" data-index="'+index+'"'+(recipeId?' data-id="'+html(recipeId)+'"':'')+
+   (sourceIndex!==null?' data-source="'+sourceIndex+'"':'')+
+   '>↩ Annuler la validation'+(label?' · '+html(label):'')+'</button>')
+ };
+ if(meal?.type==='frozen'&&actions[index+':frozen'])make('frozen',null,null,'Congélateur');
+ for(const dish of mealDishes(meal)){
+  if(actions[index+':'+dish.recipeId])make('recipe',dish.recipeId,null,recipeById(dish.recipeId)?.name||'Plat')
+ }
+ for(const leftover of mealLeftovers(meal)){
+  if(actions[index+':leftovers:'+leftover.fromIndex+':'+leftover.recipeId])
+   make('leftovers',leftover.recipeId,leftover.fromIndex,'Restes');
+ }
+ return buttons.length?'<div class="v41-meal-undo-panel"><p class="helper">Un repas validé par erreur ? Annule d’abord la validation pour corriger le stock, puis modifie ou supprime le repas.</p>'+
+  buttons.join('')+'</div>':'';
+}
 function pickMeal(index){
  const meal=getWeek().meals[index],dishes=mealDishes(meal),leftovers=mealLeftovers(meal);
- let out='<button class="btn secondary wide" data-action="v41-replace-meal" data-index="'+index+'">'+(meal?'↔ Remplacer ce repas':'❄️ Congélateur ou repas commandé')+'</button>';
+ let out=undoMealValidationControlsV41(index,meal)+
+  '<button class="btn secondary wide" data-action="v41-replace-meal" data-index="'+index+'">'+(meal?'↔ Remplacer ce repas':'❄️ Congélateur ou repas commandé')+'</button>';
  if(meal?.type==='frozen'||meal?.type==='ordered'){
   showModal('Gérer mon repas','<p class="helper">'+(meal.type==='frozen'?'❄️ Plat issu du congélateur':'🍕 Repas libre ou commandé')+'</p>'+
+    undoMealValidationControlsV41(index,meal)+
     '<button class="btn wide" data-action="v41-replace-meal" data-index="'+index+'">↔ Remplacer ce repas</button>');
   return
  }

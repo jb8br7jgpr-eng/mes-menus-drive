@@ -957,3 +957,11 @@
  .v40-type-filter>span{flex-basis:48px}
  .v40-type-filter .catalogue-filter{padding:6px 7px;font-size:10px}
 }
+
+/* V40 — un seul raccourci pour retirer la combinaison des filtres. */
+.v40-filter-reset{display:flex;justify-content:flex-end;margin-top:-2px}
+.v40-filter-reset button{
+ padding:4px 1px;min-height:26px;border:0;background:transparent;
+ color:#3e7652;font-size:11px;font-weight:800;cursor:pointer
+}
+.v40-filter-reset button:focus-visible{outline:2px solid #b9a366;outline-offset:2px}

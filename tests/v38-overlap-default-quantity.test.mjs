@@ -22,7 +22,9 @@ test('La quantité habituelle est remplacée par une quantité proposée, facult
  assert.match(editor,/Quantité proposée aux courses/);
  assert.match(editor,/Facultatif · toucher pour modifier/);
  assert.match(editor,/Quantité pré-remplie/);
- assert.match(editor,/ni les quantités des recettes, ni le stock maison, ni le contenu des paquets Carrefour/);
+ assert.match(editor,/Les recettes conservent leurs besoins propres/);
+ assert.match(editor,/Unité achetée \(boîte, paquet, bouteille/);
+ assert.match(editor,/Contenu d’une unité achetée/);
  assert.match(css,/\.v38-course-defaults/);
  const bulk=between('openBulkCatalogueV37','filterBulkV37');
  assert.match(bulk,/simples propositions/);

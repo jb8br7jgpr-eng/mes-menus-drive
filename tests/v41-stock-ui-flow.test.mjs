@@ -5,7 +5,7 @@ import {emptyStockV41,applyStockTransactionV41,availableStockV41,availableFreeze
 import {freezerReservationsV41} from '../stock-week-v41.mjs';
 import {previewStockMovementsV413,stockConfirmationTextV413} from '../stock-preview-v413.mjs';
 import {renderStockV41} from '../stock-ui-v41.mjs';
-import {handleStockActionV41} from '../stock-actions-v41.mjs';
+import {handleStockActionV41,bulkStockMovementsV414} from '../stock-actions-v41.mjs';
 import {packState,unpackState} from '../firebase/v34-cloud-codec.js';
 import {webcrypto} from 'node:crypto';
 import {runInNewContext} from 'node:vm';
@@ -31,7 +31,8 @@ const mealLeftovers=m=>m?.type==='leftovers'?
 function fixture(stock=null){
  const week={meals:Array(14).fill(null),extras:[],checked:[],excluded:[],pantry:{},generatedIngredients:[]};
  const state={schema:1,recipes,products,ingredientCatalog:ingredients,weeks:{[weekId]:week},stockV41:stock};
- let saved=0,lastMessage='',uid=0,modals=[];
+ let saved=0,lastMessage='',uid=0,modals=[],openedBulk=0;
+ let bulkRows=[];
  const inputs={};
  const ctx={
   mode:null,a:{dataset:{}},id:null,index:NaN,
@@ -40,6 +41,8 @@ function fixture(stock=null){
   toast:msg=>{lastMessage=String(msg)},persist:()=>{saved++},
   render:()=>{},renderMealContext:()=>{},closeModal:()=>{},
   showModal:(title,body)=>{modals.push({title,body})},
+  openStockBulkV414:()=>{openedBulk++},
+  readBulkStockV414:()=>bulkRows,
   getWeek:()=>state.weeks[weekId],
   recipeById:id=>recipes.find(x=>x.id===id),mealDishes,mealLeftovers,
   shopping:()=>state.weeks[weekId].checked.includes('produit:pack|achat')?
@@ -61,7 +64,8 @@ function fixture(stock=null){
   ctx.mode=mode;ctx.id=id;ctx.index=index;ctx.a={dataset};
   return handleStockActionV41(ctx)
  };
- return {ctx,state,week,inputs,invoke,get saved(){return saved},get message(){return lastMessage},modals};
+ return {ctx,state,week,inputs,invoke,get saved(){return saved},get message(){return lastMessage},
+  get openedBulk(){return openedBulk},setBulkRows:rows=>{bulkRows=rows},modals};
 }
 function withInputs(inputs){
  globalThis.document={getElementById:id=>id in inputs?{value:String(inputs[id])}:null};
@@ -365,7 +369,7 @@ test('Premier ajout au stock : aucune quantité héritée ne disparaît sans cho
  assert.equal(f.state.stockV41.version,1);
  assert.equal(f.week.pantry['ingredient:pasta|g'],300,'l’historique reste conservé');
  assert.equal(f.saved,1);
- assert.equal(f.modals.at(-1).title,'Ajouter au stock');
+ assert.equal(f.openedBulk,1,'après migration le sélecteur groupé du stock s’ouvre');
 });
 test('L’ancien stock peut être repris sans création silencieuse de produits',()=>{
  const f=fixture();withInputs(f.inputs);
@@ -729,9 +733,8 @@ test('V41.3 : aperçu de courses et congélateur avant confirmation, sans écrit
 test('V41.3 : recherche dans ajouter au stock, boutons +/- et raccourci paquet',()=>{
  const f=fixture();withInputs(f.inputs);
  f.invoke('v41-add-stock');
- assert.match(f.modals.at(-1).body,/id="v413StockPickerSearch"/);
- assert.match(f.modals.at(-1).body,/data-v413-stock-choice/);
- assert.match(f.modals.at(-1).body,/id="v413StockPickerResults"/);
+ assert.equal(f.openedBulk,1,'la sélection multiple remplace le choix unitaire');
+ // Les anciens champs restent compatibles avec une correction individuelle.
  f.invoke('v41-stock-select',{id:'pasta',dataset:{kind:'ingredient'}});
  assert.match(f.modals.at(-1).body,/data-action="v413-stock-step"/);
  assert.match(f.modals.at(-1).body,/data-action="v413-stock-one-package"/);
@@ -771,4 +774,72 @@ test('V41.3 : les actions du repas changent avec son statut et n’affichent pas
  assert.match(modal,/Les modifications sont protégées/);
  assert.match(modal,/remove-meal/);
  assert.match(modal,/quickMealActionsV413\(index,meal\)/);
+});
+
+test('V41.4 : plusieurs articles issus des courses entrent dans le stock en une seule transaction',()=>{
+ const f=fixture();withInputs(f.inputs);
+ f.state.products=[...products,{id:'soap',name:'Savon',unit:'pièce',category:'Hygiène',store:'carrefour'}];
+ f.setBulkRows([{kind:'ingredient',id:'pasta',amount:1,unit:'paquet'},
+  {kind:'daily',id:'soap',amount:2,unit:'pièce'}]);
+ f.invoke('v41-add-stock');
+ assert.equal(f.openedBulk,1,'ouvre le même sélecteur partagé que dans les courses');
+ let message='';
+ globalThis.confirm=txt=>{message=String(txt);return true};
+ f.invoke('v41-bulk-stock-add');
+ assert.equal(f.saved,1,'une seule sauvegarde pour tous les articles');
+ assert.equal(availableStockV41(f.state.stockV41,'ingredient:pasta','g'),500);
+ assert.equal(availableStockV41(f.state.stockV41,'product:soap','pièce'),2);
+ assert.match(message,/Pâtes : 0 → 500 g/);
+ assert.match(message,/Savon : 0 → 2 pièces?/);
+ assert.equal(f.state.stockV41.history.length,1);
+ assert.equal(f.state.stockV41.history[0].count,2);
+});
+
+test('V41.4 : annulation de sélection multiple ne modifie ni le stock ni les semaines',()=>{
+ const f=fixture();withInputs(f.inputs);
+ f.setBulkRows([{kind:'ingredient',id:'pasta',amount:2,unit:'paquet'}]);
+ const before=JSON.stringify(f.state);
+ globalThis.confirm=()=>false;
+ f.invoke('v41-bulk-stock-add');
+ assert.equal(f.saved,0);
+ assert.equal(JSON.stringify(f.state),before);
+});
+
+test('V41.4 : aucune entrée partielle si une des quantités est invalide',()=>{
+ const f=fixture();withInputs(f.inputs);
+ f.setBulkRows([{kind:'ingredient',id:'pasta',amount:1,unit:'paquet'},
+  {kind:'daily',id:'unknown',amount:2,unit:'pièce'}]);
+ f.invoke('v41-bulk-stock-add');
+ assert.equal(f.saved,0);
+ assert.equal(f.state.stockV41,null);
+ assert.match(f.message,/Article introuvable/);
+ f.setBulkRows([{kind:'ingredient',id:'pasta',amount:1,unit:'paquet'},
+  {kind:'ingredient',id:'pasta',amount:2,unit:'paquet'}]);
+ f.invoke('v41-bulk-stock-add');
+ assert.equal(f.saved,0);
+ assert.match(f.message,/sélectionné plusieurs fois/);
+ f.setBulkRows([{kind:'ingredient',id:'pasta',amount:NaN,unit:'paquet'}]);
+ f.invoke('v41-bulk-stock-add');
+ assert.equal(f.saved,0);
+ assert.match(f.message,/Quantité ou unité incorrecte/);
+});
+
+test('V41.4 : le catalogue et les filtres sont identiques entre Courses et Stock',()=>{
+ const f=fixture();
+ assert.match(app,/function openBulkCatalogueV37\(favoritesOnly=false,stockMode=false\)/);
+ assert.match(app,/data-bulk-target="\'\+\(stockMode\?'stock':'courses'\)/);
+ assert.match(app,/stockMode\?'v41-bulk-stock-add':'v37-bulk-add'/);
+ assert.match(app,/data-v37-select/);
+ assert.match(app,/data-v37-qty/);
+ assert.match(app,/data-v37-unit/);
+ assert.match(app,/v37-bulk-modal','v414-one-scroll/);
+ assert.match(app,/openStockBulkV414:\(\)=>openBulkCatalogueV37\(false,true\)/);
+ assert.match(style,/\.modal\.v37-bulk-modal\.v414-one-scroll/);
+ assert.match(style,/overflow:visible!important/);
+ assert.match(style,/max-height:none!important/);
+ const rows=bulkStockMovementsV414([{kind:'ingredient',id:'pasta',amount:1,unit:'paquet'}],
+  ingredients,products,['g','kg','pièce','paquet','boîte']);
+ assert.equal(rows.length,1);
+ assert.equal(rows[0].identity,'ingredient:pasta');
+ assert.equal(rows[0].product.packAmount,500);
 });

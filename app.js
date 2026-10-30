@@ -1736,11 +1736,11 @@ function bulkPurchaseExtraV37(kind,id,amount,unit){
   productId:ingredient?(item.productId||null):item.id,
   ingredientId:ingredient?item.id:null,fromCatalogue:true}
 }
-function openBulkCatalogueV37(favoritesOnly=false){
+function openBulkCatalogueV37(favoritesOnly=false,stockMode=false){
  const items=bulkCatalogueV37();
  if(!items.length){toast('Ajoute d’abord des produits ou ingrédients dans ton catalogue.');return}
  const categories=productCategoryChoices();
- let out='<p class="helper v40-bulk-help">Les quantités sont de simples propositions : sélectionne tes articles et ajuste-les sans modifier les recettes.</p>'+
+ let out='<p class="helper v40-bulk-help">'+(stockMode?'Choisis les produits déjà présents chez toi. Sélectionne plusieurs articles, ajuste leurs quantités puis valide le stock en une seule fois.':'Les quantités sont de simples propositions : sélectionne tes articles et ajuste-les sans modifier les recettes.')+'</p>'+
  catalogueFiltersV40({
   prefix:'courses',searchId:'v37BulkSearch',storeId:'v40BulkStore',
   categoryId:'v40BulkCategory',sortId:'v40BulkSort',categories,
@@ -1750,10 +1750,10 @@ function openBulkCatalogueV37(favoritesOnly=false){
  '<div class="v37-bulk-toolbar"><button class="btn tiny secondary" data-action="v37-bulk-all">Sélectionner les résultats</button>'+
  '<button class="btn tiny ghost" data-action="v37-bulk-none">Tout désélectionner</button></div>'+
  '<div class="v37-bulk-results" aria-live="polite"><span id="v37BulkVisible"></span></div>'+
- '<div class="v37-bulk-list">';
+ '<div class="v37-bulk-list" data-bulk-target="'+(stockMode?'stock':'courses')+'">';
  const existing=shopping();
  out+=items.map(x=>{
-  const matched=existing.some(row=>(x.kind==='ingredient'&&row.ingredientId===x.id)||
+  const matched=!stockMode&&existing.some(row=>(x.kind==='ingredient'&&row.ingredientId===x.id)||
    (x.kind==='daily'&&row.productId===x.id));
   return '<div class="v37-bulk-item" data-v37-row data-kind="'+x.kind+'" data-id="'+html(x.id)+
    '" data-store="'+html(x.store)+'" data-category="'+html(x.category||'Autres')+
@@ -1769,10 +1769,11 @@ function openBulkCatalogueV37(favoritesOnly=false){
    '<select data-v37-unit aria-label="Unité de '+html(x.name)+'">'+selectOptions(units,x.unit)+'</select></div></div>';
  }).join('');
  out+='</div><div class="v37-bulk-footer"><div class="v37-bulk-status" id="v37BulkStatus">Aucun article sélectionné</div>'+
- '<button class="btn wide" data-action="v37-bulk-add" id="v37BulkSubmit" disabled>Ajouter aux courses</button>'+
- '<button class="btn ghost wide v37-bulk-exceptional" data-action="extra-one-off">＋ Article ponctuel, hors catalogue</button></div>';
- showModal('🛒 Ajouter des articles',out);
- modalRoot.querySelector('.modal')?.classList.add('v37-bulk-modal');
+ '<button class="btn wide" data-action="'+(stockMode?'v41-bulk-stock-add':'v37-bulk-add')+'" id="v37BulkSubmit" disabled>'+
+ (stockMode?'Ajouter au stock':'Ajouter aux courses')+'</button>'+
+ (stockMode?'':'<button class="btn ghost wide v37-bulk-exceptional" data-action="extra-one-off">＋ Article ponctuel, hors catalogue</button>')+'</div>';
+ showModal(stockMode?'🏠 Ajouter plusieurs produits au stock':'🛒 Ajouter des articles',out);
+ modalRoot.querySelector('.modal')?.classList.add('v37-bulk-modal','v414-one-scroll');
  filterBulkV37()
 }
 function filterBulkV37(){
@@ -1807,7 +1808,9 @@ function filterBulkV37(){
 function updateBulkV37(){
  const checked=modalRoot.querySelectorAll('[data-v37-row] [data-v37-select]:checked').length;
  const submit=$('#v37BulkSubmit'),label=$('#v37BulkStatus');
- if(submit){submit.disabled=!checked;submit.textContent=checked?'＋ Ajouter '+checked+' article'+(checked>1?'s':'')+' aux courses':'Ajouter aux courses'}
+ const stockMode=modalRoot.querySelector('.v37-bulk-list')?.dataset?.bulkTarget==='stock';
+ const target=stockMode?'au stock':'aux courses';
+ if(submit){submit.disabled=!checked;submit.textContent=checked?'＋ Ajouter '+checked+' article'+(checked>1?'s':'')+' '+target:'Ajouter '+target}
  if(label)label.textContent=checked+' article'+(checked>1?'s':'')+' sélectionné'+(checked>1?'s':'');
 }
 function stepBulkV37(row,direction){
@@ -1821,6 +1824,16 @@ function stepBulkV37(row,direction){
  input.value=String(Math.max(minimum,Math.min(100000,result)));
  row.querySelector('[data-v37-select]').checked=true;
  updateBulkV37()
+}
+function readBulkStockV414(){
+ const target=modalRoot.querySelector('.v37-bulk-list');
+ if(target?.dataset.bulkTarget!=='stock')throw Error('Sélecteur de stock indisponible.');
+ return [...target.querySelectorAll('[data-v37-row]')].filter(row=>
+  row.querySelector('[data-v37-select]')?.checked).map(row=>{
+  const raw=row.querySelector('[data-v37-qty]')?.value?.trim()||'';
+  return {kind:row.dataset.kind,id:row.dataset.id,
+   amount:raw===''?NaN:Number(raw),unit:row.querySelector('[data-v37-unit]')?.value};
+ });
 }
 function commitBulkV37(){
  const selected=[...modalRoot.querySelectorAll('[data-v37-row]')].filter(row=>row.querySelector('[data-v37-select]')?.checked);
@@ -2190,7 +2203,8 @@ document.addEventListener('click',e=>{
    mode,a,id,index,state,currentWeek,uid,units,toast,persist,render,renderMealContext,
    closeModal,showModal,getWeek,recipeById,mealDishes,mealLeftovers,shopping,
    reconcileLeftovers,clearMealWithPair,selectRecipeForMeal,generateWeekCourses,
-   freezerReservationsV41:stockModulesV41.week.freezerReservationsV41
+   freezerReservationsV41:stockModulesV41.week.freezerReservationsV41,
+   openStockBulkV414:()=>openBulkCatalogueV37(false,true),readBulkStockV414
  }))return;
   if(mode==='close-modal')closeModal();
   else if(mode==='go-courses')switchTabV33('courses');

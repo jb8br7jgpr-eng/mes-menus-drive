@@ -53,6 +53,31 @@ function articleOf(ctx,kind,id) {
  return {identity,product,name:ingredient?.name||product?.name,category:ingredient?.category||product?.category||'Autres',
   store:ingredient?.store||product?.store,unit:ingredient?.unit||product?.unit||'pièce'};
 }
+/** Aucune écriture serveur : préparer tous les articles avant la transaction unique. */
+export function bulkStockMovementsV414(rows,ingredients=[],products=[],allowedUnits=[]) {
+ if(!Array.isArray(rows)||rows.length<1||rows.length>250)
+  throw Error('Choisis entre 1 et 250 articles.');
+ const seen=new Set(),movements=[];
+ for(const row of rows){
+  const kind=row?.kind,id=String(row?.id||''),amount=Number(row?.amount),unit=row?.unit;
+  if(!['ingredient','daily'].includes(kind)||!id||
+    !Number.isFinite(amount)||amount<=0||amount>100000||
+    !allowedUnits.includes(unit))throw Error('Quantité ou unité incorrecte pour un article.');
+  const key=kind+':'+id;
+  if(seen.has(key))throw Error('Un article est sélectionné plusieurs fois.');
+  seen.add(key);
+  const ingredient=kind==='ingredient'?ingredients.find(x=>x.id===id):null;
+  const product=kind==='ingredient'?
+   products.find(p=>p.id===ingredient?.productId):products.find(p=>p.id===id);
+  if(!(ingredient||product))throw Error('Article introuvable dans le catalogue.');
+  const identity=stockIdentityV41({ingredientId:ingredient?.id||null,
+    productId:product?.id||null},ingredients);
+  movements.push({type:'inventory',direction:'add',identity,
+    name:ingredient?.name||product?.name,category:ingredient?.category||product?.category||'Autres',
+    store:ingredient?.store||product?.store,amount,unit,product:product||undefined});
+ }
+ return movements;
+}
 function selection(ctx,forFrozen=false) {
  if(forFrozen){
   const recipes=ctx.state.recipes.slice().sort((a,b)=>a.name.localeCompare(b.name,'fr'));
@@ -109,13 +134,24 @@ export function handleStockActionV41(ctx) {
   'v41-courses-done','v41-eat-recipe','v41-confirm-freeze-recipe',
   'v41-adjust-stock','v41-confirm-stock','v41-correct-freezer','v41-confirm-freezer'];
  if(requiresInventory.includes(mode)&&migrationGate(ctx))return true;
- if(mode==='v41-add-stock'){selection(ctx);return true}
+ if(mode==='v41-add-stock'){ctx.openStockBulkV414();return true}
  if(mode==='v41-add-stock-fresh'){
   if(state.stockV41){selection(ctx);return true}
   if(!confirm('Commencer un nouvel inventaire vide ? Les quantités indiquées dans les anciennes courses resteront enregistrées dans leur historique, mais ne seront plus utilisées pour calculer les achats.'))return true;
   state.stockV41=emptyStockV41();
-  ctx.persist();selection(ctx);
+  ctx.persist();ctx.openStockBulkV414();
   return true;
+ }
+ if(mode==='v41-bulk-stock-add'){
+  try{
+   const rows=ctx.readBulkStockV414();
+   const movements=bulkStockMovementsV414(rows,state.ingredientCatalog,state.products,ctx.units);
+   const message=stockConfirmationTextV413(stock,movements,
+    'Ajouter '+rows.length+' article'+(rows.length>1?'s':'')+' au Stock maison ?');
+   if(!confirm(message))return true;
+   commit(ctx,tx('Ajout groupé au stock · '+rows.length+' articles',movements));
+  }catch(e){ctx.toast(e.message||'Impossible de valider les articles sélectionnés.')}
+  return true
  }
  if(mode==='v41-add-frozen'){selection(ctx,true);return true}
  if(mode==='v41-stock-select'){

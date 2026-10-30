@@ -54,3 +54,40 @@
 .v413-meal-state strong{display:block;font-size:13px;color:#245943}
 .v413-meal-state p{font-size:13px;margin:5px 0;color:#314f39}
 .v413-meal-state small{font-size:12px;line-height:1.45;color:#56735e}
+
+/* V41.4 — un seul défilement sur le sélecteur groupé, dans Courses ET Stock.
+   Avant : la modale et la liste de produits défilaient chacune séparément.
+   Maintenant : la modale est l'unique zone de scroll, sans hauteur imposée
+   ni rebond piégé dans la liste. Le pied de validation reste accessible. */
+.modal.v37-bulk-modal.v414-one-scroll{
+ max-height:94dvh;
+ overflow-x:hidden;
+ overflow-y:auto;
+ overscroll-behavior-y:contain;
+ -webkit-overflow-scrolling:touch;
+ scroll-padding-bottom:100px;
+}
+.modal.v37-bulk-modal.v414-one-scroll .v37-bulk-list{
+ max-height:none!important;
+ height:auto!important;
+ min-height:0;
+ overflow:visible!important;
+ overscroll-behavior:auto;
+ -webkit-overflow-scrolling:auto;
+ flex:0 0 auto;
+ padding-bottom:10px;
+}
+.modal.v37-bulk-modal.v414-one-scroll .v37-bulk-footer{
+ position:sticky;
+ bottom:calc(-12px - env(safe-area-inset-bottom));
+ margin-top:10px;
+ background:#fbfaf6;
+ z-index:3;
+}
+/* Les filtres et les champs n'ont pas leur propre zone défilante. */
+.modal.v37-bulk-modal.v414-one-scroll .v40-filter-panel,
+.modal.v37-bulk-modal.v414-one-scroll .v37-bulk-item,
+.modal.v37-bulk-modal.v414-one-scroll .v37-bulk-amount{
+ max-height:none;
+ overflow:visible;
+}

@@ -1094,7 +1094,7 @@ function shoppingRow(x){
   'Besoin : '+x.grossNeeded;
  if(p?.packaging)detail+=' · '+p.packaging;
  return '<div class="shopping-row shopping-clean v29-shopping-row'+(x.checked?' checked':'')+'">'+
-  '<input class="check" type="checkbox" data-check="'+html(x.id)+'" '+(x.checked?'checked':'')+' aria-label="Marquer '+name+' comme acheté">'+
+  '<label class="v37-purchase-action"><input class="check" type="checkbox" data-check="'+html(x.id)+'" '+(x.checked?'checked':'')+' aria-label="'+(x.checked?'Remettre ':'Marquer ')+name+(x.checked?' à acheter':' comme acheté')+'"><span>'+(x.checked?'✓ Acheté':'Acheté ?')+'</span></label>'+
   '<div class="grow"><div class="shopping-row-top"><strong class="shopping-name">'+name+'</strong><span class="shopping-qty">'+q+'</span></div>'+
   '<div class="shopping-meta">'+html(detail)+'</div>'+
   '<div class="shopping-store-chip">'+(x.store==='grandfrais'?'🥬 Grand Frais':'🛒 Carrefour')+'</div></div>'+
@@ -1110,7 +1110,7 @@ function editShoppingItemModal(id){
  '<option value="grandfrais" '+(x.store==='grandfrais'?'selected':'')+'>Grand Frais</option></select></div>'+
  '<button class="btn secondary wide" data-action="home-stock" data-id="'+html(x.id)+'">'+(stock?'🏠 Modifier le stock · '+html(quantity(x.stockAmount,x.stockUnit)):'🏠 Renseigner le stock maison')+'</button>';
  if(x.manualExtraIds?.length)out+='<button class="btn secondary wide" style="margin-top:9px" data-action="edit-manual-row" data-id="'+html(x.id)+'">✎ Modifier la quantité ajoutée manuellement</button>';
- out+='<button class="btn secondary wide" style="margin-top:9px" data-action="exclude" data-id="'+html(x.id)+'">Retirer des achats de cette semaine</button>';
+ out+='<button class="btn secondary wide" style="margin-top:9px" data-action="exclude" data-id="'+html(x.id)+'">Retirer de la liste (sans achat)</button>';
  showModal('Gérer un achat',out);
 }
 function renderCourses(){
@@ -1122,21 +1122,21 @@ function renderCourses(){
   carrefour=active.filter(x=>x.store==='carrefour'),
   grand=active.filter(x=>x.store==='grandfrais');
  const order=['Fruits et légumes','Viandes et poissons','Produits frais','Épicerie et divers','Hygiène et maison'];
- let out=pageHeading('Achats de la semaine','Mes courses','Les ingrédients arrivent ici quand tu génères les courses depuis les menus de la semaine choisie.');
+ let out=pageHeading('Achats de la semaine','Mes courses','À acheter : tes articles prévus. Coche « Acheté » seulement une fois l’achat effectué. Pour enlever un article sans l’acheter, utilise « Modifier » puis « Retirer ».');
  out+=weekSwitcher()+courseGenerationBanner(w,'courses');
  const progressTotal=active.length+checked.length,progressPct=progressTotal?Math.round(checked.length/progressTotal*100):0;
  out+='<div class="course-v33-progress" role="group" aria-label="Progression des courses"><div class="course-v33-progress-head"><strong>Avancement des courses</strong><span>'+
   checked.length+' / '+progressTotal+' acheté'+(checked.length>1?'s':'')+'</span></div>'+
   '<div class="course-v33-progress-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="'+progressPct+'" aria-valuetext="'+checked.length+' articles sur '+progressTotal+'" aria-label="Articles achetés"><span style="width:'+progressPct+'%"></span></div>'+
-  '<p>'+(progressTotal===0?'Aucun article à acheter pour le moment.':progressPct===100?'✓ Tous les achats prévus sont cochés.':
+  '<p>'+(progressTotal===0?'Aucun article à acheter pour le moment.':progressPct===100?'✓ Tous les achats prévus sont achetés.':
    active.length+' article'+(active.length>1?'s':'')+' restant'+(active.length>1?'s':'')+' à acheter.')+'</p></div>';
  out+='<div class="course-summary"><div class="course-shop-count carrefour"><strong>'+carrefour.length+'</strong><span>🛒 Carrefour Drive</span></div>'+
  '<div class="course-shop-count grand"><strong>'+grand.length+'</strong><span>🥬 Grand Frais</span></div></div>';
- out+='<button class="btn wide course-add-btn" data-action="add-extra">＋ Ajouter un article à cette semaine</button>';
+ out+='<button class="btn wide course-add-btn v37-bulk-main" data-action="v37-open-bulk">☑ Ajouter plusieurs articles aux courses</button>'+ '<p class="helper v37-bulk-intro">Tous tes ingrédients et achats du quotidien · quantités réglables · ajout en une fois.</p>';
  const favorites=frequentCatalogueItems();
  if(favorites.length){
   out+='<details class="course-optional" data-section="favorites" '+(courseOpenSections.has('favorites')?'open':'')+'><summary>☆ Mes achats fréquents <span class="pill gray">'+favorites.length+'</span></summary>'+
-   '<p class="helper">Ajoute un article d’un geste ou sélectionne plusieurs achats.</p>'+ '<button class="btn secondary wide v36-bulk-open" data-action="bulk-favorites">☑ Ajouter plusieurs achats d’un coup</button><div class="favorites">'+
+   '<p class="helper">Ajoute ponctuellement un favori, ou sélectionne-en plusieurs avec le bouton plus haut.</p><div class="favorites">'+
    favorites.map(x=>'<button class="favorite-chip" data-action="frequent-to-courses" data-kind="'+x.kind+'" data-id="'+html(x.id)+'">＋ '+html(x.name)+'</button>').join('')+'</div></details>'
  }
  function section(store,title,icon,rows){
@@ -1157,13 +1157,13 @@ function renderCourses(){
  out+=section('carrefour','Carrefour Drive','🛒',carrefour);
  out+=section('grandfrais','Grand Frais','🥬',grand);
   
- if(checked.length)out+='<details class="course-optional" data-section="checked" '+(courseOpenSections.has('checked')?'open':'')+'><summary>✓ Articles cochés <span class="pill gray">'+checked.length+'</span></summary>'+
-  '<p class="helper">Décoche un article pour le remettre dans les achats.</p>'+checked.map(shoppingRow).join('')+'</details>';
+ if(checked.length)out+='<details class="course-optional" data-section="checked" '+(courseOpenSections.has('checked')?'open':'')+'><summary>✓ Articles achetés <span class="pill gray">'+checked.length+'</span></summary>'+
+  '<p class="helper">Décoche « Acheté » pour le remettre dans « À acheter ».</p>'+checked.map(shoppingRow).join('')+'</details>';
  if(covered.length||excluded.length){
-  out+='<details class="course-optional" data-section="home" '+(courseOpenSections.has('home')?'open':'')+'><summary>🏠 Déjà chez nous / retirés <span class="pill gray">'+(covered.length+excluded.length)+'</span></summary>'+
+  out+='<details class="course-optional" data-section="home" '+(courseOpenSections.has('home')?'open':'')+'><summary>🏠 Stock maison et articles retirés <span class="pill gray">'+(covered.length+excluded.length)+'</span></summary>'+
    (covered.length?'<p class="helper">Couverts par votre stock : corrige la quantité si nécessaire.</p>'+
      covered.map(x=>'<div class="course-house-row"><span class="grow"><strong>'+html(x.name)+'</strong><small> · '+html(quantity(x.stockAmount,x.stockUnit))+' disponible</small></span><div class="course-house-actions"><button class="btn tiny secondary" data-action="home-stock" data-id="'+html(x.id)+'">Modifier le stock</button>'+manualEditControl(x,true)+'</div></div>').join(''):'')+
-   (excluded.length?'<p class="helper">Retirés manuellement des achats de cette semaine.</p>'+
+   (excluded.length?'<p class="helper">Retirés de la liste, mais pas déclarés achetés. Utilise « Réintégrer » si nécessaire.</p>'+
      excluded.map(x=>'<div class="course-house-row"><span class="grow">'+html(x.name)+'</span><div class="course-house-actions"><button class="btn tiny secondary" data-action="include" data-id="'+html(x.id)+'">Réintégrer</button>'+manualEditControl(x,true)+'</div></div>').join(''):'')+'</details>'
  }
 
@@ -1499,7 +1499,7 @@ function openBulkCatalogueV37(favoritesOnly=false){
    '" data-store="'+html(x.store)+'" data-frequent="'+x.frequent+'" data-search="'+html(norm(x.name))+'">'+
    '<label class="v37-bulk-choice"><input type="checkbox" data-v37-select aria-label="Sélectionner '+html(x.name)+'">'+
    '<span class="v37-bulk-item-info"><strong>'+html(x.name)+'</strong><small>'+
-   (x.kind==='ingredient'?'🥕 Ingrédient':'🧻 Achat du quotidien')+' · '+
+   (x.kind==='ingredient'?'🥕 Ingrédient':'🛍️ Achat du quotidien')+' · '+
    (x.store==='grandfrais'?'Grand Frais':'Carrefour Drive')+
    (matched?' · déjà dans les courses (quantités cumulées)':'')+'</small></span></label>'+
    '<div class="v37-bulk-amount"><button type="button" class="v37-bulk-step" data-action="v37-qty-minus" aria-label="Diminuer la quantité de '+html(x.name)+'">−</button>'+
@@ -1571,6 +1571,8 @@ function commitBulkV37(){
 }
 
 function extraModal(){
+ return openBulkCatalogueV37();
+
  let out='<p class="helper">Choisis un produit enregistré : sa quantité habituelle et son magasin seront repris automatiquement. Les achats restent ponctuels à cette semaine.</p>'+
  '<div class="field"><label for="courseAddSearch">Rechercher dans mes produits</label>'+
  '<input id="courseAddSearch" class="text-input" placeholder="Ex. dentifrice, lait, pommes…" autocomplete="off"></div>'+

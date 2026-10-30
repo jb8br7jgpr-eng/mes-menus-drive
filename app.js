@@ -1135,18 +1135,18 @@ function shoppingRow(x){
   '<label class="v37-purchase-action"><input class="check" type="checkbox" data-check="'+html(x.id)+'" '+(x.checked?'checked':'')+' aria-label="'+(x.checked?'Remettre ':'Marquer ')+name+(x.checked?' à acheter':' comme acheté')+'"><span>'+(x.checked?'✓ Acheté':'Acheté ?')+'</span></label>'+
   '<div class="grow"><div class="shopping-row-top"><strong class="shopping-name">'+name+'</strong><span class="shopping-qty">'+q+'</span></div>'+
   '<div class="shopping-meta">'+html(detail)+'</div>'+
-  '<div class="shopping-store-chip">'+(x.store==='grandfrais'?'🥬 Grand Frais':'🛒 Carrefour')+'</div></div>'+
+  '<button type="button" class="v38-stock-chip'+(stock?' has-stock':'')+'" data-action="home-stock" data-id="'+html(x.id)+'" aria-label="Stock maison de '+name+(stock?' : '+html(quantity(x.stockAmount,x.stockUnit)):' : renseigner la quantité disponible')+'">'+
+   (stock?'🏠 '+html(quantity(x.stockAmount,x.stockUnit)):'🏠 Stock maison')+'</button></div>'+
   '<button class="btn tiny secondary shopping-modify" data-action="edit-shopping-item" data-id="'+html(x.id)+'" aria-label="Modifier '+name+'">Modifier</button></div>';
 }
 function editShoppingItemModal(id){
  const x=shopping().find(row=>row.id===id);if(!x)return;
- const stock=x.stockAmount>0;
  let out='<div class="shopping-detail-header"><strong>'+html(x.name)+'</strong><span class="pill">'+html(quantity(x.qty,x.unit))+'</span></div>'+
  '<p class="helper">Modifie cet achat pour cette semaine. Aucun changement n’est appliqué aux autres produits du catalogue.</p>'+
  '<div class="field"><label for="shoppingDetailStore">Magasin</label>'+
  '<select id="shoppingDetailStore" data-store-item="'+html(x.id)+'"><option value="carrefour" '+(x.store==='carrefour'?'selected':'')+'>Carrefour Drive</option>'+
  '<option value="grandfrais" '+(x.store==='grandfrais'?'selected':'')+'>Grand Frais</option></select></div>'+
- '<button class="btn secondary wide" data-action="home-stock" data-id="'+html(x.id)+'">'+(stock?'🏠 Modifier le stock · '+html(quantity(x.stockAmount,x.stockUnit)):'🏠 Renseigner le stock maison')+'</button>';
+ '';
  if(x.manualExtraIds?.length)out+='<button class="btn secondary wide" style="margin-top:9px" data-action="edit-manual-row" data-id="'+html(x.id)+'">✎ Modifier la quantité ajoutée manuellement</button>';
  out+='<button class="btn secondary wide" style="margin-top:9px" data-action="exclude" data-id="'+html(x.id)+'">Retirer de la liste (sans achat)</button>';
  showModal('Gérer un achat',out);

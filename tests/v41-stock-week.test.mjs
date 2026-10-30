@@ -49,3 +49,14 @@ test('Congélateur : ne pas réserver les mêmes portions sur deux semaines',()=
  assert.equal(remainingFreezerPortionsV41(frozen,shifted,'lot1'),1);
  assert.equal(week2['2026-10-26'].meals[1].portions,2,'pas de mutation de la source');
 });
+
+test('Recette ancienne reliée par nom : 1 boîte de 6 œufs déduit bien six pièces',()=>{
+ const ingred=[{id:'eggs',name:'Œufs',productId:'box-eggs'}];
+ const catalog=[{id:'box-eggs',name:'Œufs boîte 6',unit:'boîte',packAmount:6,packUnit:'pièce'}];
+ const oldRecipe={id:'omelette',people:2,ingredients:[{name:'Œufs',qty:1,unit:'boîte'}]};
+ const movements=kitchenMovementsV41(oldRecipe,2,ingred,catalog);
+ assert.equal(movements.length,1);
+ assert.equal(movements[0].identity,'ingredient:eggs');
+ assert.equal(movements[0].amount,6);
+ assert.equal(movements[0].unit,'pièce');
+});

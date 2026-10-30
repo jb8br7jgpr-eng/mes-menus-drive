@@ -224,6 +224,9 @@ function mealCard(meal,i){
   if(dishes.length){
    names=dishes.map(d=>{
     const r=recipeById(d.recipeId),here=portionsEatenHere(d,dishes),left=Math.max(0,d.people-here);
+    const completed=getWeek().v41MealActions?.[i+':'+d.recipeId];
+    if(completed?.status==='frozen')return (r?r.name:'Plat supprimé')+' · ✓ préparé · ❄️ '+completed.frozenPortions+' portion'+(completed.frozenPortions>1?'s':'')+' congelée'+(completed.frozenPortions>1?'s':'');
+    if(completed?.status==='eaten')return (r?r.name:'Plat supprimé')+' · ✓ cuisiné'+(left?' · '+left+' reste'+(left>1?'s':''):'');
     return (r?r.name:'Plat supprimé')+' · '+here+' portion'+(here>1?'s':'')+' ici'+
      (left?' · '+left+' reste'+(left>1?'s':''):'')
    })

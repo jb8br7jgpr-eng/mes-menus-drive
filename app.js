@@ -2393,7 +2393,22 @@ document.addEventListener('click',e=>{
    toastWeekUndo('Repas retiré.',before,index)
   }
   else if(mode==='complete-week')populate();
-  else if(mode==='repeat-week'){const prev=state.weeks[offsetDate(currentWeek,-7)];if(!prev?.meals?.some(Boolean)){toast('Aucun menu trouvé la semaine précédente.');return}if(w.meals.some((_,i)=>isMealDoneV41(w,i))){toast('La semaine comporte déjà des repas validés dans le stock.');return}if(w.meals.some(Boolean)&&!confirm('Remplacer les repas de cette semaine ?'))return;w.meals=JSON.parse(JSON.stringify(prev.meals));persist();render();toast('Menus de la semaine précédente repris !')}
+  else if(mode==='repeat-week'){
+   const previousWeekId=offsetDate(currentWeek,-7),prev=state.weeks[previousWeekId];
+   if(!prev?.meals?.some(Boolean)){toast('Aucun menu trouvé la semaine précédente.');return}
+   if(w.meals.some((_,i)=>isMealDoneV41(w,i))){toast('La semaine comporte déjà des repas validés dans le stock.');return}
+   if(!stockModulesV41?.week?.repeatWeekMealsV41){toast('Moteur de congélateur indisponible : reprise sécurisée impossible.');return}
+   if(w.meals.some(Boolean)&&!confirm('Remplacer les repas de cette semaine ? Les portions du congélateur seront vérifiées avant de les recopier.'))return;
+   try{
+    const result=stockModulesV41.week.repeatWeekMealsV41(state.weeks,state.stockV41,previousWeekId,currentWeek);
+    state.weeks=result.weeks;
+    if(Array.isArray(getWeek().generatedIngredients))generateWeekCourses(getWeek());
+    persist();render();
+    toast(result.skippedFrozen
+      ?'Semaine reprise. '+result.skippedFrozen+' plat(s) congelé(s) non recopié(s) : portions insuffisantes ou indisponibles.'
+      :'Menus de la semaine précédente repris !');
+   }catch(error){toast(error.message||'Impossible de reprendre la semaine.')}
+  }
   else if(mode==='add-extra'||mode==='v37-open-bulk')openBulkCatalogueV37();
    else if(mode==='v37-bulk-all'||mode==='v37-bulk-none'){
     modalRoot.querySelectorAll('[data-v37-row]').forEach(row=>{

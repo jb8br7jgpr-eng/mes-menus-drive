@@ -189,7 +189,7 @@ test('Le calcul V41 des courses enlève le stock réel avant l’arrondi des bo�
  assert.ok(source.startsWith('function shopping(){'));
  const state={stockV41:stock,ingredientCatalog:[ing]};
  const context={state,getWeek:()=>week,productById:id=>id===eggs.id?eggs:null,
-  ingredientById:id=>id===ing.id?ing:null,
+  ingredientById:id=>id===ing.id?ing:null,ingredientStore:()=> 'carrefour',
   converted:(q,u)=>[Number(q)||0,u],quantity:(q,u)=>q+' '+u,
   norm:s=>String(s).toLowerCase(),productGroup:()=> 'Produits frais',
   groupFor:()=> 'Produits frais',shoppingStore:()=> 'carrefour',

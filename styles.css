@@ -736,3 +736,129 @@
  .v37-bulk-list{max-height:40dvh}
 }
 @media(prefers-reduced-motion:reduce){.v37-bulk-step,.v37-recipe-card{transition:none}}
+
+/* V38 — iPhone : empêcher la compression des cartes dans la liste défilante.
+   Sur Safari, flex-shrink réduisait les cartes sans réduire leur contenu. */
+.v37-bulk-modal .v37-bulk-list{
+  flex:0 0 auto;
+  min-height:0;
+  max-height:min(42dvh,430px);
+  overflow-x:hidden;
+  overflow-y:auto;
+  overscroll-behavior:contain;
+  -webkit-overflow-scrolling:touch;
+  scroll-padding-block:10px;
+  padding:3px 2px 14px;
+  row-gap:9px;
+}
+.v37-bulk-modal .v37-bulk-item{
+  flex:0 0 auto;
+  box-sizing:border-box;
+  height:auto;
+  min-height:98px;
+  overflow:visible;
+  padding:10px 11px 11px;
+  gap:7px;
+}
+.v37-bulk-modal .v37-bulk-choice{
+  flex:0 0 auto;
+  min-height:34px;
+}
+.v37-bulk-modal .v37-bulk-amount{
+  flex:0 0 auto;
+  min-height:37px;
+  padding-bottom:0;
+}
+.v37-bulk-modal .v37-bulk-amount input,
+.v37-bulk-modal .v37-bulk-amount select,
+.v37-bulk-modal .v37-bulk-step{
+  box-sizing:border-box;
+  height:38px;
+  min-height:38px;
+  max-height:38px;
+}
+.v37-bulk-modal .v37-bulk-footer{
+  bottom:0;
+  margin-top:8px;
+  padding:10px 2px calc(10px + env(safe-area-inset-bottom));
+  background:#fbfaf6;
+  border-top:1px solid #dfe9df;
+  box-shadow:0 -6px 14px #fbfaf6ec;
+}
+.v38-course-defaults{
+  border:1px solid #d9e7da;
+  border-radius:14px;
+  background:#f1f7ef;
+  margin:8px 0 15px;
+  padding:0 12px;
+}
+.v38-course-defaults>summary{
+  cursor:pointer;
+  padding:12px 0;
+  color:#315b3f;
+  font-size:12px;
+  font-weight:750;
+  line-height:1.5;
+}
+.v38-course-defaults>summary strong{font-weight:850;color:#23583b}
+.v38-course-defaults>summary small{
+  display:block;color:#66816e;font-size:11px;font-weight:500;margin-top:3px
+}
+.v38-course-defaults[open]>summary{margin-bottom:10px;border-bottom:1px solid #d6e5d6}
+.v38-course-defaults>.row{margin-top:3px}
+.v38-course-defaults .helper{font-size:11px;line-height:1.5;margin:5px 0 14px}
+@media(max-height:700px){
+  .v37-bulk-modal .v37-bulk-list{max-height:36dvh}
+}
+@media(max-width:380px){
+  .v37-bulk-modal .v37-bulk-item{padding:9px;min-height:102px}
+  .v37-bulk-modal .v37-bulk-amount{padding-left:0}
+}
+
+/* V38 — expliciter l'unité achetée et les contenus Carrefour. */
+.v38-purchase-unit{
+ background:#eff7ee;border:1px solid #cfdfcf;border-radius:13px;
+ padding:11px 12px;margin:10px 0 12px
+}
+.v38-purchase-unit label{font-weight:850}
+.v38-purchase-unit select{width:100%;min-height:43px;font-size:16px}
+.v38-purchase-unit .helper{font-size:11px;margin:8px 0 1px;color:#496f55;line-height:1.5}
+.v38-pack-details{border:1px solid #d8e5d4;border-radius:13px;padding:0 12px 12px;margin-bottom:13px;background:#fcfefb}
+.v38-pack-details>summary{padding:12px 0;font-size:12px;font-weight:850;color:#2b6644;cursor:pointer}
+.v38-pack-details[open]>summary{border-bottom:1px solid #e0e9dc;margin-bottom:10px}
+.v38-pack-warning{background:#f9f4e8;border:1px solid #ebe0c5;border-radius:10px;padding:10px;font-size:11px;color:#645130;line-height:1.5;margin:4px 0 12px}
+.v38-pack-preview{font-size:12px;line-height:1.5;color:#285f40;background:#e9f5e9;
+ border:1px solid #cfe3d0;border-radius:10px;padding:10px 11px;margin:4px 0 13px}
+.v38-pack-preview.unconfigured{background:#fff6e9;border-color:#f0dfc1;color:#856233}
+@media(max-width:380px){.v38-pack-details,.v38-purchase-unit{padding-left:9px;padding-right:9px}}
+
+/* V38 : stock maison visible d'un seul geste, sans agrandir les cartes de courses.
+   Le magasin est déjà indiqué par l'en-tête Carrefour / Grand Frais. */
+.shopping-row.shopping-clean.v29-shopping-row .grow{min-width:0}
+.v38-stock-chip{
+ display:inline-flex;align-items:center;justify-content:flex-start;
+ max-width:100%;width:max-content;min-width:0;min-height:28px;
+ margin-top:5px;padding:4px 8px;
+ border:1px solid #dce7d9;border-radius:8px;
+ background:#f4f8f1;color:#356a4a;cursor:pointer;
+ font-size:10px;font-weight:750;line-height:1.25;
+ overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.v38-stock-chip.has-stock{background:#e5f2e7;border-color:#bddbc5;color:#245d3e}
+.v38-stock-chip:focus-visible,.v38-stock-stepper button:focus-visible{
+ outline:3px solid #d1b36c;outline-offset:2px
+}
+.v38-stock-stepper{
+ display:grid;grid-template-columns:37px minmax(0,1fr) 37px;gap:5px;
+ min-width:0;align-items:center
+}
+.v38-stock-stepper button{
+ display:grid;place-items:center;min-height:43px;border-radius:10px;
+ border:1px solid #cbdcca;background:#f1f7ef;
+ color:#205e3d;font-size:20px;font-weight:800;cursor:pointer
+}
+.v38-stock-stepper #homeStockAmount{min-width:0;width:100%;text-align:center;font-size:16px}
+@media(max-width:370px){
+ .v38-stock-chip{font-size:9.5px;padding:4px 6px}
+ .v38-stock-stepper{grid-template-columns:33px minmax(0,1fr) 33px;gap:4px}
+}

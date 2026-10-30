@@ -1612,11 +1612,11 @@ function bulkCatalogueV37(){
    const unit=units.includes(i.unit)?i.unit:preferredIngredientUnit(i);
    const matching=state.recipes.flatMap(r=>r.ingredients||[]).find(line=>
     (line.ingredientId===i.id||norm(line.name)===norm(i.name))&&line.unit===unit&&Number(line.qty)>0);
-   return {kind:'ingredient',id:i.id,name:i.name,store:ingredientStore(i),frequent:!!i.frequent,
+   return {kind:'ingredient',id:i.id,name:i.name,store:ingredientStore(i),category:catalogueCategoryV40(i,i.productId),frequent:!!i.frequent,
     qty:Number(i.qty)>0?Number(i.qty):Number(matching?.qty)>0?Number(matching.qty):1,unit}
   }),
   ...(state.products||[]).filter(p=>!linked.has(p.id)).map(p=>({
-   kind:'daily',id:p.id,name:p.name,
+   kind:'daily',id:p.id,name:p.name,category:catalogueCategoryV40(p),
    store:state.storePreferences?.['product:'+p.id]||p.store||'carrefour',
    frequent:!!p.frequent,qty:Number(p.qty)>0?Number(p.qty):1,unit:units.includes(p.unit)?p.unit:'pièce'
   }))
@@ -1634,13 +1634,15 @@ function bulkPurchaseExtraV37(kind,id,amount,unit){
 function openBulkCatalogueV37(favoritesOnly=false){
  const items=bulkCatalogueV37();
  if(!items.length){toast('Ajoute d’abord des produits ou ingrédients dans ton catalogue.');return}
- let out='<p class="helper">Choisis tes articles et leurs quantités. Les chiffres affichés sont de simples propositions : tu peux les changer ici, sans modifier tes recettes ni les fiches produits.</p>'+
- '<div class="v37-bulk-filters"><div class="field"><label for="v37BulkSearch">Rechercher un article</label>'+
- '<input id="v37BulkSearch" type="search" autocomplete="off" placeholder="Ex. lait, pâtes, sopalin…"></div>'+
- '<div class="field"><label for="v37BulkFilter">Afficher</label>'+
- '<select id="v37BulkFilter"><option value="all">Tous les produits</option>'+
- '<option value="frequent" '+(favoritesOnly?'selected':'')+'>Mes achats fréquents</option>'+
- '<option value="carrefour">Carrefour Drive</option><option value="grandfrais">Grand Frais</option></select></div></div>'+
+ const categories=[...new Set(items.map(item=>item.category||'Autres'))].sort((a,b)=>
+  a.localeCompare(b,'fr',{sensitivity:'base'}));
+ let out='<p class="helper v40-bulk-help">Sélectionne les articles et ajuste leur quantité. Les recettes et les fiches produits ne sont pas modifiées.</p>'+
+ catalogueFiltersV40({
+  prefix:'courses',searchId:'v37BulkSearch',storeId:'v40BulkStore',
+  categoryId:'v40BulkCategory',sortId:'v40BulkSort',categories,
+  extra:'<label class="v40-frequent-toggle"><input id="v40BulkFrequent" type="checkbox" '+(favoritesOnly?'checked':'')+
+   '> ☆ Afficher seulement mes achats fréquents</label>'
+ })+
  '<div class="v37-bulk-toolbar"><button class="btn tiny secondary" data-action="v37-bulk-all">Sélectionner les résultats</button>'+
  '<button class="btn tiny ghost" data-action="v37-bulk-none">Tout désélectionner</button></div>'+
  '<div class="v37-bulk-results" aria-live="polite"><span id="v37BulkVisible"></span></div>'+
@@ -1650,12 +1652,13 @@ function openBulkCatalogueV37(favoritesOnly=false){
   const matched=existing.some(row=>(x.kind==='ingredient'&&row.ingredientId===x.id)||
    (x.kind==='daily'&&row.productId===x.id));
   return '<div class="v37-bulk-item" data-v37-row data-kind="'+x.kind+'" data-id="'+html(x.id)+
-   '" data-store="'+html(x.store)+'" data-frequent="'+x.frequent+'" data-search="'+html(norm(x.name))+'">'+
+   '" data-store="'+html(x.store)+'" data-category="'+html(x.category||'Autres')+
+   '" data-frequent="'+x.frequent+'" data-search="'+html(norm(x.name))+'" data-name="'+html(x.name)+'">'+
    '<label class="v37-bulk-choice"><input type="checkbox" data-v37-select aria-label="Sélectionner '+html(x.name)+'">'+
    '<span class="v37-bulk-item-info"><strong>'+html(x.name)+'</strong><small>'+
-   (x.kind==='ingredient'?'🥕 Ingrédient':'🛍️ Achat du quotidien')+' · '+
-   (x.store==='grandfrais'?'Grand Frais':'Carrefour Drive')+
-   (matched?' · déjà dans les courses (quantités cumulées)':'')+'</small></span></label>'+
+   (x.kind==='ingredient'?'🥕 Ingrédient':'🛍️ Quotidien')+' · '+
+   catalogueStoreLabelV40(x.store)+' · 📂 '+html(x.category||'Autres')+
+   (matched?' · déjà dans les courses':'')+'</small></span></label>'+
    '<div class="v37-bulk-amount"><button type="button" class="v37-bulk-step" data-action="v37-qty-minus" aria-label="Diminuer la quantité de '+html(x.name)+'">−</button>'+
    '<input type="number" inputmode="decimal" min="0.01" max="100000" step="any" data-v37-qty value="'+html(x.qty)+'" aria-label="Quantité de '+html(x.name)+'">'+
    '<button type="button" class="v37-bulk-step" data-action="v37-qty-plus" aria-label="Augmenter la quantité de '+html(x.name)+'">＋</button>'+
@@ -1669,15 +1672,32 @@ function openBulkCatalogueV37(favoritesOnly=false){
  filterBulkV37()
 }
 function filterBulkV37(){
- const query=norm($('#v37BulkSearch')?.value||''),scope=$('#v37BulkFilter')?.value||'all';
+ const query=norm($('#v37BulkSearch')?.value||''),
+  store=$('#v40BulkStore')?.value||'all',
+  category=$('#v40BulkCategory')?.value||'all',
+  frequent=Boolean($('#v40BulkFrequent')?.checked),
+  sort=$('#v40BulkSort')?.value||'name';
+ const list=modalRoot.querySelector('.v37-bulk-list');
+ if(!list)return;
  let visible=0;
- modalRoot.querySelectorAll('[data-v37-row]').forEach(row=>{
+ const rows=[...list.querySelectorAll('[data-v37-row]')];
+ rows.sort((a,b)=>catalogueSortCompareV40({
+  store:a.dataset.store,category:a.dataset.category,name:a.dataset.name,
+  kind:a.dataset.kind
+ },{
+  store:b.dataset.store,category:b.dataset.category,name:b.dataset.name,
+  kind:b.dataset.kind
+ },sort));
+ rows.forEach(row=>{
   const show=(!query||row.dataset.search.includes(query))&&
-   (scope==='all'||(scope==='frequent'?row.dataset.frequent==='true':row.dataset.store===scope));
-  row.hidden=!show;if(show)visible++
+   (store==='all'||row.dataset.store===store)&&
+   (category==='all'||row.dataset.category===category)&&
+   (!frequent||row.dataset.frequent==='true');
+  row.hidden=!show;if(show)visible++;
+  list.appendChild(row)
  });
  const result=$('#v37BulkVisible');
- if(result)result.textContent=visible+' résultat'+(visible>1?'s':'')+(visible===0?' · aucune correspondance':'');
+ if(result)result.textContent=visible+' résultat'+(visible>1?'s':'')+(visible===0?' · aucun article pour ces filtres':'');
  updateBulkV37()
 }
 function updateBulkV37(){
@@ -2365,7 +2385,7 @@ document.addEventListener('change',e=>{
   if(e.target.id==='catalogueUnit'){previewCourseQuantityV38();previewCarrefourPackV38();return}
   if(e.target.id==='cataloguePackUnit'){previewCarrefourPackV38();return}
   if(e.target.matches('[data-v37-select]')){updateBulkV37();return}
-  if(e.target.id==='v37BulkFilter'){filterBulkV37();return}
+  if(['v40BulkStore','v40BulkCategory','v40BulkSort','v40BulkFrequent'].includes(e.target.id)){filterBulkV37();return}
   if(e.target.matches('[data-v37-unit]')){
    const box=e.target.closest('[data-v37-row]')?.querySelector('[data-v37-select]');
    if(box)box.checked=true;

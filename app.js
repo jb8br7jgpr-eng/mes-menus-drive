@@ -1122,10 +1122,8 @@ function editManualExtraModal(extraId){
 function shoppingRow(x){
  const p=productById(x.productId),stock=x.stockAmount>0;
  const name=html(x.name),q=html(quantity(x.qty,x.unit));
- let detail=stock?'Maison : '+quantity(x.stockAmount,x.stockUnit):
-  x.source.join(' + ');
- if(x.grossNeeded)detail=(stock?'Maison : '+quantity(x.stockAmount,x.stockUnit)+' · ':'')+
-  'Besoin : '+x.grossNeeded;
+ let detail=x.source.join(' + ');
+ if(x.grossNeeded)detail='Besoin : '+x.grossNeeded;
  if(p?.packaging)detail+=' · '+p.packaging;
  if(p?.packAmount>0&&p.packUnit&&x.grossNeeded){
   const [size,unit]=converted(p.packAmount,p.packUnit);
@@ -1145,8 +1143,7 @@ function editShoppingItemModal(id){
  '<p class="helper">Modifie cet achat pour cette semaine. Aucun changement n’est appliqué aux autres produits du catalogue.</p>'+
  '<div class="field"><label for="shoppingDetailStore">Magasin</label>'+
  '<select id="shoppingDetailStore" data-store-item="'+html(x.id)+'"><option value="carrefour" '+(x.store==='carrefour'?'selected':'')+'>Carrefour Drive</option>'+
- '<option value="grandfrais" '+(x.store==='grandfrais'?'selected':'')+'>Grand Frais</option></select></div>'+
- '';
+ '<option value="grandfrais" '+(x.store==='grandfrais'?'selected':'')+'>Grand Frais</option></select></div>';
  if(x.manualExtraIds?.length)out+='<button class="btn secondary wide" style="margin-top:9px" data-action="edit-manual-row" data-id="'+html(x.id)+'">✎ Modifier la quantité ajoutée manuellement</button>';
  out+='<button class="btn secondary wide" style="margin-top:9px" data-action="exclude" data-id="'+html(x.id)+'">Retirer de la liste (sans achat)</button>';
  showModal('Gérer un achat',out);

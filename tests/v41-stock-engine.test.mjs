@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
  emptyStockV41, normalizeStockV41, stockIdentityV41, stockMeasureV41,
- applyStockTransactionV41, availableStockV41, availableFreezerV41
+ applyStockTransactionV41, availableStockV41, availableFreezerV41, previewLegacyPantryV41
 } from '../stock-engine-v41.mjs';
 
 const eggs={id:'box6',unit:'boîte',packAmount:6,packUnit:'pièce'};
@@ -113,4 +113,30 @@ test('Le noyau est optionnel et refuse une structure incohérente',()=>{
  assert.throws(()=>normalizeStockV41({items:[]}),/non reconnu/);
  assert.throws(()=>applyStockTransactionV41(emptyStockV41(),{id:'empty',movements:[]}));
  assert.throws(()=>applyStockTransactionV41(emptyStockV41(),{id:'bad',movements:[{type:'other'}]}));
+});
+
+test('La reprise historique n'utilise qu'une seule semaine et ne modifie aucune donnée',()=>{
+ const week={pantry:{'ingredient:oeufs|pièce':4,'produit:papier|paquet':2},pantryUnits:{}};
+ const old=JSON.stringify(week);
+ const preview=previewLegacyPantryV41(week,[{id:'oeufs',name:'Œufs',store:'carrefour'}],
+  [{id:'papier',name:'Papier toilette',store:'carrefour'}]);
+ assert.equal(preview.entries.length,2);
+ assert.equal(preview.entries[0].amount,4);
+ assert.equal(preview.entries[1].amount,2);
+ assert.equal(preview.requiresReview,false);
+ assert.equal(JSON.stringify(week),old);
+});
+test('Un même produit et ingrédient liés ne sont jamais additionnés silencieusement',()=>{
+ const w={pantry:{'ingredient:oeufs|pièce':4,'produit:box6|pièce':5}};
+ const preview=previewLegacyPantryV41(w,[{id:'oeufs',name:'Œufs',productId:'box6'}],[eggs]);
+ assert.equal(preview.entries.length,2);
+ assert.equal(preview.requiresReview,true);
+ assert.equal(preview.entries.filter(x=>x.requiresReview).length,2);
+ assert.match(preview.warnings.join(' '),/ne pas additionner automatiquement/);
+});
+test('Les anciennes lignes non reliées au catalogue nécessitent une vérification manuelle',()=>{
+ const preview=previewLegacyPantryV41({pantry:{'ail|pièce':3,'ingredient:introuvable|g':5}});
+ assert.equal(preview.entries.length,0);
+ assert.equal(preview.requiresReview,true);
+ assert.equal(preview.warnings.length,2);
 });

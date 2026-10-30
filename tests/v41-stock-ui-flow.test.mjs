@@ -355,7 +355,7 @@ test('Premier ajout au stock : aucune quantité héritée ne disparaît sans cho
  const before=JSON.stringify(f.state);
  f.invoke('v41-add-stock');
  assert.match(f.modals.at(-1).title,/Initialiser mon stock permanent/);
- assert.match(f.modals.at(-1).body,/Examiner et reprendre mon ancien stock/);
+ assert.match(f.modals.at(-1).body,/Examiner le stock du 2026-10-26/);
  assert.match(f.modals.at(-1).body,/Démarrer un stock vide/);
  assert.equal(JSON.stringify(f.state),before);
  assert.equal(f.saved,0);
@@ -376,4 +376,46 @@ test('L’ancien stock peut être repris sans création silencieuse de produits'
  assert.equal(availableStockV41(f.state.stockV41,'ingredient:pasta','g'),300);
  assert.equal(f.week.pantry['ingredient:pasta|g'],300);
  assert.equal(f.state.stockV41MigratedFrom,weekId);
+});
+
+test('Stock de la semaine précédente : un premier achat ne peut pas créer un nouveau stock silencieux',()=>{
+ const f=fixture();withInputs(f.inputs);
+ f.state.weeks['2026-10-19']={meals:Array(14).fill(null),
+  pantry:{'ingredient:pasta|g':450},extras:[],checked:[],excluded:[]};
+ f.week.checked=['produit:pack|achat'];
+ f.week.pantry={};
+ const before=JSON.stringify(f.state);
+ f.invoke('v41-courses-done');
+ assert.match(f.modals.at(-1).title,/Initialiser mon stock permanent/);
+ assert.match(f.modals.at(-1).body,/2026-10-19/);
+ assert.equal(f.saved,0);
+ assert.equal(JSON.stringify(f.state),before);
+ f.invoke('v41-preview-migration',{dataset:{week:'2026-10-19'}});
+ assert.match(f.modals.at(-1).body,/450 g/);
+ f.invoke('v41-confirm-migration',{dataset:{week:'2026-10-19'}});
+ assert.equal(availableStockV41(f.state.stockV41,'ingredient:pasta','g'),450);
+ assert.equal(f.state.stockV41MigratedFrom,'2026-10-19');
+ assert.equal(f.week.checked.length,1,'l’achat en attente n’est pas validé par la migration');
+});
+
+test('La création d’un plat congelé n’ignore jamais le stock de l’ancienne semaine',()=>{
+ const f=fixture();withInputs(f.inputs);
+ f.state.weeks['2026-10-19']={meals:Array(14).fill(null),pantry:{'ingredient:pasta|g':120}};
+ f.invoke('v41-add-frozen');
+ assert.equal(f.state.stockV41,null);
+ assert.equal(f.saved,0);
+ assert.match(f.modals.at(-1).body,/2026-10-19/);
+ f.invoke('v41-save-frozen',{id:'pasta-dinner'});
+ assert.equal(f.state.stockV41,null);
+ assert.equal(f.saved,0);
+});
+
+test('La déduction d’une recette attend également le choix de migration',()=>{
+ const f=fixture();withInputs(f.inputs);
+ f.state.weeks['2026-10-19']={meals:Array(14).fill(null),pantry:{'ingredient:pasta|g':250}};
+ f.week.meals[0]={type:'recipe',recipeId:'pasta-dinner',people:2};
+ f.invoke('v41-eat-recipe',{index:0,id:'pasta-dinner'});
+ assert.equal(f.saved,0);
+ assert.equal(f.state.stockV41,null);
+ assert.equal(f.week.v41MealActions,undefined);
 });

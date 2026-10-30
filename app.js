@@ -1606,14 +1606,45 @@ function undoMealValidationControlsV41(index,meal){
  return buttons.length?'<div class="v41-meal-undo-panel"><p class="helper">Un repas validé par erreur ? Annule d’abord la validation pour corriger le stock, puis modifie ou supprime le repas.</p>'+
   buttons.join('')+'</div>':'';
 }
+// V41.3 : actions quotidiennes visibles dès l'ouverture du repas.
+function quickMealActionsV413(index,meal){
+ const w=getWeek(),done=w.v41MealActions||{},out=[];
+ const button=(action,label,attrs='',secondary=false)=>'<button class="btn '+(secondary?'secondary ':'')+'v413-meal-action" data-action="'+action+'" data-index="'+index+'"'+attrs+'>'+label+'</button>';
+ if(meal?.type==='frozen'&&!done[index+':frozen'])
+  out.push(button('v41-eat-frozen','✓ C’est mangé'));
+ for(const dish of mealDishes(meal)){
+  if(done[index+':'+dish.recipeId])continue;
+  const id=' data-id="'+html(dish.recipeId)+'"';
+  const title=html(recipeById(dish.recipeId)?.name||'Plat');
+  out.push(button('v41-eat-recipe','✓ C’est mangé · '+title,id));
+  out.push(button('v41-freeze-recipe','❄️ Au congélateur · '+title,id,true));
+ }
+ for(const leftover of mealLeftovers(meal)){
+  const key=index+':leftovers:'+leftover.fromIndex+':'+leftover.recipeId;
+  if(done[key])continue;
+  out.push(button('v41-eat-leftovers','✓ Restes mangés',
+   ' data-id="'+html(leftover.recipeId)+'" data-source="'+leftover.fromIndex+'"'));
+ }
+ return out.length?'<div class="v413-meal-quick"><strong>Actions du repas</strong><div class="v413-meal-quick-buttons">'+out.join('')+'</div></div>':'';
+}
 function pickMeal(index){
  const meal=getWeek().meals[index],dishes=mealDishes(meal),leftovers=mealLeftovers(meal);
- let out=undoMealValidationControlsV41(index,meal)+
-  '<button class="btn secondary wide" data-action="v41-replace-meal" data-index="'+index+'">'+(meal?'↔ Remplacer ce repas':'❄️ Congélateur ou repas commandé')+'</button>';
+ const title=days[Math.floor(index/2)]+' '+(index%2?'soir':'midi');
+ const validated=isMealDoneV41(getWeek(),index);
+ const summary=meal?.type==='frozen'?'❄️ Plat du congélateur':meal?.type==='ordered'?'🍕 Repas libre / commandé':
+  dishes.map(d=>html(recipeById(d.recipeId)?.name||'Plat')).concat(leftovers.map(d=>'🍱 Restes')).join(' · ')||'Repas libre';
+ const quick=quickMealActionsV413(index,meal);
+ if(validated){
+  showModal(title,'<div class="v413-meal-state"><strong>✓ Repas déjà validé dans le stock</strong><p>'+summary+
+   '</p><small>Les modifications sont protégées pour éviter de retirer deux fois les ingrédients. Annule la validation avant de modifier ce repas.</small></div>'+
+   undoMealValidationControlsV41(index,meal)+quick);
+  return
+ }
+ let out='<div class="v413-meal-top">'+
+  '<button class="btn secondary" data-action="v41-replace-meal" data-index="'+index+'">↔ '+(meal?'Remplacer':'Choisir un repas')+'</button>'+
+  (meal?'<button class="btn secondary" data-action="remove-meal" data-index="'+index+'">Vider le repas</button>':'')+'</div>'+quick;
  if(meal?.type==='frozen'||meal?.type==='ordered'){
-  showModal('Gérer mon repas','<p class="helper">'+(meal.type==='frozen'?'❄️ Plat issu du congélateur':'🍕 Repas libre ou commandé')+'</p>'+
-    undoMealValidationControlsV41(index,meal)+
-    '<button class="btn wide" data-action="v41-replace-meal" data-index="'+index+'">↔ Remplacer ce repas</button>');
+  showModal(title,'<p class="helper">'+summary+'</p>'+out);
   return
  }
  if(leftovers.length){
@@ -1656,8 +1687,7 @@ function pickMeal(index){
  if(!state.recipes.length)out+='<div class="note" style="margin-top:10px">Ajoute d’abord tes plats au catalogue, puis retrouve-les ici.</div>';
  if(meal)out+='<div class="meal-transfer-actions">'+
  '<button class="btn secondary" data-action="move-copy-meal" data-mode="copy" data-index="'+index+'" '+(!dishes.length?'disabled':'')+'>⧉ Copier</button>'+
- '<button class="btn secondary" data-action="move-copy-meal" data-mode="move" data-index="'+index+'">↔ Déplacer</button></div>'+
- '<button class="btn secondary wide" style="margin-top:12px" data-action="remove-meal" data-index="'+index+'">Vider ce repas</button>';
+ '<button class="btn secondary" data-action="move-copy-meal" data-mode="move" data-index="'+index+'">↔ Déplacer</button></div>';
  showModal(days[Math.floor(index/2)]+' '+(index%2?'soir':'midi'),out)
 }
 function extraSearchItems(term=''){
@@ -2582,6 +2612,14 @@ document.addEventListener('change',e=>{
  }
  }else if(e.target.matches('[data-store-item]')){const item=e.target.dataset.storeItem,store=e.target.value;closeModal();setShoppingStore(item,store)}else if(e.target.matches('[data-check]')){const w=getWeek(),id=e.target.dataset.check;w.checked=e.target.checked?[...new Set([...w.checked,id])]:w.checked.filter(x=>x!==id);persist();render(true)}else if(e.target.id==='importFile')importData(e.target.files?.[0])});
 document.addEventListener('input',e=>{
+  if(e.target.id==='v413StockPickerSearch'){
+   const needle=String(e.target.value||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim().toLocaleLowerCase('fr-FR');
+   document.querySelectorAll('#v413StockPickerResults [data-v413-stock-choice]').forEach(row=>{
+    const title=(row.textContent||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase('fr-FR');
+    row.hidden=Boolean(needle)&&!title.includes(needle);
+   });
+   return
+  }
   if(e.target.id==='v41StockSearch'){
    const needle=String(e.target.value||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim().toLocaleLowerCase('fr-FR');
    let visible=0;

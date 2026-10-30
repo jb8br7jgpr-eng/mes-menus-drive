@@ -3,6 +3,7 @@ import {emptyStockV41,applyStockTransactionV41,availableStockV41,
  stockIdentityV41,previewLegacyPantryV41} from './stock-engine-v41.mjs';
 import {kitchenMovementsV41,purchasedMovementsV41,planFrozenMealV41,
  remainingFreezerPortionsV41} from './stock-week-v41.mjs';
+import {stockConfirmationTextV413} from './stock-preview-v413.mjs';
 const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const qty=n=>Number(n||0).toLocaleString('fr-FR',{maximumFractionDigits:3});
 const input=(id,label,amount=1,min=0.001,max=100000)=>'<div class="field"><label for="'+id+'">'+esc(label)+'</label><input type="number" inputmode="decimal" id="'+id+'" step="any" min="'+min+'" max="'+max+'" value="'+amount+'"></div>';
@@ -63,9 +64,11 @@ function selection(ctx,forFrozen=false) {
  const linked=new Set(ingredients.map(x=>x.productId).filter(Boolean));
  const products=(ctx.state.products||[]).filter(x=>!linked.has(x.id)).map(x=>({kind:'product',...x}));
  const all=[...ingredients,...products].sort((a,b)=>a.name.localeCompare(b.name,'fr'));
- ctx.showModal('Ajouter au stock','<p class="helper">Choisis un produit ou un ingrédient existant, pour éviter les doublons.</p>'+
-  (all.length?'<div class="v41-select-list">'+all.map(x=>
-   '<button class="v41-select-row" data-action="v41-stock-select" data-kind="'+x.kind+'" data-id="'+esc(x.id)+'">'+
+ ctx.showModal('Ajouter au stock','<p class="helper">Recherche un article existant, pour éviter les doublons.</p>'+ 
+  '<div class="v413-search"><label for="v413StockPickerSearch">Rechercher un article</label>'+ 
+  '<input id="v413StockPickerSearch" type="search" placeholder="Ex. pâtes, lait, savon…" autocomplete="off" aria-controls="v413StockPickerResults"></div>'+
+  (all.length?'<div class="v41-select-list" id="v413StockPickerResults">'+all.map(x=>
+   '<button class="v41-select-row" data-v413-stock-choice data-action="v41-stock-select" data-kind="'+x.kind+'" data-id="'+esc(x.id)+'">'+
    '<span>'+esc(x.name)+'<small>'+esc(x.category||'Autres')+'</small></span><span>＋</span></button>').join('')+'</div>':
    '<div class="note">Ajoute d’abord tes ingrédients et produits habituels dans Produits.</div>'));
 }
@@ -119,10 +122,29 @@ export function handleStockActionV41(ctx) {
   const article=articleOf(ctx,a.dataset.kind,id);if(!article)return true;
   ctx.showModal('Stock · '+article.name,
    '<p class="helper">Quantité à ajouter au stock permanent.</p>'+
-   input('v41StockQuantity','Quantité',1)+
+   '<div class="v413-quantity"><button type="button" class="btn secondary" data-action="v413-stock-step" data-step="-1" aria-label="Diminuer la quantité">−</button>'+ 
+   input('v41StockQuantity','Quantité',1)+ 
+   '<button type="button" class="btn secondary" data-action="v413-stock-step" data-step="1" aria-label="Augmenter la quantité">＋</button></div>'+ 
    '<div class="field"><label for="v41StockUnit">Unité</label><select id="v41StockUnit">'+
    ctx.units.map(u=>'<option value="'+esc(u)+'" '+(u===article.unit?'selected':'')+'>'+esc(u)+'</option>').join('')+
-   '</select></div><button class="btn wide" data-action="v41-save-stock" data-kind="'+a.dataset.kind+'" data-id="'+esc(id)+'">Ajouter au stock</button>');return true
+   '</select></div>'+ 
+   (article.product&&ctx.units.includes(article.product.unit)?'<button class="btn secondary wide" data-action="v413-stock-one-package" data-unit="'+esc(article.product.unit)+'">＋ 1 '+esc(article.product.unit)+ 
+    (Number(article.product.packAmount)>0?' = '+qty(article.product.packAmount)+' '+esc(article.product.packUnit||''):'')+'</button>':'')+ 
+   '<button class="btn wide" data-action="v41-save-stock" data-kind="'+a.dataset.kind+'" data-id="'+esc(id)+'">Ajouter au stock</button>');return true
+ }
+ if(mode==='v413-stock-step'){
+  const field=document.getElementById('v41StockQuantity'),unit=document.getElementById('v41StockUnit')?.value;
+  if(!field)return true;
+  const step=['g','ml'].includes(unit)?100:['kg','l'].includes(unit)?0.1:unit==='cl'?10:1;
+  const current=Number(field.value),delta=Number(a.dataset.step);
+  if(![-1,1].includes(delta))return true;
+  const next=Math.round(((Number.isFinite(current)?current:1)+delta*step)*1000)/1000;
+  field.value=String(Math.min(100000,Math.max(0.001,next)));return true
+ }
+ if(mode==='v413-stock-one-package'){
+  const field=document.getElementById('v41StockQuantity'),unit=document.getElementById('v41StockUnit');
+  if(!field||!unit||!ctx.units.includes(a.dataset.unit))return true;
+  unit.value=a.dataset.unit;field.value='1';return true
  }
  if(mode==='v41-save-stock'){
   const article=articleOf(ctx,a.dataset.kind,id),n=amount('v41StockQuantity'),unit=document.getElementById('v41StockUnit')?.value;
@@ -200,7 +222,6 @@ export function handleStockActionV41(ctx) {
    if(relatedLeftovers.length&&!confirm('Ce plat a déjà '+relatedLeftovers.length+
     ' repas de restes prévus. Les congeler retirera ces restes des menus pour éviter de compter deux fois les portions. Continuer ?'))return true;
   }
-  if(!freeze&&!confirm('Confirmer que « '+r.name+' » a bien été préparé ('+dish.people+' portions) ? Les ingrédients de toutes les portions seront déduits du Stock maison.'))return true;
   const frozenPortions=freeze?amount('v41FreezePortions'):0;
   if(freeze&&(!Number.isInteger(frozenPortions)||frozenPortions<1||frozenPortions>Number(dish.people))){
    ctx.toast('Choisis un nombre de portions compris entre 1 et '+dish.people+'.');return true
@@ -212,6 +233,8 @@ export function handleStockActionV41(ctx) {
     lotId='lot:'+ctx.uid();
     movements.push({type:'freezer',direction:'add',lotId,recipeId:id,name:r.name,portions:frozenPortions,preparedAt:new Date().toISOString()});
    }
+   const confirmation=stockConfirmationTextV413(stock,movements,(freeze?'Préparer et congeler « ':'Confirmer la préparation de « ')+r.name+' » ('+dish.people+' portions) ?');
+   if(!confirm(confirmation))return true;
    commit(ctx,tx(freeze?'Plat préparé et congelé':'Plat préparé et mangé',movements),()=>{
     w.v41MealActions=w.v41MealActions||{};
     w.v41MealActions[key]={status:freeze?'frozen':'eaten',lotId,frozenPortions,at:new Date().toISOString(),
@@ -425,7 +448,9 @@ export function handleStockActionV41(ctx) {
   const selected=ctx.shopping().filter(x=>x.checked&&!x.excluded&&!x.covered);
   const result=purchasedMovementsV41(selected,state.ingredientCatalog,state.products);
   if(!result.movements.length){ctx.toast(result.warnings.length?'Relie ces achats à une fiche Produit avant de les enregistrer.':'Aucun nouvel achat coché à valider.');return true}
-  if(!confirm('Ajouter '+result.movements.length+' achat(s) réellement effectués au Stock maison ?'))return true;
+  try {
+   if(!confirm(stockConfirmationTextV413(stock,result.movements,'Enregistrer '+result.movements.length+' achat(s) dans le Stock maison ?')))return true;
+  }catch(e){ctx.toast(e.message||'Aperçu des achats indisponible.');return true}
   commit(ctx,tx('Courses faites · '+ctx.currentWeek,result.movements),()=>{
    w.v41ValidatedRows=w.v41ValidatedRows||{};
    const registered=selected.filter(x=>x.productId||x.ingredientId);

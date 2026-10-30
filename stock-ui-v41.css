@@ -35,3 +35,22 @@
 .v41-meal-undo-panel{display:grid;gap:7px;margin:0 0 13px;padding:12px;border:1px solid #e7d6af;border-radius:14px;background:#fff9ed}
 .v41-meal-undo-panel .helper{font-size:12px;margin:0 0 2px;line-height:1.45;color:#745b32}
 .v41-meal-undo{white-space:normal;min-height:40px;text-align:center}
+
+/* V41.3 : recherche et saisie stock plus rapides, sans déformer les autres écrans. */
+.v413-search{display:grid;gap:6px;margin:10px 0 12px}
+.v413-search label{font-size:12px;font-weight:700;color:#315e42}
+.v413-search input{font-size:16px;min-height:45px;padding:10px 12px;width:100%;min-width:0;border:1px solid #cadcce;border-radius:12px;background:#fff;color:#244334}
+#v413StockPickerResults [data-v413-stock-choice][hidden]{display:none!important}
+.v413-quantity{display:grid;grid-template-columns:44px minmax(0,1fr) 44px;gap:8px;align-items:end;margin:12px 0}
+.v413-quantity>.btn{height:45px;min-width:0;padding:0;font-size:21px}
+.v413-quantity>.field{min-width:0;margin:0}
+.v413-meal-top{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;margin-bottom:12px}
+.v413-meal-top .btn{white-space:normal;min-height:43px;padding:7px;font-size:12px}
+.v413-meal-quick{background:#eff5ec;border:1px solid #d4e6d5;border-radius:14px;padding:12px;margin:12px 0}
+.v413-meal-quick>strong{color:#245943;font-size:12px}
+.v413-meal-quick-buttons{display:grid;gap:7px;margin-top:9px}
+.v413-meal-action{white-space:normal;text-align:center;min-height:42px;padding:9px;font-size:12px}
+.v413-meal-state{border:1px solid #d4e6d5;border-radius:14px;padding:13px;background:#eff5ec;margin:0 0 12px}
+.v413-meal-state strong{display:block;font-size:13px;color:#245943}
+.v413-meal-state p{font-size:13px;margin:5px 0;color:#314f39}
+.v413-meal-state small{font-size:12px;line-height:1.45;color:#56735e}

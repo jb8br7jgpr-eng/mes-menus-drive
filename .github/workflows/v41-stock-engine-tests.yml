@@ -21,6 +21,7 @@ jobs:
           node --check stock-week-v41.mjs
           node --check stock-ui-v41.mjs
           node --check stock-actions-v41.mjs
+          node --check stock-preview-v413.mjs
       - name: Vérifier le moteur d'inventaire pur
         run: node --test tests/v41-stock-engine.test.mjs tests/v41-stock-week.test.mjs tests/v41-stock-ui-flow.test.mjs tests/v41-two-phones.test.mjs
       - name: Vérifier les fonctions existantes V35 à V40

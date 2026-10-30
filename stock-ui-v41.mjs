@@ -4,7 +4,7 @@ const escape = x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','
 const q = n=>Number(n||0).toLocaleString('fr-FR',{maximumFractionDigits:3});
 const days=['Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi','Dimanche'];
 const row=(name,description,content='')=>'<div class="v41-stock-row" data-v41-stock-row><div class="grow"><strong>'+escape(name)+'</strong><small>'+escape(description)+'</small></div>'+content+'</div>';
-export function renderStockV41({state,week,weekId,view='home',recipeById,mealDishes}) {
+export function renderStockV41({state,week,weekId,view='home',recipeById,mealDishes,mealLeftovers}) {
  const stock=state.stockV41||{items:{},freezer:{}};
  const items=Object.values(stock.items||{}).filter(x=>Number(x.quantity)>0).sort((a,b)=>a.name.localeCompare(b.name,'fr'));
  const frozen=Object.values(stock.freezer||{}).filter(x=>Number(x.portions)>0).sort((a,b)=>a.name.localeCompare(b.name,'fr'));
@@ -52,6 +52,16 @@ export function renderStockV41({state,week,weekId,view='home',recipeById,mealDis
       '<div class="v41-stock-actions"><button class="btn tiny" data-action="v41-eat-recipe" data-index="'+i+'" data-id="'+escape(dish.recipeId)+'">C’est mangé</button>'+
       '<button class="btn tiny secondary" data-action="v41-freeze-recipe" data-index="'+i+'" data-id="'+escape(dish.recipeId)+'">❄️ Au congélateur</button></div>'));
    }
+   for(const leftover of (typeof mealLeftovers==='function'?mealLeftovers(meal):[])){
+    const source=recipeById(leftover.recipeId),prepared=actions[leftover.fromIndex+':'+leftover.recipeId];
+    entries.push(row('🍱 Restes : '+(source?.name||'Plat préparé'),
+      days[Math.floor(i/2)]+' '+(i%2?'soir':'midi')+' · '+leftover.people+' portion'+(leftover.people>1?'s':'')+
+      ' · sans nouvelle déduction d’ingrédients',
+      '<span class="v41-stock-info">'+(prepared?'Préparés':'À préparer')+'</span>'));
+   }
+   if(meal?.type==='ordered')entries.push(row('🍕 Repas libre ou commandé',
+    days[Math.floor(i/2)]+' '+(i%2?'soir':'midi')+' · aucun ingrédient à acheter',
+    '<span class="v41-stock-info">Sans stock</span>'));
   });
   out+='<div class="v41-week-caption">📅 Semaine du '+escape(weekId)+
     ' · les ingrédients ne sortent du stock qu’à la préparation effective du plat.</div>';

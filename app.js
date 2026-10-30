@@ -250,6 +250,33 @@ function renderMenus(){const w=getWeek(),count=w.meals.filter(Boolean).length, l
   out+='<p class="helper">Choisis librement quand manger les restes : touche le repas souhaité, puis « Placer des restes ici ». La sélection indique les plats cuisinés et les portions encore disponibles. Aucun repas de restes n’est rempli automatiquement.</p>';
   return out
 }
+
+function planRecipeV36(recipeId){
+ const recipe=recipeById(recipeId);if(!recipe)return;
+ const w=getWeek(),end=offsetDate(currentWeek,6);
+ let out='<p class="helper">Choisis où ajouter <strong>'+html(recipe.name)+'</strong>. Les plats déjà prévus restent en place.</p>'+
+ '<div class="v36-plan-week">📅 Du '+niceDate(currentWeek)+' au '+niceDate(end)+' <small>· semaine sélectionnée</small></div>'+
+ '<div class="field"><label for="v36PlanPortions">Portions à préparer</label>'+
+ '<input id="v36PlanPortions" type="number" min="1" max="30" value="'+Number(recipe.people||2)+'">'+
+ '<span class="helper">Portions de base proposées automatiquement.</span></div>'+
+ '<div class="v36-plan-grid">';
+ for(let i=0;i<14;i++){
+  const meal=w.meals[i],already=mealDishes(meal).some(d=>d.recipeId===recipeId);
+  out+='<button class="v36-plan-target" data-action="plan-recipe-to-meal" data-id="'+html(recipeId)+'" data-index="'+i+'" '+(already?'disabled':'')+'>'+
+  '<strong>'+days[Math.floor(i/2)]+' '+(i%2?'soir':'midi')+'</strong><small>'+
+  (already?'Déjà prévu':meal?'Ajouter au repas':'Repas libre')+'</small></button>'
+ }
+ showModal('＋ Ajouter aux menus',out+'</div>')
+}
+function commitPlannedRecipeV36(recipeId,index,portions){
+ if(!Number.isInteger(index)||index<0||index>13||!Number.isInteger(portions)||portions<1||portions>30)return false;
+ const w=getWeek(),before=weekBeforeUndo();
+ if(!addRecipeToMeal(w,index,recipeId,portions))return false;
+ persist();closeModal();currentTab='menus';tabScrollV33.menus=0;renderMealContext(index);
+ toastWeekUndo('Plat ajouté aux menus.',before,index);
+ return true
+}
+
 function recipeImg(r){return '<span class="recipe-img">'+(r.image?'<img src="'+html(r.image)+'" alt="">':html(icons[r.category]||'🍽️'))+'</span>'}
 function normalRecipeType(value){
  if(value==='Salade')return 'Salades';
@@ -271,7 +298,7 @@ function recipeRows(){
  return list.map(r=>'<div class="recipe-card"><button class="recipe-preview-trigger" data-action="view-recipe" data-id="'+html(r.id)+'" aria-label="Consulter le plat '+html(r.name)+'">'+recipeImg(r)+'<span class="recipe-preview-copy"><strong class="recipe-preview-name">'+html(r.name)+'</strong><span class="recipe-preview-meta">'+
   r.ingredients.length+' ingrédient'+(r.ingredients.length>1?'s':'')+' · '+r.people+' portions</span>'+
   '<span class="pill gray">'+html(normalRecipeType(r.category)==='legacy'?(r.category||'Autre'):normalRecipeType(r.category))+'</span></span></button>'+
-  '<div class="recipe-actions"><button class="icon-btn" data-action="edit-recipe" data-id="'+html(r.id)+'" aria-label="Modifier '+html(r.name)+'">✎</button>'+
+  '<div class="recipe-actions"><button class="btn tiny v36-recipe-plan" data-action="plan-recipe" data-id="'+html(r.id)+'">＋ Menus</button><button class="icon-btn" data-action="edit-recipe" data-id="'+html(r.id)+'" aria-label="Modifier '+html(r.name)+'">✎</button>'+
   '<button class="btn tiny secondary" data-action="duplicate-recipe" data-id="'+html(r.id)+'">Dupliquer</button></div></div>').join('')||
   emptyView('🍲','Aucun plat trouvé',search||recipeTypeFilter!=='all'?'Essaie un autre nom ou un autre type.':'Commence par ajouter votre premier plat.',
    '<button class="btn" data-action="add-recipe">＋ Ajouter un plat</button>')
@@ -291,7 +318,7 @@ function viewRecipeV33(id){
   html(r.people)+' portion'+(r.people>1?'s':'')+'</span></div>'+
   '<h3>Ingrédients</h3><ul class="recipe-v33-ingredients">'+ingredients+'</ul>'+
   '<p class="helper">Quantités enregistrées pour la recette. La consultation ne modifie ni les menus ni les courses.</p>'+
-  '<button class="btn secondary wide" data-action="edit-recipe" data-id="'+html(r.id)+'">✎ Modifier ce plat</button></div>';
+  '<button class="btn wide v36-recipe-plan-preview" data-action="plan-recipe" data-id="'+html(r.id)+'">＋ Ajouter aux menus</button>'+ '<button class="btn secondary wide" data-action="edit-recipe" data-id="'+html(r.id)+'">✎ Modifier ce plat</button></div>';
  showModal(html(r.name),body);
 }
 function renderPlats(){
@@ -1734,6 +1761,12 @@ document.addEventListener('click',e=>{
   }
   else if(mode==='week-current')returnToCurrentWeekV33()
    else if(mode==='open-week-calendar')openCalendarV36()
+   else if(mode==='plan-recipe')planRecipeV36(id)
+   else if(mode==='plan-recipe-to-meal'){
+    const portions=Number($('#v36PlanPortions')?.value);
+    if(!commitPlannedRecipeV36(id,index,portions))
+     toast('Impossible d’ajouter le plat : vérifie les portions ou le repas choisi.');
+   }
    else if(mode==='calendar-shift')shiftCalendarV36(Number(a.dataset.shift))
    else if(mode==='calendar-select')selectCalendarV36(a.dataset.date)
    else if(mode==='calendar-current'){closeModal();returnToCurrentWeekV33()}

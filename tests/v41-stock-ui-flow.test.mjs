@@ -254,3 +254,57 @@ test('Cette semaine affiche aussi les restes et les repas commandés sans nouvel
  assert.match(view,/Repas libre ou commandé/);
  assert.match(view,/Sans stock/);
 });
+
+test('Un paquet ajouté à la main soustrait le stock en grammes avant calcul des achats',()=>{
+ const packet={id:'pack',name:'Pâtes 500 g',unit:'paquet',packAmount:500,packUnit:'g',store:'carrefour'};
+ const ing={id:'pasta',name:'Pâtes',productId:'pack',store:'carrefour'};
+ const stock=applyStockTransactionV41(emptyStockV41(),{id:'pasta-on-hand',movements:[
+  {type:'inventory',direction:'add',identity:'ingredient:pasta',amount:350,unit:'g',name:'Pâtes'}
+ ]}).stock;
+ const week={meals:[],generatedIngredients:[],pantry:{},
+  extras:[{id:'extra1',productId:'pack',name:'Pâtes',qty:1,unit:'paquet',fromCatalogue:true}],checked:[],excluded:[]};
+ const source=app.slice(app.indexOf('function shopping(){'),app.indexOf('function stockUnitChoices('));
+ const state={stockV41:stock,ingredientCatalog:[ing]};
+ const shopping=runInNewContext(source+';shopping',{
+  state,getWeek:()=>week,productById:id=>id==='pack'?packet:null,
+  ingredientById:id=>id==='pasta'?ing:null,ingredientStore:()=> 'carrefour',
+  converted:(q,u)=>[Number(q)||0,u],quantity:(q,u)=>q+' '+u,
+  norm:s=>String(s).toLowerCase(),productGroup:()=> 'Épicerie et divers',
+  groupFor:()=> 'Épicerie et divers',shoppingStore:()=> 'carrefour',
+  stockModulesV41:{core:{availableStockV41,stockIdentityV41}}
+ });
+ const purchase=shopping()[0];
+ assert.equal(purchase.qty,1,'350 g à la maison ne couvrent pas le paquet de 500 g');
+ assert.equal(purchase.stockAmount,350);
+ assert.equal(purchase.totalNeedAmount,500);
+ assert.equal(purchase.stockUnit,'g');
+ state.stockV41=applyStockTransactionV41(stock,{id:'more-pasta',movements:[
+  {type:'inventory',direction:'add',identity:'ingredient:pasta',amount:150,unit:'g',name:'Pâtes'}
+ ]}).stock;
+ const covered=shopping()[0];
+ assert.equal(covered.qty,0,'500 g à la maison couvrent exactement le paquet ajouté manuellement');
+ assert.equal(covered.covered,true);
+});
+
+test('Conditionnement inconnu : le stock est mesuré dans l’unité vendue et non en pièces imaginaires',()=>{
+ const packet={id:'packet-unknown',name:'Biscuits',unit:'paquet',store:'carrefour'};
+ const week={meals:[],generatedIngredients:[],pantry:{},
+  extras:[{id:'extra1',productId:'packet-unknown',name:'Biscuits',qty:2,unit:'paquet',fromCatalogue:true}],
+  checked:[],excluded:[]};
+ const stock=applyStockTransactionV41(emptyStockV41(),{id:'biscuit-stock',movements:[
+  {type:'inventory',direction:'add',identity:'product:packet-unknown',amount:1,unit:'paquet',name:'Biscuits'}
+ ]}).stock;
+ const source=app.slice(app.indexOf('function shopping(){'),app.indexOf('function stockUnitChoices('));
+ const shopping=runInNewContext(source+';shopping',{
+  state:{stockV41:stock,ingredientCatalog:[]},getWeek:()=>week,
+  productById:id=>id===packet.id?packet:null,ingredientById:()=>null,
+  converted:(q,u)=>[Number(q)||0,u],quantity:(q,u)=>q+' '+u,
+  norm:s=>String(s).toLowerCase(),productGroup:()=> 'Épicerie et divers',
+  groupFor:()=> 'Épicerie et divers',shoppingStore:()=> 'carrefour',
+  stockModulesV41:{core:{availableStockV41,stockIdentityV41}}
+ });
+ const purchase=shopping()[0];
+ assert.equal(purchase.unit,'paquet');
+ assert.equal(purchase.qty,1);
+ assert.equal(purchase.stockAmount,1);
+});

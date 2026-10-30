@@ -75,7 +75,24 @@ function replaceModal(ctx,index) {
 export function handleStockActionV41(ctx) {
  const {mode,a,id,index}=ctx,w=ctx.getWeek(),state=ctx.state,stock=stockOf(state);
  const tx=(label,movements)=>({id:'v41:'+ctx.uid(),label,movements});
- if(mode==='v41-add-stock'){selection(ctx);return true}
+ if(mode==='v41-add-stock'){
+  const hasOldStock=Object.values(w.pantry||{}).some(q=>Number(q)>0);
+  if(!state.stockV41 && hasOldStock){
+   ctx.showModal('Initialiser mon stock permanent',
+    '<p class="helper">Tu as déjà renseigné du stock dans les anciennes courses. Le nouvel inventaire devient la référence unique pour toutes les semaines : il ne faut pas masquer tes anciennes quantités sans ton accord.</p>'+
+    '<button class="btn wide" data-action="v41-preview-migration">Examiner et reprendre mon ancien stock</button>'+
+    '<button class="btn secondary wide" data-action="v41-add-stock-fresh">Démarrer un stock vide à la place</button>');
+   return true;
+  }
+  selection(ctx);return true
+ }
+ if(mode==='v41-add-stock-fresh'){
+  if(state.stockV41){selection(ctx);return true}
+  if(!confirm('Commencer un nouvel inventaire vide ? Les quantités indiquées dans les anciennes courses resteront enregistrées dans leur historique, mais ne seront plus utilisées pour calculer les achats.'))return true;
+  state.stockV41=emptyStockV41();
+  ctx.persist();selection(ctx);
+  return true;
+ }
  if(mode==='v41-add-frozen'){selection(ctx,true);return true}
  if(mode==='v41-stock-select'){
   const article=articleOf(ctx,a.dataset.kind,id);if(!article)return true;

@@ -170,7 +170,7 @@ function calendarMarkupV36(){
  out+='<div class="v36-calendar-grid" role="group" aria-label="Calendrier des semaines">'+
  days.map(d=>'<span class="v36-calendar-weekday">'+d.slice(0,1)+'</span>').join('');
  for(let i=0;i<cells;i++){
-  const day=new Date(year,month,1-offset+i,12),key=monday(day),iso=localDate(day),planned=weekHasMealsV36(key);
+  const day=new Date(year,month,1-offset+i,12),key=monday(day),iso=localDate(day),planned=day.getDay()===1&&weekHasMealsV36(key);
   out+='<button type="button" class="v36-calendar-day'+(currentWeek===key?' selected':'')+
    (day.getMonth()!==month?' outside':'')+(iso===localDate(new Date())?' today':'')+
    '" data-action="calendar-select" data-date="'+iso+'" aria-pressed="'+(currentWeek===key)+'" aria-label="'+

@@ -369,7 +369,7 @@ test('Premier ajout au stock : aucune quantité héritée ne disparaît sans cho
  assert.equal(f.state.stockV41.version,1);
  assert.equal(f.week.pantry['ingredient:pasta|g'],300,'l’historique reste conservé');
  assert.equal(f.saved,1);
- assert.equal(f.modals.at(-1).title,'Ajouter au stock');
+ assert.equal(f.openedBulk,1,'après migration le sélecteur groupé du stock s’ouvre');
 });
 test('L’ancien stock peut être repris sans création silencieuse de produits',()=>{
  const f=fixture();withInputs(f.inputs);

@@ -466,10 +466,13 @@ function catalogueEditor(kind,id=null,draft=null,linkedIngredientId=null){
   '<option value="carrefour" '+(store==='carrefour'?'selected':'')+'>Carrefour Drive</option>'+
   '<option value="grandfrais" '+(store==='grandfrais'?'selected':'')+'>Grand Frais</option></select></div>'+
   '<div class="field"><label for="catalogueCategory">Catégorie</label><select id="catalogueCategory">'+selectOptions(productCategories,record.category||'Autres')+'</select></div>'+
+  (!isIngredient?'<div class="field v38-purchase-unit"><label for="catalogueUnit">Unité achetée (boîte, paquet, bouteille…)</label>'+
+    '<select id="catalogueUnit">'+selectOptions(units,suggestedUnit)+'</select>'+
+    '<p class="helper">C’est l’unité affichée dans les courses et utilisée pour le panier Carrefour. Si les œufs sont vendus en boîte, choisis « boîte », pas « pièce ».</p></div>':'')+
   '<details class="v38-course-defaults"><summary>🛒 Quantité proposée aux courses : <strong data-v38-default-preview>'+html(quantity(suggestedQty,suggestedUnit))+'</strong><small>Facultatif · toucher pour modifier</small></summary>'+
   '<div class="row stock-editor-row"><div class="field grow"><label for="catalogueQty">Quantité pré-remplie</label><input id="catalogueQty" type="number" inputmode="decimal" step="any" min=".01" required value="'+html(suggestedQty)+'"></div>'+
-  '<div class="field grow"><label for="catalogueUnit">Unité</label><select id="catalogueUnit">'+selectOptions(units,suggestedUnit)+'</select></div></div>'+
-  '<p class="helper">C’est seulement la quantité suggérée lorsque tu ajoutes cet article à tes courses. Tu peux la changer à chaque ajout. Cela ne change ni les quantités des recettes, ni le stock maison, ni le contenu des paquets Carrefour.</p></details>'+
+  (isIngredient?'<div class="field grow"><label for="catalogueUnit">Unité proposée</label><select id="catalogueUnit">'+selectOptions(units,suggestedUnit)+'</select></div>':'')+
+  '</div><p class="helper">Préremplissage pour un ajout manuel, modifiable à chaque fois. Les recettes conservent leurs besoins propres, et les quantités à acheter sont arrondies selon le conditionnement Carrefour renseigné ci-dessous.</p></details>'+
   '<label class="catalogue-frequent-check"><input id="catalogueFrequent" type="checkbox" '+(record.frequent?'checked':'')+'> ☆ Ajouter à mes achats fréquents</label>';
  if(isIngredient){
   body+='<div class="catalogue-reference-panel" id="catalogueReferencePanel" '+(store==='grandfrais'?'hidden':'')+'>'+
@@ -477,12 +480,14 @@ function catalogueEditor(kind,id=null,draft=null,linkedIngredientId=null){
    '<select id="catalogueLinkedProduct"><option value="">Aucune référence associée</option>'+referenceOptions+'</select></div>'+
    '<p class="helper">La même référence sert à toutes les recettes contenant cet ingrédient.</p></div>';
  }else{
-  body+='<details class="daily-optional catalogue-advanced" '+(id||isImported||record.ean||record.brand?'open':'')+'><summary>Marque, emballage et référence Carrefour (facultatif)</summary>'+
+  body+='<details class="daily-optional catalogue-advanced v38-pack-details" '+(store==='carrefour'||id||isImported||record.ean||record.brand?'open':'')+'><summary>📦 Contenu de l’unité achetée et référence Carrefour</summary>'+
+   '<p class="helper v38-pack-warning">Un lien Carrefour ne suffit pas à connaître automatiquement le contenu d’un paquet ou d’une boîte. Renseigne le contenu pour convertir les quantités nécessaires aux recettes en nombre de paquets à acheter.</p>'+
    '<div class="field"><label for="catalogueBrand">Marque</label><input id="catalogueBrand" maxlength="80" value="'+html(record.brand||'')+'"></div>'+
    '<div class="field"><label for="cataloguePackaging">Conditionnement</label><input id="cataloguePackaging" maxlength="80" value="'+html(record.packaging||'')+'"></div>'+
    '<div class="catalogue-reference-panel" id="catalogueReferencePanel" '+(store==='grandfrais'?'hidden':'')+'>'+
-   '<div class="row stock-editor-row"><div class="field grow"><label for="cataloguePackAmount">Contenu par paquet</label><input id="cataloguePackAmount" type="number" inputmode="decimal" min=".01" step="any" value="'+html(record.packAmount??'')+'"></div>'+
-   '<div class="field grow"><label for="cataloguePackUnit">Unité</label><select id="cataloguePackUnit">'+selectOptions(contentUnits,record.packUnit||'g')+'</select></div></div>'+
+   '<div class="row stock-editor-row"><div class="field grow"><label for="cataloguePackAmount">Contenu d’une unité achetée</label><input id="cataloguePackAmount" type="number" inputmode="decimal" min=".01" step="any" placeholder="Ex. 6" value="'+html(record.packAmount??'')+'"></div>'+
+   '<div class="field grow"><label for="cataloguePackUnit">Mesuré en</label><select id="cataloguePackUnit">'+selectOptions(contentUnits,record.packUnit||'pièce')+'</select></div></div>'+
+   '<div id="v38PackPreview" class="v38-pack-preview" aria-live="polite"></div>'+
    '<div class="field"><label for="catalogueEan">Code-barres EAN-13 (facultatif)</label><input id="catalogueEan" inputmode="numeric" maxlength="13" pattern="[0-9]{13}" value="'+html(record.ean||'')+'"></div>'+
    '<div class="field"><label for="catalogueUrl">Lien Carrefour (facultatif)</label><input id="catalogueUrl" type="url" maxlength="2000" value="'+html(record.url||'')+'"></div>'+
    '</div></details>';

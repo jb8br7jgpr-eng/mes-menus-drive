@@ -115,7 +115,7 @@ test('Le noyau est optionnel et refuse une structure incohérente',()=>{
  assert.throws(()=>applyStockTransactionV41(emptyStockV41(),{id:'bad',movements:[{type:'other'}]}));
 });
 
-test('La reprise historique n'utilise qu'une seule semaine et ne modifie aucune donnée',()=>{
+test("La reprise historique n’utilise qu’une seule semaine et ne modifie aucune donnée",()=>{
  const week={pantry:{'ingredient:oeufs|pièce':4,'produit:papier|paquet':2},pantryUnits:{}};
  const old=JSON.stringify(week);
  const preview=previewLegacyPantryV41(week,[{id:'oeufs',name:'Œufs',store:'carrefour'}],

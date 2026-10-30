@@ -298,12 +298,17 @@ function visibleRecipes(){
 }
 function recipeRows(){
  const list=visibleRecipes();
- return list.map(r=>'<div class="recipe-card"><button class="recipe-preview-trigger" data-action="view-recipe" data-id="'+html(r.id)+'" aria-label="Consulter le plat '+html(r.name)+'">'+recipeImg(r)+'<span class="recipe-preview-copy"><strong class="recipe-preview-name">'+html(r.name)+'</strong><span class="recipe-preview-meta">'+
-  r.ingredients.length+' ingrédient'+(r.ingredients.length>1?'s':'')+' · '+r.people+' portions</span>'+
+ return list.map(r=>'<article class="recipe-card v37-recipe-card">'+
+  '<button class="recipe-preview-trigger" data-action="view-recipe" data-id="'+html(r.id)+'" aria-label="Consulter le plat '+html(r.name)+'">'+
+  recipeImg(r)+'<span class="recipe-preview-copy"><strong class="recipe-preview-name">'+html(r.name)+'</strong>'+
+  '<span class="recipe-preview-meta">'+r.ingredients.length+' ingrédient'+(r.ingredients.length>1?'s':'')+' · '+r.people+' portions</span>'+
   '<span class="pill gray">'+html(normalRecipeType(r.category)==='legacy'?(r.category||'Autre'):normalRecipeType(r.category))+'</span></span></button>'+
-  '<div class="recipe-actions"><button class="btn tiny v36-recipe-plan" data-action="plan-recipe" data-id="'+html(r.id)+'">＋ Menus</button><button class="icon-btn" data-action="edit-recipe" data-id="'+html(r.id)+'" aria-label="Modifier '+html(r.name)+'">✎</button>'+
-  '<button class="btn tiny secondary" data-action="duplicate-recipe" data-id="'+html(r.id)+'">Dupliquer</button></div></div>').join('')||
-  emptyView('🍲','Aucun plat trouvé',search||recipeTypeFilter!=='all'?'Essaie un autre nom ou un autre type.':'Commence par ajouter votre premier plat.',
+  '<div class="recipe-actions v37-recipe-actions" role="group" aria-label="Actions pour '+html(r.name)+'">'+
+  '<button class="btn tiny v36-recipe-plan" data-action="plan-recipe" data-id="'+html(r.id)+'">＋ Menus</button>'+
+  '<button class="btn tiny secondary" data-action="duplicate-recipe" data-id="'+html(r.id)+'">Dupliquer</button>'+
+  '<button class="btn tiny secondary v37-recipe-edit" data-action="edit-recipe" data-id="'+html(r.id)+'" aria-label="Modifier '+html(r.name)+'">✎ Modifier</button>'+
+  '</div></article>').join('')||
+  emptyView('🍲','Aucun plat trouvé',search||recipeTypeFilter!=='all'?'Essaie un autre nom ou un autre type.':'Commence par ajouter ton premier plat.',
    '<button class="btn" data-action="add-recipe">＋ Ajouter un plat</button>')
 }
 function viewRecipeV33(id){
@@ -598,6 +603,7 @@ function renderProduits(){
  '</div></div></div>';
  out+='<div class="catalog-primary-actions"><button class="btn" data-action="add-unified-product">＋ Ajouter un produit</button>'+
  '<button class="btn secondary" data-action="open-carrefour-import">📋 Importer Carrefour</button></div>';
+ out+='<button class="btn secondary wide v37-catalogue-add" data-action="v37-open-bulk">☑ Ajouter plusieurs produits aux courses</button>';
  out+='<div class="field catalog-search"><input class="text-input" id="productSearch" value="'+html(productSearch)+'" placeholder="⌕ Rechercher un produit…" aria-label="Rechercher un produit"></div>';
  out+='<div class="section-head"><h2>Votre catalogue</h2><span class="pill" id="catalogueCount">'+n+' produit'+(n>1?'s':'')+'</span></div>'+
  '<div id="catalogueResults">'+unifiedCatalogueRows()+'</div>'+
@@ -1089,7 +1095,7 @@ function shoppingRow(x){
   'Besoin : '+x.grossNeeded;
  if(p?.packaging)detail+=' · '+p.packaging;
  return '<div class="shopping-row shopping-clean v29-shopping-row'+(x.checked?' checked':'')+'">'+
-  '<input class="check" type="checkbox" data-check="'+html(x.id)+'" '+(x.checked?'checked':'')+' aria-label="Marquer '+name+' comme acheté">'+
+  '<label class="v37-purchase-action"><input class="check" type="checkbox" data-check="'+html(x.id)+'" '+(x.checked?'checked':'')+' aria-label="'+(x.checked?'Remettre ':'Marquer ')+name+(x.checked?' à acheter':' comme acheté')+'"><span>'+(x.checked?'✓ Acheté':'Acheté ?')+'</span></label>'+
   '<div class="grow"><div class="shopping-row-top"><strong class="shopping-name">'+name+'</strong><span class="shopping-qty">'+q+'</span></div>'+
   '<div class="shopping-meta">'+html(detail)+'</div>'+
   '<div class="shopping-store-chip">'+(x.store==='grandfrais'?'🥬 Grand Frais':'🛒 Carrefour')+'</div></div>'+
@@ -1105,7 +1111,7 @@ function editShoppingItemModal(id){
  '<option value="grandfrais" '+(x.store==='grandfrais'?'selected':'')+'>Grand Frais</option></select></div>'+
  '<button class="btn secondary wide" data-action="home-stock" data-id="'+html(x.id)+'">'+(stock?'🏠 Modifier le stock · '+html(quantity(x.stockAmount,x.stockUnit)):'🏠 Renseigner le stock maison')+'</button>';
  if(x.manualExtraIds?.length)out+='<button class="btn secondary wide" style="margin-top:9px" data-action="edit-manual-row" data-id="'+html(x.id)+'">✎ Modifier la quantité ajoutée manuellement</button>';
- out+='<button class="btn secondary wide" style="margin-top:9px" data-action="exclude" data-id="'+html(x.id)+'">Retirer des achats de cette semaine</button>';
+ out+='<button class="btn secondary wide" style="margin-top:9px" data-action="exclude" data-id="'+html(x.id)+'">Retirer de la liste (sans achat)</button>';
  showModal('Gérer un achat',out);
 }
 function renderCourses(){
@@ -1117,21 +1123,21 @@ function renderCourses(){
   carrefour=active.filter(x=>x.store==='carrefour'),
   grand=active.filter(x=>x.store==='grandfrais');
  const order=['Fruits et légumes','Viandes et poissons','Produits frais','Épicerie et divers','Hygiène et maison'];
- let out=pageHeading('Achats de la semaine','Mes courses','Les ingrédients arrivent ici quand tu génères les courses depuis les menus de la semaine choisie.');
+ let out=pageHeading('Achats de la semaine','Mes courses','À acheter : tes articles prévus. Coche « Acheté » seulement une fois l’achat effectué. Pour enlever un article sans l’acheter, utilise « Modifier » puis « Retirer ».');
  out+=weekSwitcher()+courseGenerationBanner(w,'courses');
  const progressTotal=active.length+checked.length,progressPct=progressTotal?Math.round(checked.length/progressTotal*100):0;
  out+='<div class="course-v33-progress" role="group" aria-label="Progression des courses"><div class="course-v33-progress-head"><strong>Avancement des courses</strong><span>'+
   checked.length+' / '+progressTotal+' acheté'+(checked.length>1?'s':'')+'</span></div>'+
   '<div class="course-v33-progress-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="'+progressPct+'" aria-valuetext="'+checked.length+' articles sur '+progressTotal+'" aria-label="Articles achetés"><span style="width:'+progressPct+'%"></span></div>'+
-  '<p>'+(progressTotal===0?'Aucun article à acheter pour le moment.':progressPct===100?'✓ Tous les achats prévus sont cochés.':
+  '<p>'+(progressTotal===0?'Aucun article à acheter pour le moment.':progressPct===100?'✓ Tous les achats prévus sont achetés.':
    active.length+' article'+(active.length>1?'s':'')+' restant'+(active.length>1?'s':'')+' à acheter.')+'</p></div>';
  out+='<div class="course-summary"><div class="course-shop-count carrefour"><strong>'+carrefour.length+'</strong><span>🛒 Carrefour Drive</span></div>'+
  '<div class="course-shop-count grand"><strong>'+grand.length+'</strong><span>🥬 Grand Frais</span></div></div>';
- out+='<button class="btn wide course-add-btn" data-action="add-extra">＋ Ajouter un article à cette semaine</button>';
+ out+='<button class="btn wide course-add-btn v37-bulk-main" data-action="v37-open-bulk">☑ Ajouter plusieurs articles aux courses</button>'+ '<p class="helper v37-bulk-intro">Tous tes ingrédients et achats du quotidien · quantités réglables · ajout en une fois.</p>';
  const favorites=frequentCatalogueItems();
  if(favorites.length){
   out+='<details class="course-optional" data-section="favorites" '+(courseOpenSections.has('favorites')?'open':'')+'><summary>☆ Mes achats fréquents <span class="pill gray">'+favorites.length+'</span></summary>'+
-   '<p class="helper">Ajoute un article d’un geste ou sélectionne plusieurs achats.</p>'+ '<button class="btn secondary wide v36-bulk-open" data-action="bulk-favorites">☑ Ajouter plusieurs achats d’un coup</button><div class="favorites">'+
+   '<p class="helper">Ajoute ponctuellement un favori, ou sélectionne-en plusieurs avec le bouton plus haut.</p><div class="favorites">'+
    favorites.map(x=>'<button class="favorite-chip" data-action="frequent-to-courses" data-kind="'+x.kind+'" data-id="'+html(x.id)+'">＋ '+html(x.name)+'</button>').join('')+'</div></details>'
  }
  function section(store,title,icon,rows){
@@ -1152,13 +1158,13 @@ function renderCourses(){
  out+=section('carrefour','Carrefour Drive','🛒',carrefour);
  out+=section('grandfrais','Grand Frais','🥬',grand);
   
- if(checked.length)out+='<details class="course-optional" data-section="checked" '+(courseOpenSections.has('checked')?'open':'')+'><summary>✓ Articles cochés <span class="pill gray">'+checked.length+'</span></summary>'+
-  '<p class="helper">Décoche un article pour le remettre dans les achats.</p>'+checked.map(shoppingRow).join('')+'</details>';
+ if(checked.length)out+='<details class="course-optional" data-section="checked" '+(courseOpenSections.has('checked')?'open':'')+'><summary>✓ Articles achetés <span class="pill gray">'+checked.length+'</span></summary>'+
+  '<p class="helper">Décoche « Acheté » pour le remettre dans « À acheter ».</p>'+checked.map(shoppingRow).join('')+'</details>';
  if(covered.length||excluded.length){
-  out+='<details class="course-optional" data-section="home" '+(courseOpenSections.has('home')?'open':'')+'><summary>🏠 Déjà chez nous / retirés <span class="pill gray">'+(covered.length+excluded.length)+'</span></summary>'+
+  out+='<details class="course-optional" data-section="home" '+(courseOpenSections.has('home')?'open':'')+'><summary>🏠 Stock maison et articles retirés <span class="pill gray">'+(covered.length+excluded.length)+'</span></summary>'+
    (covered.length?'<p class="helper">Couverts par votre stock : corrige la quantité si nécessaire.</p>'+
      covered.map(x=>'<div class="course-house-row"><span class="grow"><strong>'+html(x.name)+'</strong><small> · '+html(quantity(x.stockAmount,x.stockUnit))+' disponible</small></span><div class="course-house-actions"><button class="btn tiny secondary" data-action="home-stock" data-id="'+html(x.id)+'">Modifier le stock</button>'+manualEditControl(x,true)+'</div></div>').join(''):'')+
-   (excluded.length?'<p class="helper">Retirés manuellement des achats de cette semaine.</p>'+
+   (excluded.length?'<p class="helper">Retirés de la liste, mais pas déclarés achetés. Utilise « Réintégrer » si nécessaire.</p>'+
      excluded.map(x=>'<div class="course-house-row"><span class="grow">'+html(x.name)+'</span><div class="course-house-actions"><button class="btn tiny secondary" data-action="include" data-id="'+html(x.id)+'">Réintégrer</button>'+manualEditControl(x,true)+'</div></div>').join(''):'')+'</details>'
  }
 
@@ -1443,14 +1449,130 @@ function extraSearchResults(term=''){
   '<span class="grow"><strong>'+html(x.name)+'</strong><small>'+(x.kind==='ingredient'?'Ingrédient':'Quotidien')+
   ' · '+(x.store==='grandfrais'?'Grand Frais':'Carrefour')+(x.frequent?' · ☆ fréquent':'')+'</small></span><span aria-hidden="true">＋</span></button>').join('');
 }
-function extraModal(){
- let out='<p class="helper">Choisis un produit enregistré : sa quantité habituelle et son magasin seront repris automatiquement. Les achats restent ponctuels à cette semaine.</p>'+
- '<div class="field"><label for="courseAddSearch">Rechercher dans mes produits</label>'+
- '<input id="courseAddSearch" class="text-input" placeholder="Ex. dentifrice, lait, pommes…" autocomplete="off"></div>'+
- '<div id="courseAddSearchResults" class="course-search-results">'+extraSearchResults()+'</div>'+
- '<button class="btn secondary wide course-one-off" data-action="extra-one-off">＋ Article ponctuel, hors catalogue</button>';
- showModal('Ajouter aux courses',out);
+
+/* V37 — sélectionner et quantifier tous les ingrédients et achats du quotidien.
+   Les nouvelles lignes utilisent le format extras déjà synchronisé par Firebase. */
+function bulkCatalogueV37(){
+ const linked=new Set((state.ingredientCatalog||[]).map(i=>i.productId).filter(Boolean));
+ const items=[
+  ...(state.ingredientCatalog||[]).map(i=>{
+   const unit=preferredIngredientUnit(i);
+   const matching=state.recipes.flatMap(r=>r.ingredients||[]).find(line=>
+    (line.ingredientId===i.id||norm(line.name)===norm(i.name))&&line.unit===unit&&Number(line.qty)>0);
+   return {kind:'ingredient',id:i.id,name:i.name,store:ingredientStore(i),frequent:!!i.frequent,
+    qty:Number(i.qty)>0?Number(i.qty):Number(matching?.qty)>0?Number(matching.qty):1,unit}
+  }),
+  ...(state.products||[]).filter(p=>!linked.has(p.id)).map(p=>({
+   kind:'daily',id:p.id,name:p.name,
+   store:state.storePreferences?.['product:'+p.id]||p.store||'carrefour',
+   frequent:!!p.frequent,qty:Number(p.qty)>0?Number(p.qty):1,unit:units.includes(p.unit)?p.unit:'pièce'
+  }))
+ ];
+ return items.sort((a,b)=>Number(b.frequent)-Number(a.frequent)||
+   a.name.localeCompare(b.name,'fr',{sensitivity:'base'})||a.kind.localeCompare(b.kind))
 }
+function bulkPurchaseExtraV37(kind,id,amount,unit){
+ const ingredient=kind==='ingredient',item=ingredient?ingredientById(id):kind==='daily'?productById(id):null;
+ if(!item||!Number.isFinite(amount)||amount<=0||amount>100000||!units.includes(unit))return null;
+ return {id:uid(),name:item.name,qty:amount,unit,
+  productId:ingredient?(item.productId||null):item.id,
+  ingredientId:ingredient?item.id:null,fromCatalogue:true}
+}
+function openBulkCatalogueV37(favoritesOnly=false){
+ const items=bulkCatalogueV37();
+ if(!items.length){toast('Ajoute d’abord des produits ou ingrédients dans ton catalogue.');return}
+ let out='<p class="helper">Sélectionne plusieurs articles, règle leur quantité et ajoute tout en une fois. Ingrédients et achats du quotidien sont réunis ici.</p>'+
+ '<div class="v37-bulk-filters"><div class="field"><label for="v37BulkSearch">Rechercher un article</label>'+
+ '<input id="v37BulkSearch" type="search" autocomplete="off" placeholder="Ex. lait, pâtes, sopalin…"></div>'+
+ '<div class="field"><label for="v37BulkFilter">Afficher</label>'+
+ '<select id="v37BulkFilter"><option value="all">Tous les produits</option>'+
+ '<option value="frequent" '+(favoritesOnly?'selected':'')+'>Mes achats fréquents</option>'+
+ '<option value="carrefour">Carrefour Drive</option><option value="grandfrais">Grand Frais</option></select></div></div>'+
+ '<div class="v37-bulk-toolbar"><button class="btn tiny secondary" data-action="v37-bulk-all">Sélectionner les résultats</button>'+
+ '<button class="btn tiny ghost" data-action="v37-bulk-none">Tout désélectionner</button></div>'+
+ '<div class="v37-bulk-results" aria-live="polite"><span id="v37BulkVisible"></span></div>'+
+ '<div class="v37-bulk-list">';
+ const existing=shopping();
+ out+=items.map(x=>{
+  const matched=existing.some(row=>(x.kind==='ingredient'&&row.ingredientId===x.id)||
+   (x.kind==='daily'&&row.productId===x.id));
+  return '<div class="v37-bulk-item" data-v37-row data-kind="'+x.kind+'" data-id="'+html(x.id)+
+   '" data-store="'+html(x.store)+'" data-frequent="'+x.frequent+'" data-search="'+html(norm(x.name))+'">'+
+   '<label class="v37-bulk-choice"><input type="checkbox" data-v37-select aria-label="Sélectionner '+html(x.name)+'">'+
+   '<span class="v37-bulk-item-info"><strong>'+html(x.name)+'</strong><small>'+
+   (x.kind==='ingredient'?'🥕 Ingrédient':'🛍️ Achat du quotidien')+' · '+
+   (x.store==='grandfrais'?'Grand Frais':'Carrefour Drive')+
+   (matched?' · déjà dans les courses (quantités cumulées)':'')+'</small></span></label>'+
+   '<div class="v37-bulk-amount"><button type="button" class="v37-bulk-step" data-action="v37-qty-minus" aria-label="Diminuer la quantité de '+html(x.name)+'">−</button>'+
+   '<input type="number" inputmode="decimal" min="0.01" max="100000" step="any" data-v37-qty value="'+html(x.qty)+'" aria-label="Quantité de '+html(x.name)+'">'+
+   '<button type="button" class="v37-bulk-step" data-action="v37-qty-plus" aria-label="Augmenter la quantité de '+html(x.name)+'">＋</button>'+
+   '<select data-v37-unit aria-label="Unité de '+html(x.name)+'">'+selectOptions(units,x.unit)+'</select></div></div>';
+ }).join('');
+ out+='</div><div class="v37-bulk-footer"><div class="v37-bulk-status" id="v37BulkStatus">Aucun article sélectionné</div>'+
+ '<button class="btn wide" data-action="v37-bulk-add" id="v37BulkSubmit" disabled>Ajouter aux courses</button>'+
+ '<button class="btn ghost wide v37-bulk-exceptional" data-action="extra-one-off">＋ Article ponctuel, hors catalogue</button></div>';
+ showModal('🛒 Ajouter des articles',out);
+ modalRoot.querySelector('.modal')?.classList.add('v37-bulk-modal');
+ filterBulkV37()
+}
+function filterBulkV37(){
+ const query=norm($('#v37BulkSearch')?.value||''),scope=$('#v37BulkFilter')?.value||'all';
+ let visible=0;
+ modalRoot.querySelectorAll('[data-v37-row]').forEach(row=>{
+  const show=(!query||row.dataset.search.includes(query))&&
+   (scope==='all'||(scope==='frequent'?row.dataset.frequent==='true':row.dataset.store===scope));
+  row.hidden=!show;if(show)visible++
+ });
+ const result=$('#v37BulkVisible');
+ if(result)result.textContent=visible+' résultat'+(visible>1?'s':'')+(visible===0?' · aucune correspondance':'');
+ updateBulkV37()
+}
+function updateBulkV37(){
+ const checked=modalRoot.querySelectorAll('[data-v37-row] [data-v37-select]:checked').length;
+ const submit=$('#v37BulkSubmit'),label=$('#v37BulkStatus');
+ if(submit){submit.disabled=!checked;submit.textContent=checked?'＋ Ajouter '+checked+' article'+(checked>1?'s':'')+' aux courses':'Ajouter aux courses'}
+ if(label)label.textContent=checked+' article'+(checked>1?'s':'')+' sélectionné'+(checked>1?'s':'');
+}
+function stepBulkV37(row,direction){
+ const input=row?.querySelector('[data-v37-qty]'),unit=row?.querySelector('[data-v37-unit]')?.value;
+ if(!input||![-1,1].includes(direction))return;
+ const jump=['g','ml'].includes(unit)?100:['cl'].includes(unit)?10:1;
+ const original=Number(input.value);
+ const current=Number.isFinite(original)&&original>0?original:jump;
+ const result=Math.round((current+direction*jump)*100)/100;
+ const minimum=['pièce','paquet','boîte','rouleau','bouteille','pot','sachet','g','ml'].includes(unit)?1:0.01;
+ input.value=String(Math.max(minimum,Math.min(100000,result)));
+ row.querySelector('[data-v37-select]').checked=true;
+ updateBulkV37()
+}
+function commitBulkV37(){
+ const selected=[...modalRoot.querySelectorAll('[data-v37-row]')].filter(row=>row.querySelector('[data-v37-select]')?.checked);
+ if(!selected.length){toast('Sélectionne au moins un article.');return}
+ const staged=[];
+ for(const row of selected){
+  const raw=row.querySelector('[data-v37-qty]')?.value||'',
+   amount=raw.trim()===''?NaN:Number(raw),unit=row.querySelector('[data-v37-unit]')?.value;
+  const extra=bulkPurchaseExtraV37(row.dataset.kind,row.dataset.id,amount,unit);
+  if(!extra){toast('Vérifie la quantité et l’unité de '+(row.querySelector('strong')?.textContent||'cet article')+'.');return}
+  staged.push(extra)
+ }
+ const current=getWeek(),before=weekBeforeUndo(),beforeRows=shopping();
+ const affected=new Set(beforeRows.filter(row=>staged.some(extra=>
+   (extra.ingredientId&&row.ingredientId===extra.ingredientId)||
+   (extra.productId&&row.productId===extra.productId))).map(row=>row.id));
+ current.extras.push(...staged);
+ // Un nouvel achat ne doit jamais rester automatiquement marqué « acheté » ou « retiré ».
+ const afterRows=shopping();
+ afterRows.forEach(row=>{if(staged.some(extra=>
+  (extra.ingredientId&&row.ingredientId===extra.ingredientId)||
+  (extra.productId&&row.productId===extra.productId)))affected.add(row.id)});
+ current.checked=current.checked.filter(id=>!affected.has(id));
+ current.excluded=current.excluded.filter(id=>!affected.has(id));
+ persist();closeModal();tabScrollV33.courses=0;switchTabV33('courses');
+ toastWeekUndo(staged.length+' article'+(staged.length>1?'s':'')+' ajouté'+(staged.length>1?'s':'')+' aux courses.',before)
+}
+
+function extraModal(){return openBulkCatalogueV37()}
 function extraOneOffModal(){
  const out='<p class="helper">Pour un achat exceptionnel, sans nouvelle fiche dans Produits. Pour un article habituel, utilise la recherche du catalogue.</p>'+
  '<form id="extraForm"><div class="field"><label for="extraName">Nom de l’article</label><input id="extraName" maxlength="80" required placeholder="Ex. cadeau, fournitures…"></div>'+
@@ -1841,7 +1963,7 @@ document.addEventListener('click',e=>{
   else if(mode==='generate-week-courses'){
    const w=getWeek(),status=coursesStatus(w);
    if(!hasCookedMeals(w)){toast('Ajoute d’abord un plat aux menus de cette semaine.');return}
-   if(status!=='not-generated'&&!confirm('Régénérer les ingrédients des recettes pour cette semaine ? Les nouveaux menus remplaceront les anciens besoins de recettes dans Courses. Les ajouts manuels, le stock maison, les articles cochés et les exclusions seront conservés.'))return;
+   if(status!=='not-generated'&&!confirm('Régénérer les ingrédients des recettes pour cette semaine ? Les nouveaux menus remplaceront les anciens besoins de recettes dans Courses. Les ajouts manuels, le stock maison, les articles marqués achetés et les articles retirés seront conservés.'))return;
    checkpoint('Avant génération des courses de la semaine');
    generateWeekCourses(w);persist();tabScrollV33.courses=0;switchTabV33('courses');
    toast('Courses de la semaine générées : Carrefour et Grand Frais sont prêts !')
@@ -2010,11 +2132,21 @@ document.addEventListener('click',e=>{
   }
   else if(mode==='complete-week')populate();
   else if(mode==='repeat-week'){const prev=state.weeks[offsetDate(currentWeek,-7)];if(!prev?.meals?.some(Boolean)){toast('Aucun menu trouvé la semaine précédente.');return}if(w.meals.some(Boolean)&&!confirm('Remplacer les repas de cette semaine ?'))return;w.meals=JSON.parse(JSON.stringify(prev.meals));persist();render();toast('Menus de la semaine précédente repris !')}
-  else if(mode==='add-extra')extraModal();
+  else if(mode==='add-extra'||mode==='v37-open-bulk')openBulkCatalogueV37();
+   else if(mode==='v37-bulk-all'||mode==='v37-bulk-none'){
+    modalRoot.querySelectorAll('[data-v37-row]').forEach(row=>{
+     if(mode==='v37-bulk-none'||!row.hidden)
+      row.querySelector('[data-v37-select]').checked=mode==='v37-bulk-all'
+    });
+    updateBulkV37()
+   }
+   else if(mode==='v37-qty-minus'||mode==='v37-qty-plus')
+    stepBulkV37(a.closest('[data-v37-row]'),mode==='v37-qty-plus'?1:-1);
+   else if(mode==='v37-bulk-add')commitBulkV37();
   else if(mode==='extra-one-off')extraOneOffModal();
   else if(mode==='select-extra-catalogue')unifiedToCourses(a.dataset.kind,id);
   else if(mode==='frequent-to-courses')unifiedToCourses(a.dataset.kind,id);
-   else if(mode==='bulk-favorites')bulkFavoritesV36();
+   else if(mode==='bulk-favorites')openBulkCatalogueV37(true);
    else if(mode==='bulk-select-all'||mode==='bulk-select-none'){
     document.querySelectorAll('[data-v36-favorite]:not(:disabled)').forEach(cb=>{cb.checked=mode==='bulk-select-all'});
     updateBulkFavoritesCountV36()
@@ -2069,6 +2201,14 @@ document.addEventListener('click',e=>{
   else if(mode==='clear-all'){if(confirm('Effacer toutes les données actuelles ? Une copie locale sera conservée dans les versions précédentes.')){checkpoint('Avant effacement');state=baseState();persist();closeModal();render();toast('Données actuelles effacées.')}}
 });
 document.addEventListener('change',e=>{
+  if(e.target.matches('[data-v37-select]')){updateBulkV37();return}
+  if(e.target.id==='v37BulkFilter'){filterBulkV37();return}
+  if(e.target.matches('[data-v37-unit]')){
+   const box=e.target.closest('[data-v37-row]')?.querySelector('[data-v37-select]');
+   if(box)box.checked=true;
+   updateBulkV37();return
+  }
+  if(e.target.matches('[data-v37-qty]')){const row=e.target.closest('[data-v37-row]');if(row)row.querySelector('[data-v37-select]').checked=true;updateBulkV37();return}
   if(e.target.matches('[data-v36-favorite]')){updateBulkFavoritesCountV36();return}
  if(e.target.id==='catalogueStore'){$('#catalogueReferencePanel')?.toggleAttribute('hidden',e.target.value==='grandfrais');return}
  if(e.target.id==='mealRecipeType'){refreshMealRecipePicker();return}
@@ -2098,6 +2238,7 @@ document.addEventListener('change',e=>{
  }
  }else if(e.target.matches('[data-store-item]')){const item=e.target.dataset.storeItem,store=e.target.value;closeModal();setShoppingStore(item,store)}else if(e.target.matches('[data-check]')){const w=getWeek(),id=e.target.dataset.check;w.checked=e.target.checked?[...new Set([...w.checked,id])]:w.checked.filter(x=>x!==id);persist();render(true)}else if(e.target.id==='importFile')importData(e.target.files?.[0])});
 document.addEventListener('input',e=>{
+  if(e.target.id==='v37BulkSearch'){filterBulkV37();return}
  if(e.target.id==='courseAddSearch'){const results=$('#courseAddSearchResults');if(results)results.innerHTML=extraSearchResults(e.target.value);return}
  if(e.target.id==='mealRecipeSearch'){refreshMealRecipePicker();return}
  if(e.target.id==='homeStockAmount')refreshStockPreview();if(e.target.matches?.('.ingredient-name'))refreshIngredientEntry(e.target.closest('.ingredient-line'));if(e.target.matches?.('.ingredient-unit'))e.target.closest('.ingredient-line').dataset.unitSelected='true';if(e.target.id==='recipeSearch'){search=e.target.value;const result=$('#recipeResults'),count=$('#recipeCount');if(result)result.innerHTML=recipeRows();if(count)count.textContent=visibleRecipes().length+' / '+state.recipes.length+' plats'}else if(e.target.id==='productSearch'){productSearch=e.target.value;const result=$('#catalogueResults'),count=$('#catalogueCount');if(result)result.innerHTML=unifiedCatalogueRows();if(count){const n=unifiedCatalogueItems().length;count.textContent=n+' produit'+(n>1?'s':'')}}});

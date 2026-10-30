@@ -641,3 +641,98 @@
 @media(prefers-reduced-motion:reduce){
  .v36-calendar-day,.recipe-card,.day-card,.course-store{transition:none}
 }
+
+/* V37 — cartes de plats compactes et lisibles sur iPhone.
+   Supprime la disposition verticale historique des boutons. */
+.recipe-card.v37-recipe-card{
+ display:flex;flex-direction:column;align-items:stretch;justify-content:flex-start;
+ gap:8px;padding:11px 12px;margin-bottom:9px;min-height:0;height:auto;
+ border-radius:16px;background:#fff
+}
+.v37-recipe-card .recipe-preview-trigger{
+ display:flex;align-items:center;flex:none;width:100%;min-width:0;gap:12px;text-align:left
+}
+.v37-recipe-card .recipe-preview-trigger .recipe-img{
+ flex:0 0 61px;width:61px;height:61px;border-radius:12px
+}
+.v37-recipe-card .recipe-preview-copy{flex:1;gap:3px}
+.v37-recipe-card .recipe-preview-name{font-size:14px}
+.v37-recipe-card .recipe-preview-meta{font-size:11px}
+.v37-recipe-card .pill.gray{padding:5px 9px;font-size:10px}
+.v37-recipe-card .recipe-actions.v37-recipe-actions{
+ display:flex;grid-column:auto;flex-direction:row;flex-wrap:nowrap;
+ align-items:center;justify-content:flex-start;align-self:stretch;
+ width:100%;min-height:0;gap:7px;margin:0;padding:8px 0 0;
+ border-top:1px solid #e9efe7
+}
+.v37-recipe-actions .btn,
+.v37-recipe-actions .btn.tiny{
+ display:inline-flex;align-items:center;justify-content:center;flex:0 1 auto;
+ min-width:0;min-height:34px;margin:0;padding:7px 10px;font-size:11px;
+ white-space:nowrap;border-radius:10px
+}
+.v37-recipe-actions .v36-recipe-plan{
+ margin-right:auto;background:#e9f4e9;border-color:#cce3d0;color:#286645
+}
+.v37-recipe-edit{background:#fff}
+@media(max-width:380px){
+ .recipe-card.v37-recipe-card{gap:6px;padding:10px}
+ .v37-recipe-card .recipe-preview-trigger .recipe-img{width:55px;height:55px;flex-basis:55px}
+ .v37-recipe-actions .btn,.v37-recipe-actions .btn.tiny{font-size:10px;padding:7px 7px;gap:4px}
+}
+/* V37 — shopping : la coche est explicitement l'état Acheté, jamais une sélection. */
+.v37-purchase-action{
+ flex:0 0 auto;min-width:57px;display:flex;flex-direction:column;
+ align-items:center;justify-content:flex-start;gap:4px;cursor:pointer;
+ color:#58715f;font-size:10px;font-weight:750;line-height:1.25;text-align:center
+}
+.v37-purchase-action .check{margin:1px 0 0}
+.shopping-row.checked .v37-purchase-action{color:#216640}
+.shopping-row.shopping-clean:has(.v37-purchase-action){align-items:center;gap:8px}
+.v37-bulk-intro{font-size:11px;line-height:1.4;margin:-5px 3px 12px}
+.v37-catalogue-add{margin:4px 0 13px;min-height:45px;background:#edf6ec}
+.v37-bulk-main{min-height:48px}
+.modal.v37-bulk-modal{max-height:94dvh;padding-bottom:calc(12px + env(safe-area-inset-bottom))}
+.v37-bulk-filters{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);gap:9px;margin:12px 0 6px}
+.v37-bulk-filters .field{min-width:0;margin:0}
+.v37-bulk-filters label{font-size:11px}
+.v37-bulk-filters input,.v37-bulk-filters select{
+ width:100%;min-width:0;min-height:43px;border:1px solid #d6e4d8;border-radius:11px;
+ background:#fff;color:#294c37;padding:8px 9px;font-size:16px
+}
+.v37-bulk-toolbar{display:flex;justify-content:space-between;align-items:center;gap:7px;margin:11px 0 8px}
+.v37-bulk-toolbar .btn{font-size:11px}
+.v37-bulk-results{font-size:11px;font-weight:750;color:#52725d;margin:5px 0 8px}
+.v37-bulk-list{display:flex;flex-direction:column;gap:7px;max-height:42dvh;overflow-y:auto;
+ overscroll-behavior:contain;padding:1px 2px 10px}
+.v37-bulk-item{display:flex;flex-direction:column;gap:10px;border:1px solid #e1e9df;
+ border-radius:13px;background:#fff;padding:10px 11px;min-height:92px}
+.v37-bulk-item[hidden]{display:none!important}
+.v37-bulk-item:has([data-v37-select]:checked){border-color:#7da68a;background:#eef7ec}
+.v37-bulk-choice{display:flex;align-items:flex-start;gap:9px;cursor:pointer;min-width:0}
+.v37-bulk-choice input{appearance:auto;accent-color:#287148;width:20px;height:20px;flex:0 0 20px;margin:1px 0 0}
+.v37-bulk-item-info{display:flex;flex-direction:column;gap:4px;min-width:0}
+.v37-bulk-item-info strong{font-size:13px;line-height:1.35;overflow-wrap:anywhere}
+.v37-bulk-item-info small{font-size:10px;color:#728275;line-height:1.4}
+.v37-bulk-amount{display:grid;grid-template-columns:31px minmax(52px,72px) 31px minmax(82px,1fr);
+ gap:6px;align-items:center;padding-left:28px}
+.v37-bulk-amount input,.v37-bulk-amount select{
+ width:100%;min-width:0;min-height:37px;border:1px solid #cfe1d0;background:#fff;
+ border-radius:9px;text-align:center;padding:5px;font-size:16px;color:#224b32
+}
+.v37-bulk-amount select{text-align:left;padding:5px 4px}
+.v37-bulk-step{display:grid;place-items:center;border:1px solid #cfe1d0;border-radius:9px;
+ background:#f5faf3;color:#1e6241;font-size:17px;font-weight:750;min-height:37px;cursor:pointer}
+.v37-bulk-footer{position:sticky;bottom:calc(-12px - env(safe-area-inset-bottom));z-index:2;
+ padding:10px 2px calc(9px + env(safe-area-inset-bottom));margin-top:6px;
+ background:#fbfaf6;border-top:1px solid #dfe9df;box-shadow:0 -10px 15px #fbfaf6e8}
+.v37-bulk-status{font-size:12px;font-weight:800;text-align:center;color:#376b4a;margin:2px 0 8px}
+.v37-bulk-footer .btn{min-height:45px}
+.v37-bulk-exceptional{min-height:36px!important;margin-top:3px;font-size:11px;color:#52775b}
+@media(max-width:380px){
+ .v37-bulk-amount{grid-template-columns:28px 57px 28px minmax(70px,1fr);padding-left:0;gap:5px}
+ .v37-bulk-filters{gap:6px}
+ .v37-bulk-toolbar .btn{padding:8px 7px}
+ .v37-bulk-list{max-height:40dvh}
+}
+@media(prefers-reduced-motion:reduce){.v37-bulk-step,.v37-recipe-card{transition:none}}

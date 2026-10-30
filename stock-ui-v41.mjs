@@ -54,10 +54,16 @@ export function renderStockV41({state,week,weekId,view='home',recipeById,mealDis
    }
    for(const leftover of (typeof mealLeftovers==='function'?mealLeftovers(meal):[])){
     const source=recipeById(leftover.recipeId),prepared=actions[leftover.fromIndex+':'+leftover.recipeId];
+    const leftoverKey=i+':leftovers:'+leftover.fromIndex+':'+leftover.recipeId;
+    const completed=actions[leftoverKey];
     entries.push(row('🍱 Restes : '+(source?.name||'Plat préparé'),
       days[Math.floor(i/2)]+' '+(i%2?'soir':'midi')+' · '+leftover.people+' portion'+(leftover.people>1?'s':'')+
       ' · sans nouvelle déduction d’ingrédients',
-      '<span class="v41-stock-info">'+(prepared?'Préparés':'À préparer')+'</span>'));
+      completed?'<span class="v41-stock-done">✓ Mangé</span>':
+      '<div class="v41-stock-actions"><span class="v41-stock-info">'+
+      (prepared?.status==='eaten'?'Déjà cuisinés':'À préparer')+'</span>'+
+      '<button class="btn tiny" data-action="v41-eat-leftovers" data-index="'+i+
+      '" data-source="'+leftover.fromIndex+'" data-id="'+escape(leftover.recipeId)+'">C’est mangé</button></div>'));
    }
    if(meal?.type==='ordered')entries.push(row('🍕 Repas libre ou commandé',
     days[Math.floor(i/2)]+' '+(i%2?'soir':'midi')+' · aucun ingrédient à acheter',

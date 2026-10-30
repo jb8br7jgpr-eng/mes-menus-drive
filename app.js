@@ -281,6 +281,7 @@ function planRecipeV36(recipeId){
 function commitPlannedRecipeV36(recipeId,index,portions){
  if(!Number.isInteger(index)||index<0||index>13||!Number.isInteger(portions)||portions<1||portions>30)return false;
  const w=getWeek(),before=weekBeforeUndo();
+ if(isMealDoneV41(w,index))return false;
  if(!addRecipeToMeal(w,index,recipeId,portions))return false;
  persist();closeModal();currentTab='menus';tabScrollV33.menus=0;renderMealContext(index);
  toastWeekUndo('Plat ajouté aux menus.',before,index);
@@ -1863,6 +1864,7 @@ function portionsEatenHere(d,dishes){
  if(prepared<=2)return prepared; // 1 ou 2 portions préparées : aucun reste, même avec plusieurs plats.
  return Math.min(prepared,prepared>=4?2:(dishes.length===1?2:1))
 }
+function isMealDoneV41(w,index){return Object.keys(w?.v41MealActions||{}).some(key=>key.startsWith(index+':'))}
 function sourceBudget(w,fromIndex,recipeId){
  if(w.v41MealActions?.[fromIndex+':'+recipeId]?.status==='frozen')return 0;
  const dishes=mealDishes(w.meals[fromIndex]);
@@ -1927,6 +1929,7 @@ function moveCopyMeal(w,source,target,mode){
  if(!Number.isInteger(source)||!Number.isInteger(target)||source===target||source<0||target<0||source>=w.meals.length||target>=w.meals.length)return false;
  const original=w.meals[source];if(!original)return false;
  const parts=mealParts(original),dishes=mealDishes(original),leftovers=mealLeftovers(original);
+ if(isMealDoneV41(w,source)||isMealDoneV41(w,target))return false;
  if(mode==='copy'&&!dishes.length)return false; // Les mêmes restes ne peuvent pas être consommés deux fois.
  if(mode==='copy'){
   clearMealWithPair(w,target);
@@ -2203,6 +2206,7 @@ document.addEventListener('click',e=>{
   else if(mode==='clear-day'){
    const day=Number(a.dataset.day);
    if(!Number.isInteger(day)||day<0||day>6||!w.meals[day*2]&&!w.meals[day*2+1])return;
+   if(isMealDoneV41(w,day*2)||isMealDoneV41(w,day*2+1)){toast('Cette journée contient un repas déjà validé dans le stock.');return}
    if(!confirm('Vider les repas du '+days[day]+' (midi et soir) ? Les éventuels restes liés à ces plats seront aussi retirés. Les recettes et les produits resteront enregistrés.'))return;
    checkpoint('Avant suppression des repas du '+days[day]);
    const before=weekBeforeUndo();clearCalendarDay(w,day);persist();render(true);
@@ -2210,6 +2214,7 @@ document.addEventListener('click',e=>{
   }
   else if(mode==='clear-week'){
    if(!w.meals.some(Boolean))return;
+   if(w.meals.some((_,i)=>isMealDoneV41(w,i))){toast('Impossible de vider une semaine qui contient des repas déjà validés dans le stock.');return}
    if(!confirm('Vider les 14 repas de la semaine du '+niceDate(currentWeek)+' ? Tu conserveras toutes tes recettes, tes produits et tes autres ajouts de courses.'))return;
    checkpoint('Avant suppression des repas de toute la semaine');
    clearCalendarWeek(w);persist();render();toast('Calendrier de la semaine vidé !')
@@ -2224,6 +2229,7 @@ document.addEventListener('click',e=>{
   else if(mode==='apply-meal-transfer'){
    const target=Number(a.dataset.target),action=a.dataset.mode;
    if(!Number.isInteger(target)||target<0||target>13||!w.meals[index])return;
+   if(isMealDoneV41(w,index)||isMealDoneV41(w,target)){toast('Repas validé : impossible de modifier un mouvement de stock déjà enregistré.');return}
    if(w.meals[target]&&!confirm('Le repas cible contient déjà des plats. Le remplacer ?'))return;
    if(action==='move'&&target>index){
     const earlier=w.meals.some((m,i)=>i>index&&i<=target&&mealLeftovers(m).some(x=>x.fromIndex===index));
@@ -2344,9 +2350,10 @@ document.addEventListener('click',e=>{
    row.querySelector('.ingredient-unit').value=preferredIngredientUnit(ing);
    refreshIngredientEntry(row);row.querySelector('.ingredient-qty')?.focus()
   }
-  else if(mode==='choose-recipe'){const portions=peopleInput(id);if(portions===null){toast('Choisis entre 1 et 30 portions.');return}if(!addRecipeToMeal(w,index,id,portions)){toast('Ce plat est déjà présent dans ce repas. Modifie plutôt ses portions.');return}persist();closeModal();renderMealContext(index)}
+  else if(mode==='choose-recipe'){if(isMealDoneV41(w,index)){toast('Ce repas a déjà été validé.');return}const portions=peopleInput(id);if(portions===null){toast('Choisis entre 1 et 30 portions.');return}if(!addRecipeToMeal(w,index,id,portions)){toast('Ce plat est déjà présent dans ce repas. Modifie plutôt ses portions.');return}persist();closeModal();renderMealContext(index)}
   else if(mode==='choose-leftovers')pickLeftoverSource(index);
   else if(mode==='apply-leftovers'){
+   if(isMealDoneV41(w,index)){toast('Ce repas a déjà été validé.');return}
    const source=Number(a.dataset.source),qty=Number($('#leftoverPeople')?.value);
    if(!Number.isInteger(qty)||qty<1||qty>30){toast('Choisis entre 1 et 30 portions de restes.');return}
    if(!addLeftoversToMeal(w,index,source,id,qty)){toast('Cette quantité de restes n’est plus disponible.');pickLeftoverSource(index);return}
@@ -2355,6 +2362,7 @@ document.addEventListener('click',e=>{
   else if(mode==='remove-leftover'){
    const li=Number(a.dataset.leftover),parts=mealParts(w.meals[index]),left=mealLeftovers(w.meals[index]);
    if(!Number.isInteger(li)||!left[li])return;
+   if(isMealDoneV41(w,index)){toast('Ce repas a déjà été validé.');return}
    const removed=left[li];
    const at=parts.findIndex(p=>p.type==='leftovers'&&p.recipeId===removed.recipeId&&p.fromIndex===removed.fromIndex);
    if(at>=0)parts.splice(at,1);
@@ -2363,22 +2371,25 @@ document.addEventListener('click',e=>{
   }
   else if(mode==='save-dish-portions'){
    const dishIndex=Number(a.dataset.dish),dishes=mealDishes(w.meals[index]),portions=portionInputForDish(dishIndex);
+   if(isMealDoneV41(w,index)){toast('Repas déjà validé dans le stock.');return}
    if(!Number.isInteger(dishIndex)||!dishes[dishIndex]||portions===null){toast('Choisis entre 1 et 30 portions.');return}
    dishes[dishIndex].people=portions;setMealDishes(w,index,dishes);persist();closeModal();renderMealContext(index);toast('Portions du plat enregistrées !')
   }
   else if(mode==='remove-dish'){
    const dishIndex=Number(a.dataset.dish),dishes=mealDishes(w.meals[index]);
+   if(isMealDoneV41(w,index)){toast('Repas déjà validé dans le stock.');return}
    if(!Number.isInteger(dishIndex)||!dishes[dishIndex])return;
    const before=weekBeforeUndo();dishes.splice(dishIndex,1);setMealDishes(w,index,dishes);persist();closeModal();renderMealContext(index);
    toastWeekUndo('Plat retiré.',before,index)
   }
   else if(mode==='remove-meal'){
    if(!w.meals[index])return;
+   if(isMealDoneV41(w,index)){toast('Ce repas a déjà été validé dans le stock.');return}
    const before=weekBeforeUndo();clearMealWithPair(w,index);persist();closeModal();renderMealContext(index);
    toastWeekUndo('Repas retiré.',before,index)
   }
   else if(mode==='complete-week')populate();
-  else if(mode==='repeat-week'){const prev=state.weeks[offsetDate(currentWeek,-7)];if(!prev?.meals?.some(Boolean)){toast('Aucun menu trouvé la semaine précédente.');return}if(w.meals.some(Boolean)&&!confirm('Remplacer les repas de cette semaine ?'))return;w.meals=JSON.parse(JSON.stringify(prev.meals));persist();render();toast('Menus de la semaine précédente repris !')}
+  else if(mode==='repeat-week'){const prev=state.weeks[offsetDate(currentWeek,-7)];if(!prev?.meals?.some(Boolean)){toast('Aucun menu trouvé la semaine précédente.');return}if(w.meals.some((_,i)=>isMealDoneV41(w,i))){toast('La semaine comporte déjà des repas validés dans le stock.');return}if(w.meals.some(Boolean)&&!confirm('Remplacer les repas de cette semaine ?'))return;w.meals=JSON.parse(JSON.stringify(prev.meals));persist();render();toast('Menus de la semaine précédente repris !')}
   else if(mode==='add-extra'||mode==='v37-open-bulk')openBulkCatalogueV37();
    else if(mode==='v37-bulk-all'||mode==='v37-bulk-none'){
     modalRoot.querySelectorAll('[data-v37-row]').forEach(row=>{

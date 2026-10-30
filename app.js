@@ -1062,16 +1062,16 @@ function stockPreview(x,amount,unit){
  const val=stockInputToBase(x,amount,unit);
  if(val===null)return 'Cette unité ne correspond pas au produit.';
  const need=x.totalNeedAmount||0,left=Math.max(0,need-val);
- let remaining='Reste à acheter : '+quantity(left,x.stockUnit);
+ let remaining='À acheter : '+quantity(left,x.stockUnit);
  const p=productById(x.productId);
  const [packValue,packUnit]=p?.packAmount>0?converted(p.packAmount,p.packUnit):[0,''];
  if(packValue>0&&packUnit===x.stockUnit){
   const packs=Math.ceil(Math.max(0,left)/packValue-1e-9);
   const label=p.unit||'paquet';
-  remaining+=' · '+packs+' '+label+(packs>1?'s':'')+' Carrefour';
+  remaining='À acheter : '+packs+' '+label+(packs>1?'s':'')+' Carrefour (besoin restant : '+quantity(left,x.stockUnit)+')';
  }
- if(left===0)remaining='✓ Vous avez déjà tout ce qu’il faut pour ce produit.';
- return 'Besoin : '+quantity(need,x.stockUnit)+' · Stock maison : '+quantity(val,x.stockUnit)+' · '+remaining
+ if(left===0)remaining='✓ Rien à acheter : le stock maison couvre les besoins.';
+ return remaining
 }
 function refreshStockPreview(){
  const id=$('#homeStockItemId')?.value,x=shopping().find(z=>z.id===id),amount=Number($('#homeStockAmount')?.value),unit=$('#homeStockUnit')?.value;

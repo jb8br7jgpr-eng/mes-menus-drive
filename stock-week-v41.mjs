@@ -88,6 +88,58 @@ export function planFrozenMealV41(weeks,stock,weekId,index,lotId,portions) {
   return updated;
 }
 
+// Reprendre une ancienne semaine : les recettes peuvent être rejouées mais les
+// portions congelées doivent TOUJOURS être réservées à nouveau. Une portion déjà
+// mangée la semaine précédente ne devient jamais une nouvelle portion disponible.
+export function repeatWeekMealsV41(weeks,stock,sourceWeekId,targetWeekId) {
+  if(sourceWeekId===targetWeekId || !weeks?.[sourceWeekId]?.meals ||
+     !weeks?.[targetWeekId]?.meals ||
+     !/^\\d{4}-\\d{2}-\\d{2}$/.test(targetWeekId))
+    throw Error('Semaines de planning invalides.');
+  let updated=copy(weeks),skippedFrozen=0,copiedFrozen=0;
+  updated[targetWeekId].meals=Array(14).fill(null);
+  // L'action ne doit jamais conserver une validation d'inventaire passée.
+  updated[targetWeekId].v41MealActions={};
+  for(let i=0;i<14;i++){
+    const meal=weeks[sourceWeekId].meals[i];
+    if(!meal)continue;
+    if(meal.type==='frozen'){
+      try{
+        updated=planFrozenMealV41(updated,stock,targetWeekId,i,meal.lotId,meal.portions);
+        copiedFrozen++;
+      }catch(_){skippedFrozen++}
+      continue
+    }
+    if(meal.type==='multi'&&Array.isArray(meal.dishes)){
+      // Les sous-plats congelés sont historiques et ne doivent pas se recopier
+      // silencieusement ; aucun sous-plat réservé sans contrôle des portions.
+      const keep=meal.dishes.filter(d=>d&&d.type!=='frozen').map(copy);
+      skippedFrozen+=meal.dishes.length-keep.length;
+      if(keep.length)updated[targetWeekId].meals[i]={type:'multi',dishes:keep};
+    }else{
+      updated[targetWeekId].meals[i]=copy(meal);
+      // Ne pas reprendre les drapeaux de consommation d'une semaine passée.
+      delete updated[targetWeekId].meals[i].consumed;
+      delete updated[targetWeekId].meals[i].completed;
+    }
+  }
+  // Les restes ne doivent jamais faire référence à une préparation absente.
+  const hasSource=(idx,id)=>{
+    const source=updated[targetWeekId].meals[idx];
+    return source?.type==='recipe'?source.recipeId===id:
+      source?.type==='multi'&&(source.dishes||[]).some(d=>d?.recipeId===id&&d.type!=='leftovers'&&d.type!=='frozen');
+  };
+  for(let i=0;i<14;i++){
+    const meal=updated[targetWeekId].meals[i];
+    if(meal?.type==='leftovers'&&!hasSource(meal.fromIndex,meal.recipeId))updated[targetWeekId].meals[i]=null;
+    if(meal?.type==='multi'){
+      const kept=meal.dishes.filter(d=>d.type!=='leftovers'||hasSource(d.fromIndex,d.recipeId));
+      updated[targetWeekId].meals[i]=kept.length?{type:'multi',dishes:kept}:null;
+    }
+  }
+  return {weeks:updated,skippedFrozen,copiedFrozen};
+}
+
 // Les courses représentent toujours le manque total, jamais un mélange de boîtes
 // et de pièces. L'arrondi au paquet reste la responsabilité du catalogue existant.
 export function shoppingShortfallsV41(lines,stock,ingredients=[],products=[]) {

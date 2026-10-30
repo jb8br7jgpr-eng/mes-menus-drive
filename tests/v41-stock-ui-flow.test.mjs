@@ -138,12 +138,12 @@ test('Repas congelé : réservation sans courses ni décompte, consommation une 
  ]}).stock;
  const f=fixture(stock);withInputs({...f.inputs,v41FrozenMealPortions:2});
  f.invoke('v41-replace-frozen',{index:4,id:'lot-pasta'});
- assert.equal(f.week.meals[4].type,'frozen');
- assert.equal(f.week.meals[4].portions,2);
+ assert.equal(f.ctx.getWeek().meals[4].type,'frozen');
+ assert.equal(f.ctx.getWeek().meals[4].portions,2);
  assert.equal(availableFreezerV41(f.state.stockV41,'pasta-dinner'),3);
  f.invoke('v41-eat-frozen',{index:4});
  assert.equal(availableFreezerV41(f.state.stockV41,'pasta-dinner'),1);
- assert.equal(f.week.v41MealActions['4:frozen'].status,'eaten');
+ assert.equal(f.ctx.getWeek().v41MealActions['4:frozen'].status,'eaten');
  const saved=f.saved;
  f.invoke('v41-eat-frozen',{index:4});
  assert.equal(f.saved,saved);

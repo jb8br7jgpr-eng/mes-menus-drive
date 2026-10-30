@@ -211,8 +211,10 @@ function mealCard(meal,i){
  let names=[],note='',classes='';
  if(meal?.type==='leftovers'){
   const r=meal.recipeId?recipeById(meal.recipeId):null;
+  const eaten=getWeek().v41MealActions?.[i+':leftovers:'+meal.fromIndex+':'+meal.recipeId];
   names=[r?'🍱 Restes : '+r.name:'🍱 Restes'];classes=' filled';
-  note=(meal.leftoverPortions||2)+' portion'+((meal.leftoverPortions||2)>1?'s':'')+' · sans nouvelles courses'
+  note=(meal.leftoverPortions||2)+' portion'+((meal.leftoverPortions||2)>1?'s':'')+
+    (eaten?' · ✓ mangés':' · sans nouvelles courses')
  }else if(meal?.type==='frozen'){
   const lot=state.stockV41?.freezer?.[meal.lotId],r=recipeById(meal.recipeId);
   names=['❄️ '+(r?.name||lot?.name||'Plat congelé')];classes=' filled';
@@ -2118,7 +2120,7 @@ document.addEventListener('click',e=>{
  }
  if(mode.startsWith('v41-')&&stockModulesV41?.actions.handleStockActionV41({
    mode,a,id,index,state,currentWeek,uid,units,toast,persist,render,renderMealContext,
-   closeModal,showModal,getWeek,recipeById,mealDishes,shopping,
+   closeModal,showModal,getWeek,recipeById,mealDishes,mealLeftovers,shopping,
    reconcileLeftovers,clearMealWithPair,selectRecipeForMeal,generateWeekCourses,
    freezerReservationsV41:stockModulesV41.week.freezerReservationsV41
  }))return;

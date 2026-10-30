@@ -9,7 +9,7 @@ const icons={'Pâtes':'🍝','Viande':'🥩','Poisson':'🐟','Légumes':'🥦',
 const units=['g','kg','ml','cl','l','pièce','paquet','boîte','rouleau','bouteille','pot','sachet'];
 const contentUnits=['g','kg','ml','cl','l','pièce','rouleau'];
 const baseState=()=>({schema:1,recipes:[],products:[],weeks:{},staples:[],storePreferences:{},ingredientCatalog:[],favoritesUnifiedV29:false,coursesExplicitGenerationV1:false,settings:{people:2}});
-let state=baseState(), currentTab='menus', currentWeek='', search='', recipeSort='az', recipeTypeFilter='all', productSearch='', productCategory='Toutes', ingredientStoreTab='carrefour', catalogueTypeFilter='all', catalogueStoreFilter='all', db=null, usingFallback=false;
+let state=baseState(), currentTab='menus', currentWeek='', search='', recipeSort='az', recipeTypeFilter='all', productSearch='', productCategory='Toutes', ingredientStoreTab='carrefour', catalogueTypeFilter='all', catalogueStoreFilter='all', catalogueCategoryFilter='all', db=null, usingFallback=false;
 let pendingRecipeDraftImage='',pendingIngredientLinkId=null;
 let independentProductsOpen=false;const courseOpenSections=new Set();
 let calendarMonthV36='';
@@ -347,7 +347,39 @@ function renderPlats(){
  return out
 }
 
-const productCategories=['Épicerie','Fruits et légumes','Viandes et poissons','Produits frais','Hygiène','Maison','Autres'];
+/* V39 — catégories détaillées, ordonnées par rayons. Elles ne modifient
+   ni les catégories des plats, ni les magasins, ni les références Carrefour. */
+const productCategoryGroups=[
+ ['Fruits, légumes et marché',['Fruits','Légumes','Herbes et aromates']],
+ ['Boucherie, charcuterie et poissonnerie',['Viandes','Volailles','Charcuterie','Poissons','Fruits de mer']],
+ ['Crémerie, œufs et produits frais',['Lait','Beurre et crème','Fromages','Yaourts et desserts frais','Œufs']],
+ ['Épicerie salée',['Pâtes, riz et féculents','Légumineuses','Conserves et bocaux','Sauces et condiments','Huiles et vinaigres','Épices et assaisonnements','Apéritifs salés']],
+ ['Épicerie sucrée et boulangerie',['Pains et boulangerie','Farines et pâtisserie','Céréales et petit-déjeuner','Biscuits et goûters','Chocolats et confiseries','Desserts et pâtisseries']],
+ ['Boissons',['Eaux et sodas','Jus et sirops','Café, thé et infusions']],
+ ['Surgelés et repas rapides',['Surgelés','Plats préparés']],
+ ['Entretien et maison',['Entretien et nettoyage','Papier et consommables','Cuisine et accessoires']],
+ ['Hygiène et soins',['Hygiène corporelle','Beauté et cosmétiques','Santé et parapharmacie']],
+ ['Famille et animaux',['Bébé et puériculture','Animaux']],
+ ['Divers',['Autres']]
+];
+const productCategoriesLegacy=['Épicerie','Fruits et légumes','Viandes et poissons','Produits frais','Hygiène','Maison'];
+const productCategories=[...new Set([...productCategoryGroups.flatMap(group=>group[1]),...productCategoriesLegacy])];
+function productCategoryOptions(selected='Autres'){
+ const name=String(selected||'Autres'),known=productCategories.includes(name);
+ let options=productCategoryGroups.map(([group,values])=>
+  '<optgroup label="'+html(group)+'">'+selectOptions(values,name)+'</optgroup>').join('');
+ if(!known||productCategoriesLegacy.includes(name)){
+  options+='<optgroup label="Catégorie précédente (conservée)"><option value="'+html(name)+'" selected>'+html(name)+'</option></optgroup>'
+ }
+ return options
+}
+function productCategoryChoices(){
+ const values=new Set([...(state.ingredientCatalog||[]),...(state.products||[])].map(p=>String(p.category||'Autres')));
+ return [...values].sort((a,b)=>productCategories.indexOf(a)-productCategories.indexOf(b)||a.localeCompare(b,'fr'))
+}
+function productCategoryGroupName(value){
+ return productCategoryGroups.find(([,values])=>values.includes(value))?.[0]||'Ancienne catégorie'
+}
 function productById(id){return (state.products||[]).find(p=>p.id===id)}
 function validCarrefourLink(raw){
   const value=String(raw||'').trim();if(!value)return '';
@@ -465,7 +497,7 @@ function catalogueEditor(kind,id=null,draft=null,linkedIngredientId=null){
   '<div class="field"><label for="catalogueStore">Magasin habituel</label><select id="catalogueStore">'+
   '<option value="carrefour" '+(store==='carrefour'?'selected':'')+'>Carrefour Drive</option>'+
   '<option value="grandfrais" '+(store==='grandfrais'?'selected':'')+'>Grand Frais</option></select></div>'+
-  '<div class="field"><label for="catalogueCategory">Catégorie</label><select id="catalogueCategory">'+selectOptions(productCategories,record.category||'Autres')+'</select></div>'+
+  '<div class="field"><label for="catalogueCategory">Rayon / catégorie de produit</label><select id="catalogueCategory">'+productCategoryOptions(record.category||'Autres')+'</select></div>'+
   (!isIngredient?'<div class="field v38-purchase-unit"><label for="catalogueUnit">Unité achetée (boîte, paquet, bouteille…)</label>'+
     '<select id="catalogueUnit">'+selectOptions(units,suggestedUnit)+'</select>'+
     '<p class="helper">C’est l’unité affichée dans les courses et utilisée pour le panier Carrefour. Si les œufs sont vendus en boîte, choisis « boîte », pas « pièce ».</p></div>':'')+
@@ -534,7 +566,7 @@ function saveUnifiedCatalogue(e){
    name=$('#catalogueName')?.value.trim(),store=$('#catalogueStore')?.value,category=$('#catalogueCategory')?.value,
    qty=Number($('#catalogueQty')?.value),unit=$('#catalogueUnit')?.value,frequent=Boolean($('#catalogueFrequent')?.checked);
  if(!['ingredient','daily'].includes(kind)||!name||!['carrefour','grandfrais'].includes(store)||!productCategories.includes(category)||
-   !Number.isFinite(qty)||qty<=0||!units.includes(unit)){toast('Vérifie le nom, le magasin, la catégorie et la quantité.');return}
+   !Number.isFinite(qty)||qty<=0||!units.includes(unit)||(!productCategories.includes(category)&&category!==old?.category)){toast('Vérifie le nom, le magasin, la catégorie et la quantité.');return}
  if(isIngredient){
   const duplicate=ingredientByName(name);
   if(duplicate&&duplicate.id!==old?.id){toast('Cet ingrédient existe déjà. Modifie sa fiche.');return}

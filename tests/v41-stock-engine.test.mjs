@@ -158,3 +158,27 @@ test('La sauvegarde Firebase V34 sait transporter le nouvel inventaire optionnel
  assert.ok(packed.bytes<8_000_000);
  assert.deepEqual(oldFormat,{schema:1,recipes:[],products:[],weeks:{},ingredientCatalog:[],settings:{people:2}});
 });
+
+test('Reprise ancien stock : la boîte de 6 œufs devient 6 pièces sans pertes ni doublons',()=>{
+ const week={pantry:{'produit:box6|boîte':1},pantryUnits:{}};
+ const preview=previewLegacyPantryV41(week,[{id:'oeufs',name:'Œufs',productId:'box6'}],[eggs]);
+ assert.equal(preview.requiresReview,false);
+ assert.equal(preview.entries.length,1);
+ assert.equal(preview.entries[0].identity,'ingredient:oeufs');
+ assert.equal(preview.entries[0].amount,6);
+ assert.equal(preview.entries[0].unit,'pièce');
+ const stocked=applyStockTransactionV41(emptyStockV41(),{id:'reprise-oeufs',
+  movements:preview.entries.map(row=>({type:'inventory',direction:'add',...row}))}).stock;
+ assert.equal(availableStockV41(stocked,'ingredient:oeufs','pièce'),6);
+ assert.equal(week.pantry['produit:box6|boîte'],1,'aucune modification historique');
+});
+
+test('Reprise ancien stock : grammes et paquets déjà convertis créent un avertissement de doublon',()=>{
+ const preview=previewLegacyPantryV41({pantry:{
+  'ingredient:oeufs|pièce':4,'produit:box6|boîte':1
+ }},[{id:'oeufs',name:'Œufs',productId:'box6'}],[eggs]);
+ assert.equal(preview.requiresReview,true);
+ assert.equal(preview.entries.length,2);
+ assert.equal(preview.entries.every(x=>x.requiresReview),true);
+ assert.match(preview.warnings.join(' '),/ne pas additionner automatiquement/);
+});

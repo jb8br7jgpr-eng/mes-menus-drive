@@ -1,13 +1,18 @@
 // Speedrive V41 — rendu seul du sixième onglet. Aucune écriture Firebase ici.
+import {freezerReservationsV41} from './stock-week-v41.mjs';
 const escape = x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const q = n=>Number(n||0).toLocaleString('fr-FR',{maximumFractionDigits:3});
-const capitalize = s=>String(s||'').trim();
 const days=['Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi','Dimanche'];
-const row=(name,description,content='')=>'<div class="v41-stock-row"><div class="grow"><strong>'+escape(name)+'</strong><small>'+escape(description)+'</small></div>'+content+'</div>';
+const row=(name,description,content='')=>'<div class="v41-stock-row" data-v41-stock-row><div class="grow"><strong>'+escape(name)+'</strong><small>'+escape(description)+'</small></div>'+content+'</div>';
 export function renderStockV41({state,week,weekId,view='home',recipeById,mealDishes}) {
  const stock=state.stockV41||{items:{},freezer:{}};
  const items=Object.values(stock.items||{}).filter(x=>Number(x.quantity)>0).sort((a,b)=>a.name.localeCompare(b.name,'fr'));
  const frozen=Object.values(stock.freezer||{}).filter(x=>Number(x.portions)>0).sort((a,b)=>a.name.localeCompare(b.name,'fr'));
+ const reserved=freezerReservationsV41(state.weeks||{});
+ const freePortions=lot=>Math.max(0,Number(lot.portions||0)-Number(reserved[lot.lotId]||0));
+ const search='<div class="v41-stock-search"><label for="v41StockSearch">Rechercher dans mon stock</label>'+
+   '<input id="v41StockSearch" type="search" autocomplete="off" placeholder="Ex. œufs, pâtes, chili…" aria-controls="v41StockResults">'+
+   '<small id="v41StockSearchCount" role="status" aria-live="polite"></small></div>';
  const active=name=>view===name?' is-selected':'';
  let out='<div class="v41-stock-head"><div class="eyebrow">Inventaire permanent</div><h1>Stock maison</h1><p class="muted">Tes produits et tes plats congelés, reliés aux menus et aux courses.</p></div>'+
  '<div class="v41-stock-segments" role="group" aria-label="Sections du stock">'+
@@ -19,14 +24,16 @@ export function renderStockV41({state,week,weekId,view='home',recipeById,mealDis
    '<button class="btn wide" data-action="v41-add-stock">＋ Ajouter un produit au stock</button>'+
    (!state.stockV41?'<p class="note">Ton nouvel inventaire est vide. Tu peux le remplir manuellement ou examiner la reprise du stock indiqué dans les anciennes courses.</p><button class="btn secondary wide" data-action="v41-preview-migration">Examiner mon ancien stock</button>':'');
   if(!items.length) out+='<div class="v41-empty">🏠 Aucun produit enregistré. Les achats validés pourront remplir ce stock.</div>';
-  else out+='<div class="v41-stock-list">'+items.map(x=>row(x.name,(x.category||'Autres')+' · '+(x.store==='grandfrais'?'Grand Frais':'Carrefour / maison'),
+  else out+=search+'<div class="v41-stock-list" id="v41StockResults">'+items.map(x=>row(x.name,(x.category||'Autres')+' · '+(x.store==='grandfrais'?'Grand Frais':'Carrefour / maison'),
    '<div class="v41-stock-qty">'+q(x.quantity)+' '+escape(x.unit)+'</div><button class="btn tiny secondary" data-action="v41-adjust-stock" data-identity="'+escape(x.identity)+'" data-unit="'+escape(x.unit)+'">Corriger</button>')).join('')+'</div>'
  }else if(view==='freezer'){
-  out+='<div class="v41-stock-stat"><strong>'+frozen.reduce((n,x)=>n+x.portions,0)+'</strong><span>portions au congélateur</span></div>'+
+  out+='<div class="v41-stock-stat"><strong>'+frozen.reduce((n,x)=>n+x.portions,0)+'</strong><span>portions au congélateur · '+frozen.reduce((n,x)=>n+freePortions(x),0)+' encore libres</span></div>'+
    '<button class="btn wide" data-action="v41-add-frozen">＋ Ajouter un plat déjà congelé</button>';
   if(!frozen.length)out+='<div class="v41-empty">❄️ Aucun plat congelé. Tu pourras congeler un plat depuis le planning.</div>';
-  else out+='<div class="v41-stock-list">'+frozen.map(x=>row('❄️ '+x.name,
-    'Lot de '+(x.preparedAt?new Date(x.preparedAt).toLocaleDateString('fr-FR'):'date non précisée'),
+  else out+=search+'<div class="v41-stock-list" id="v41StockResults">'+frozen.map(x=>row('❄️ '+x.name,
+    'Lot de '+(x.preparedAt?new Date(x.preparedAt).toLocaleDateString('fr-FR'):'date non précisée')+
+    ' · '+freePortions(x)+' libre'+(freePortions(x)>1?'s':'')+
+    (reserved[x.lotId]?' · '+reserved[x.lotId]+' prévue'+(reserved[x.lotId]>1?'s':'')+' dans les menus':''),
     '<div class="v41-stock-qty">'+x.portions+' portion'+(x.portions>1?'s':'')+'</div><button class="btn tiny secondary" data-action="v41-correct-freezer" data-id="'+escape(x.lotId)+'">Corriger</button>')).join('')+'</div>';
  }else{
   const w=week||{meals:[]},actions=w.v41MealActions||{},entries=[];

@@ -424,7 +424,8 @@ function catalogueFiltersV40({prefix,searchId,searchValue='',storeId,storeValue=
   '<div class="field"><label for="'+storeId+'">Magasin</label><select id="'+storeId+'">'+catalogueStoreOptionsV40(storeValue)+'</select></div>'+
   '<div class="field"><label for="'+categoryId+'">Catégorie</label><select id="'+categoryId+'">'+catalogueCategoryOptionsV40(categories,categoryValue)+'</select></div>'+
   '<div class="field v40-filter-sort"><label for="'+sortId+'">Trier par</label><select id="'+sortId+'">'+catalogueSortOptionsV40(sortValue)+'</select></div>'+
-  '</div>'+extra+'</div>'
+  '</div>'+extra+
+  '<div class="v40-filter-reset"><button type="button" data-action="v40-reset-filters" data-context="'+prefix+'">↺ Effacer les filtres</button></div></div>'
 }
 
 function productById(id){return (state.products||[]).find(p=>p.id===id)}
@@ -2202,7 +2203,22 @@ document.addEventListener('click',e=>{
    if(a.dataset.kind==='ingredient')ingredientEditor(null);
    else productEditor(null,{name:'',category:'Autres',store:catalogueStoreFilter==='grandfrais'?'grandfrais':'carrefour',qty:1,unit:'paquet'});
   }
-  else if(mode==='catalogue-type-filter'){catalogueTypeFilter=['all','ingredient','daily'].includes(a.dataset.value)?a.dataset.value:'all';render(true)}
+  else if(mode==='v40-reset-filters'){
+    if(a.dataset.context==='courses'){
+     const search=$('#v37BulkSearch'),store=$('#v40BulkStore'),category=$('#v40BulkCategory'),
+      sort=$('#v40BulkSort'),frequent=$('#v40BulkFrequent');
+     if(search)search.value='';
+     if(store)store.value='all';
+     if(category)category.value='all';
+     if(sort)sort.value='name';
+     if(frequent)frequent.checked=false;
+     filterBulkV37()
+    }else{
+     productSearch='';catalogueStoreFilter='all';catalogueCategoryFilter='all';
+     catalogueSortV40='name';catalogueTypeFilter='all';render(true)
+    }
+   }
+   else if(mode==='catalogue-type-filter'){catalogueTypeFilter=['all','ingredient','daily'].includes(a.dataset.value)?a.dataset.value:'all';render(true)}
   else if(mode==='catalogue-store-filter'){
    catalogueStoreFilter=['all','carrefour','grandfrais'].includes(a.dataset.value)?a.dataset.value:'all';
    if(catalogueStoreFilter!=='all')ingredientStoreTab=catalogueStoreFilter;

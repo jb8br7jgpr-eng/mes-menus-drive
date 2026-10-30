@@ -224,8 +224,9 @@ function mealCard(meal,i){
   mealLeftovers(meal).forEach(x=>{const r=recipeById(x.recipeId);names.push('🍱 Restes : '+(r?.name||'Autre plat')+' · '+x.people+' portion'+(x.people>1?'s':''))});
   if(names.length){classes=' filled';note=names.length===1?'1 plat':names.length+' plats pour ce repas'}
  }
+ const available=mealDishes(meal).reduce((n,d)=>n+Math.max(0,sourceBudget(getWeek(),i,d.recipeId)-usedLeftovers(getWeek(),i,d.recipeId)),0);
  return '<button class="meal-tile'+classes+'" data-action="pick-meal" data-index="'+i+'" aria-label="'+html(days[Math.floor(i/2)])+' '+(i%2?'soir':'midi')+', '+html(names.join(' et ')||'ajouter un plat')+'"><span class="meal-type">'+(i%2?'Soir':'Midi')+(note?' · '+html(note):'')+'</span>'+
- (names.length?names.map(n=>'<strong>'+html(n)+'</strong>').join(''):'<span class="add">＋ Ajouter un plat</span>')+'</button>';
+ (names.length?names.map(n=>'<strong>'+html(n)+'</strong>').join(''):'<span class="add">＋ Ajouter un plat</span>')+(available?'<span class="v36-leftover-pill">🍱 '+available+' portion'+(available>1?'s':'')+' disponible'+(available>1?'s':'')+'</span>':'')+'</button>';
 }
 function renderMenus(){const w=getWeek(),count=w.meals.filter(Boolean).length, last=offsetDate(currentWeek,6),isThis=currentWeek===monday(new Date());
   let out='<div class="hero"><div class="eyebrow">Planificateur hebdomadaire</div><h1>Qu’est-ce qu’on mange cette semaine ?</h1><p>Planifie tes repas, cuisine pour deux ou plus et place les restes quand tu veux.</p>'+
@@ -239,6 +240,8 @@ function renderMenus(){const w=getWeek(),count=w.meals.filter(Boolean).length, l
   (!isThis?'<div class="week-v33-return"><button class="week-v33-return-btn" data-action="week-current">↩ Revenir à la semaine actuelle</button></div>':'');
   out+='<div class="status-bar"><span style="width:'+(count/14*100)+'%"></span></div>';
   out+=courseGenerationBanner(w,'menus');
+  const availableThisWeek=w.meals.reduce((total,meal,i)=>total+mealDishes(meal).reduce((n,d)=>n+Math.max(0,sourceBudget(w,i,d.recipeId)-usedLeftovers(w,i,d.recipeId)),0),0);
+  if(availableThisWeek)out+='<div class="v36-leftovers-summary">🍱 <strong>'+availableThisWeek+' portion'+(availableThisWeek>1?'s':'')+' disponible'+(availableThisWeek>1?'s':'')+'</strong> à placer dans les prochains repas si tu le souhaites.</div>';
   out+='<div class="meal-list">';
   for(let day=0;day<7;day++){
    const d=offsetDate(currentWeek,day),isToday=d===localDate(new Date()),hasMeals=Boolean(w.meals[day*2]||w.meals[day*2+1]);
@@ -1410,9 +1413,10 @@ function pickMeal(index){
  '</select></div></div>';
  out+='<div id="mealRecipeCount" class="meal-picker-count">'+
  Math.max(0,state.recipes.length-dishes.length)+' plat(s) disponibles</div>';
- out+='<div class="recipe-picker meal-picker-scroll">'+
+ const availableRestes=availableLeftoverSources(getWeek(),index).reduce((n,x)=>n+x.available,0);
+  out+='<div class="recipe-picker meal-picker-scroll">'+
  '<button class="picker-item" data-action="choose-leftovers" data-index="'+index+'"><span class="emoji">🍱</span>'+
- '<span class="grow"><strong>Placer des restes ici</strong><small>Choisis leur plat d’origine et les portions disponibles</small></span>'+
+ '<span class="grow"><strong>🍱 '+(availableRestes?availableRestes+' portion'+(availableRestes>1?'s':'')+' de restes disponible'+(availableRestes>1?'s':''):'Placer des restes ici')+'</strong><small>'+(availableRestes?'Touche pour choisir un plat et placer ses restes':'Choisis leur plat d’origine et les portions disponibles')+'</small></span>'+
  '<span class="end">＋</span></button>'+
  '<div id="mealRecipeResults" data-index="'+index+'">'+mealRecipePickerResults(index)+'</div></div>';
  if(!state.recipes.length)out+='<div class="note" style="margin-top:10px">Ajoute d’abord tes plats au catalogue, puis retrouve-les ici.</div>';

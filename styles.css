@@ -565,3 +565,79 @@
  .week-v33-return-btn{font-size:11px}
 }
 @media(prefers-reduced-motion:reduce){.course-v33-progress-track span{transition:none}}
+
+/* V36 — confort iPhone, calendrier et accès rapide (aucune donnée serveur modifiée) */
+.v36-week-label{
+ appearance:none;background:linear-gradient(145deg,#fffefa,#f4f8f0);border:1px solid #dbe7d9;
+ border-radius:15px;padding:9px 7px;flex:1;min-width:0;min-height:49px;
+ color:var(--ink);cursor:pointer;box-shadow:0 3px 12px #203f2510;
+}
+.v36-week-label:active{background:#e9f1e6}
+.week-control>.icon-btn{flex:0 0 37px}
+.v36-calendar-nav{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:15px}
+.v36-calendar-nav strong{font-size:15px;font-weight:850;text-transform:capitalize}
+.v36-calendar-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px;margin:0 0 12px}
+.v36-calendar-weekday{text-align:center;font-size:11px;color:#718578;font-weight:850;padding:8px 0}
+.v36-calendar-day{
+ display:flex;align-items:center;flex-direction:column;justify-content:center;gap:4px;cursor:pointer;
+ min-width:0;min-height:45px;padding:5px 0;border:1px solid #e4ece2;border-radius:11px;
+ background:#fff;color:var(--ink);font-size:13px;font-weight:750;font-variant-numeric:tabular-nums;
+ transition:background .15s ease,border-color .15s ease,transform .15s ease;
+}
+.v36-calendar-day.outside{color:#a1ada2;background:#f8f8f4}
+.v36-calendar-day.selected{background:#e7f3e7;border-color:#76ac82;color:#1e6445}
+.v36-calendar-day.today{box-shadow:inset 0 0 0 1px #bd9451}
+.v36-calendar-day:active{transform:scale(.95)}
+.v36-calendar-day i{display:block;width:5px;height:5px;border-radius:100%;background:transparent}
+.v36-calendar-day i.planned{background:#39875a}
+.v36-calendar-legend{font-size:11px;line-height:1.5;margin:5px 1px 17px;color:#63816b}
+.v36-plan-week{background:#eaf4e8;color:#315d40;border:1px solid #d6e6d3;padding:11px 12px;
+ border-radius:13px;font-size:13px;font-weight:800;margin:12px 0 15px}
+.v36-plan-week small{font-weight:500;font-size:11px;display:block;margin-top:3px}
+.v36-plan-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:8px 0 5px}
+.v36-plan-target{display:flex;flex-direction:column;gap:5px;text-align:left;cursor:pointer;padding:11px 12px;
+ background:#fff;border:1px solid #dce9dc;border-radius:12px;color:var(--ink);min-height:64px}
+.v36-plan-target strong{font-size:12px;font-weight:800}
+.v36-plan-target small{font-size:11px;color:#548569}
+.v36-plan-target:active{background:#e6f2e3}
+.v36-plan-target:disabled{opacity:.5;cursor:default;background:#f4f5f1}
+.recipe-card{display:grid;grid-template-columns:minmax(0,1fr);gap:5px}
+.recipe-actions{grid-column:1;display:flex;justify-content:flex-end;align-items:center;
+ width:100%;margin:2px 0 0;padding-top:8px;border-top:1px solid #edf1e9;gap:7px}
+.v36-recipe-plan{margin-right:auto;min-height:34px;background:#e9f3e5;color:#286341;border:1px solid #cde5ce;
+ box-shadow:none;font-size:12px}
+.v36-recipe-plan-preview{margin-top:12px}
+.v36-bulk-open{margin:8px 0 12px;min-height:43px;background:#fff}
+.v36-bulk-tools{display:flex;gap:7px;flex-wrap:wrap;margin:10px 0}
+.v36-bulk-list{display:flex;flex-direction:column;gap:6px;max-height:47dvh;overflow-y:auto;overscroll-behavior:contain;
+ padding:3px 2px 8px}
+.v36-bulk-row{display:flex;align-items:center;gap:11px;border:1px solid #e0eade;border-radius:12px;
+ padding:10px 12px;min-height:55px;background:white;cursor:pointer}
+.v36-bulk-row:has(input:checked){border-color:#7fab88;background:#e8f3e7}
+.v36-bulk-row.already{background:#f5f6f2;opacity:.65}
+.v36-bulk-row input{accent-color:#277047;width:19px;height:19px;flex:0 0 19px}
+.v36-bulk-name{display:flex;flex-direction:column;gap:4px;min-width:0}
+.v36-bulk-name strong{font-size:12px;overflow-wrap:anywhere}
+.v36-bulk-name small{font-size:10px;color:var(--muted)}
+.v36-bulk-submit{margin-top:13px}
+.v36-leftovers-summary{background:linear-gradient(115deg,#ecf6e8,#f5f7ed);border:1px solid #cee6cf;
+ border-radius:14px;padding:12px 13px;margin:12px 0;font-size:12px;line-height:1.5;color:#35694c}
+.v36-leftover-pill{display:inline-flex;width:fit-content;align-items:center;line-height:1.2;
+ font-size:10px;font-weight:800;color:#2c7249;background:#def1e2;border:1px solid #b9ddc2;
+ border-radius:9px;padding:5px 7px;margin-top:2px}
+.recipe-card,.day-card,.course-store{transition:border-color .16s ease,box-shadow .16s ease}
+.recipe-card:focus-within,.day-card:focus-within,.course-store:focus-within{
+ border-color:#a9cbb2;box-shadow:0 5px 22px #204d2e15
+}
+.v36-week-label:focus-visible,.v36-calendar-day:focus-visible,.v36-plan-target:focus-visible,
+.v36-bulk-row:focus-within,.v36-recipe-plan:focus-visible,.v36-bulk-open:focus-visible{
+ outline:3px solid #d1b36c;outline-offset:2px
+}
+@media(max-width:380px){
+ .v36-calendar-grid{gap:3px}.v36-calendar-day{min-height:41px}
+ .v36-plan-grid{gap:6px}.v36-plan-target{padding:9px 8px}
+ .v36-recipe-plan{min-height:32px;font-size:11px;padding:7px 9px}
+}
+@media(prefers-reduced-motion:reduce){
+ .v36-calendar-day,.recipe-card,.day-card,.course-store{transition:none}
+}

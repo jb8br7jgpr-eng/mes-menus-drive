@@ -466,7 +466,7 @@ function catalogueEditor(kind,id=null,draft=null,linkedIngredientId=null){
   '<option value="carrefour" '+(store==='carrefour'?'selected':'')+'>Carrefour Drive</option>'+
   '<option value="grandfrais" '+(store==='grandfrais'?'selected':'')+'>Grand Frais</option></select></div>'+
   '<div class="field"><label for="catalogueCategory">Catégorie</label><select id="catalogueCategory">'+selectOptions(productCategories,record.category||'Autres')+'</select></div>'+
-  '<details class="v38-course-defaults"><summary>🛒 Quantité proposée aux courses : <strong>'+html(quantity(suggestedQty,suggestedUnit))+'</strong><small>Facultatif · toucher pour modifier</small></summary>'+
+  '<details class="v38-course-defaults"><summary>🛒 Quantité proposée aux courses : <strong data-v38-default-preview>'+html(quantity(suggestedQty,suggestedUnit))+'</strong><small>Facultatif · toucher pour modifier</small></summary>'+
   '<div class="row stock-editor-row"><div class="field grow"><label for="catalogueQty">Quantité pré-remplie</label><input id="catalogueQty" type="number" inputmode="decimal" step="any" min=".01" required value="'+html(suggestedQty)+'"></div>'+
   '<div class="field grow"><label for="catalogueUnit">Unité</label><select id="catalogueUnit">'+selectOptions(units,suggestedUnit)+'</select></div></div>'+
   '<p class="helper">C’est seulement la quantité suggérée lorsque tu ajoutes cet article à tes courses. Tu peux la changer à chaque ajout. Cela ne change ni les quantités des recettes, ni le stock maison, ni le contenu des paquets Carrefour.</p></details>'+
@@ -497,6 +497,13 @@ function catalogueEditor(kind,id=null,draft=null,linkedIngredientId=null){
  if(id)body+='<button class="btn danger wide" style="margin-top:12px" data-action="'+(isIngredient?'delete-catalog-ingredient':'delete-product')+'" data-id="'+html(id)+'">Supprimer ce produit</button>';
  showModal(isImported?'Importer depuis Carrefour':id?'Gérer le produit':'Nouveau produit',
   (isImported?'<div class="note">Vérifie les informations importées avant d’enregistrer. Aucun panier Carrefour n’est modifié.</div>':'')+body);
+}
+function previewCourseQuantityV38(){
+ const preview=modalRoot.querySelector('[data-v38-default-preview]');
+ if(!preview)return;
+ const raw=$('#catalogueQty')?.value||'',unit=$('#catalogueUnit')?.value;
+ const amount=raw.trim()===''?NaN:Number(raw);
+ preview.textContent=Number.isFinite(amount)&&amount>0&&units.includes(unit)?quantity(amount,unit):'à renseigner'
 }
 function ingredientEditor(id,draftName=''){catalogueEditor('ingredient',id,{name:draftName,store:ingredientStoreTab})}
 function saveCatalogIngredient(e){saveUnifiedCatalogue(e)}
@@ -2207,6 +2214,7 @@ document.addEventListener('click',e=>{
   else if(mode==='clear-all'){if(confirm('Effacer toutes les données actuelles ? Une copie locale sera conservée dans les versions précédentes.')){checkpoint('Avant effacement');state=baseState();persist();closeModal();render();toast('Données actuelles effacées.')}}
 });
 document.addEventListener('change',e=>{
+  if(e.target.id==='catalogueUnit'){previewCourseQuantityV38();return}
   if(e.target.matches('[data-v37-select]')){updateBulkV37();return}
   if(e.target.id==='v37BulkFilter'){filterBulkV37();return}
   if(e.target.matches('[data-v37-unit]')){
@@ -2244,6 +2252,7 @@ document.addEventListener('change',e=>{
  }
  }else if(e.target.matches('[data-store-item]')){const item=e.target.dataset.storeItem,store=e.target.value;closeModal();setShoppingStore(item,store)}else if(e.target.matches('[data-check]')){const w=getWeek(),id=e.target.dataset.check;w.checked=e.target.checked?[...new Set([...w.checked,id])]:w.checked.filter(x=>x!==id);persist();render(true)}else if(e.target.id==='importFile')importData(e.target.files?.[0])});
 document.addEventListener('input',e=>{
+  if(e.target.id==='catalogueQty'){previewCourseQuantityV38();return}
   if(e.target.id==='v37BulkSearch'){filterBulkV37();return}
  if(e.target.id==='courseAddSearch'){const results=$('#courseAddSearchResults');if(results)results.innerHTML=extraSearchResults(e.target.value);return}
  if(e.target.id==='mealRecipeSearch'){refreshMealRecipePicker();return}

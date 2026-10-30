@@ -375,7 +375,10 @@ function productCategoryOptions(selected='Autres'){
 }
 function productCategoryChoices(){
  const values=new Set([...(state.ingredientCatalog||[]),...(state.products||[])].map(p=>String(p.category||'Autres')));
- return [...values].sort((a,b)=>productCategories.indexOf(a)-productCategories.indexOf(b)||a.localeCompare(b,'fr'))
+ return [...values].sort((a,b)=>{
+  const ia=productCategories.indexOf(a),ib=productCategories.indexOf(b);
+  return (ia<0?productCategories.length:ia)-(ib<0?productCategories.length:ib)||a.localeCompare(b,'fr')
+ })
 }
 function productCategoryGroupName(value){
  return productCategoryGroups.find(([,values])=>values.includes(value))?.[0]||'Ancienne catégorie'
@@ -565,7 +568,7 @@ function saveUnifiedCatalogue(e){
    old=isIngredient?ingredientById(id):productById(id),
    name=$('#catalogueName')?.value.trim(),store=$('#catalogueStore')?.value,category=$('#catalogueCategory')?.value,
    qty=Number($('#catalogueQty')?.value),unit=$('#catalogueUnit')?.value,frequent=Boolean($('#catalogueFrequent')?.checked);
- if(!['ingredient','daily'].includes(kind)||!name||!['carrefour','grandfrais'].includes(store)||!productCategories.includes(category)||
+ if(!['ingredient','daily'].includes(kind)||!name||!['carrefour','grandfrais'].includes(store)||
    !Number.isFinite(qty)||qty<=0||!units.includes(unit)||(!productCategories.includes(category)&&category!==old?.category)){toast('Vérifie le nom, le magasin, la catégorie et la quantité.');return}
  if(isIngredient){
   const duplicate=ingredientByName(name);
@@ -614,7 +617,18 @@ function saveUnifiedCatalogue(e){
  if(catalogueTypeFilter!=='all'&&catalogueTypeFilter!==kind)catalogueTypeFilter='all';
  persist();closeModal();render();toast('Produit enregistré !')
 }
-function productBadge(p){return (p.category==='Hygiène'?'🧴':p.category==='Maison'?'🧻':p.category==='Fruits et légumes'?'🥕':p.category==='Produits frais'?'🥛':p.category==='Viandes et poissons'?'🥩':'🛍️')}
+function productBadge(p){
+ const cat=p?.category||'Autres',group=productGroup(p);
+ if(cat==='Papier et consommables'||cat==='Maison')return '🧻';
+ if(cat==='Animaux')return '🐾';
+ if(cat==='Boissons'||['Eaux et sodas','Jus et sirops','Café, thé et infusions'].includes(cat))return '🥤';
+ if(cat==='Surgelés')return '❄️';
+ if(group==='Hygiène et maison')return '🧴';
+ if(group==='Fruits et légumes')return '🥕';
+ if(group==='Viandes et poissons')return '🥩';
+ if(group==='Produits frais')return '🥛';
+ return '🛍️'
+}
 // Les références déjà liées à un ingrédient apparaissent uniquement
 // sur sa fiche, jamais une seconde fois dans les articles indépendants.
 function independentProducts(store=ingredientStoreTab){
@@ -641,6 +655,7 @@ function unifiedCatalogueItems(){
  const needle=norm(productSearch);
  return items.filter(x=>(catalogueTypeFilter==='all'||catalogueTypeFilter===x.type)&&
   (catalogueStoreFilter==='all'||catalogueStoreFilter===x.store)&&
+  (catalogueCategoryFilter==='all'||(x.item.category||'Autres')===catalogueCategoryFilter)&&
   (!needle||[x.name,x.item.brand,x.item.packaging,x.item.category].some(v=>norm(v).includes(needle))))
   .sort((a,b)=>a.name.localeCompare(b.name,'fr',{sensitivity:'base'})||a.type.localeCompare(b.type));
 }
@@ -653,6 +668,7 @@ function unifiedCatalogueRows(){
     ([x.item.brand,x.item.packaging].filter(Boolean).join(' · ')||quantity(x.item.qty||1,x.item.unit||'paquet'));
   return '<article class="catalogue-unified-card"><div class="catalogue-unified-icon">'+(ing?'🥕':productBadge(x.item))+'</div>'+
     '<div class="grow"><strong>'+html(x.name)+'</strong><div class="catalogue-unified-meta"><span class="catalogue-type-badge">'+(ing?'Ingrédient':'Quotidien')+'</span> · '+(x.store==='grandfrais'?'Grand Frais':'Carrefour Drive')+(x.item.frequent?' · ☆ Fréquent':'')+'</div>'+
+    '<div class="v39-category-label">📂 '+html(x.item.category||'Autres')+'</div>'+
     '<div class="catalogue-unified-desc">'+html(description)+'</div></div>'+
     '<div class="catalogue-unified-actions"><button class="btn tiny" data-action="add-unified-courses" data-kind="'+x.type+'" data-id="'+html(x.id)+'">＋ Courses</button>'+
     '<button class="btn tiny secondary" data-action="edit-unified-product" data-kind="'+x.type+'" data-id="'+html(x.id)+'">Gérer</button></div></article>';
@@ -669,7 +685,10 @@ function renderProduits(){
  out+='<div class="catalog-primary-actions"><button class="btn" data-action="add-unified-product">＋ Ajouter un produit</button>'+
  '<button class="btn secondary" data-action="open-carrefour-import">📋 Importer Carrefour</button></div>';
  out+='<button class="btn secondary wide v37-catalogue-add" data-action="v37-open-bulk">☑ Ajouter plusieurs produits aux courses</button>';
- out+='<div class="field catalog-search"><input class="text-input" id="productSearch" value="'+html(productSearch)+'" placeholder="⌕ Rechercher un produit…" aria-label="Rechercher un produit"></div>';
+ out+='<div class="v39-catalog-search-tools"><div class="field catalog-search"><input class="text-input" id="productSearch" value="'+html(productSearch)+'" placeholder="⌕ Rechercher un produit…" aria-label="Rechercher un produit"></div>'+
+ '<div class="field v39-catalog-category"><label for="catalogueCategoryFilter">Catégorie</label><select id="catalogueCategoryFilter" aria-label="Filtrer les produits par catégorie">'+
+ '<option value="all">Toutes les catégories</option>'+
+ productCategoryChoices().map(cat=>'<option value="'+html(cat)+'" '+(catalogueCategoryFilter===cat?'selected':'')+'>'+html(cat)+'</option>').join('')+'</select></div></div>';
  out+='<div class="section-head"><h2>Votre catalogue</h2><span class="pill" id="catalogueCount">'+n+' produit'+(n>1?'s':'')+'</span></div>'+
  '<div id="catalogueResults">'+unifiedCatalogueRows()+'</div>'+
  '<p class="helper catalog-footer">Ingrédients : recettes et courses. Quotidien : courses uniquement. Le magasin et le stock maison fonctionnent pour les deux dans Courses.</p>';
@@ -707,7 +726,10 @@ function addCatalogProduct(id){
 function norm(v){return String(v||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim().replace(/\s+/g,' ').toLowerCase()}
 function converted(q,u){q=Number(q)||0;return u==='kg'?[q*1000,'g']:u==='l'?[q*1000,'ml']:u==='cl'?[q*10,'ml']:[q,u||'pièce']}
 function quantity(q,u){const n=Math.round((Number(q)+Number.EPSILON)*100)/100;const s=n.toLocaleString('fr-FR',{maximumFractionDigits:2});const plurals={'pièce':'pièces','paquet':'paquets','boîte':'boîtes','bouteille':'bouteilles','pot':'pots','sachet':'sachets','rouleau':'rouleaux'};return s+' '+(n>1&&plurals[u]?plurals[u]:(u||'pièce'))}
-function defaultShoppingStore(category){return ['Fruits et légumes','Viandes et poissons'].includes(category)?'grandfrais':'carrefour'}
+function defaultShoppingStore(category){
+ return ['Fruits et légumes','Viandes et poissons','Fruits','Légumes','Herbes et aromates',
+  'Viandes','Volailles','Charcuterie','Poissons','Fruits de mer'].includes(category)?'grandfrais':'carrefour'
+}
 // Chaque ingrédient physique est unique dans la base, même s'il apparaît
 // dans dix recettes. Les quantités restent propres à chaque plat.
 function ingredientById(id){return (state.ingredientCatalog||[]).find(i=>i.id===id)}
@@ -907,7 +929,15 @@ function setShoppingStore(itemId,store){
  persist();render(true);toast(store==='grandfrais'?'Mis sur la liste Grand Frais':'Mis sur la liste Carrefour Drive')
 }
 function groupFor(name,unit){const s=norm(name);if(/pq|papier toilette|lessive|savon|shampo|dentifrice|baume|douche|mouchoir|deodorant/.test(s))return 'Hygiène et maison';if(/poulet|boeuf|bœuf|jambon|poisson|saumon|crevette|porc|steak|dinde/.test(s))return 'Viandes et poissons';if(/tomate|oignon|carotte|salade|pomme|banane|courgette|ail|citron|poivron|brocoli|champignon/.test(s))return 'Fruits et légumes';if(/lait|crème|creme|yaourt|fromage|beurre|mozzarella|oeuf|œuf/.test(s))return 'Produits frais';return 'Épicerie et divers'}
-function productGroup(p){if(['Hygiène','Maison'].includes(p?.category))return 'Hygiène et maison';if(p?.category==='Viandes et poissons')return 'Viandes et poissons';if(p?.category==='Fruits et légumes')return 'Fruits et légumes';if(p?.category==='Produits frais')return 'Produits frais';return 'Épicerie et divers'}
+function productGroup(p){
+ const c=p?.category||'Autres';
+ if(['Hygiène','Maison','Hygiène corporelle','Beauté et cosmétiques','Santé et parapharmacie',
+   'Entretien et nettoyage','Papier et consommables','Cuisine et accessoires','Bébé et puériculture','Animaux'].includes(c))return 'Hygiène et maison';
+ if(['Viandes et poissons','Viandes','Volailles','Charcuterie','Poissons','Fruits de mer'].includes(c))return 'Viandes et poissons';
+ if(['Fruits et légumes','Fruits','Légumes','Herbes et aromates'].includes(c))return 'Fruits et légumes';
+ if(['Produits frais','Lait','Beurre et crème','Fromages','Yaourts et desserts frais','Œufs'].includes(c))return 'Produits frais';
+ return 'Épicerie et divers'
+}
 // Les menus sont un brouillon. Seul le bouton « Générer les courses » capture
 // une photographie des ingrédients de cette semaine. Les ajouts manuels restent
 // indépendants et n'ont pas à attendre cette génération.
@@ -2294,6 +2324,13 @@ document.addEventListener('change',e=>{
   if(e.target.matches('[data-v37-qty]')){const row=e.target.closest('[data-v37-row]');if(row)row.querySelector('[data-v37-select]').checked=true;updateBulkV37();return}
   if(e.target.matches('[data-v36-favorite]')){updateBulkFavoritesCountV36();return}
  if(e.target.id==='catalogueStore'){$('#catalogueReferencePanel')?.toggleAttribute('hidden',e.target.value==='grandfrais');return}
+ if(e.target.id==='catalogueCategoryFilter'){
+  catalogueCategoryFilter=productCategoryChoices().includes(e.target.value)?e.target.value:'all';
+  const result=$('#catalogueResults'),count=$('#catalogueCount');
+  if(result)result.innerHTML=unifiedCatalogueRows();
+  if(count){const n=unifiedCatalogueItems().length;count.textContent=n+' produit'+(n>1?'s':'')}
+  return
+ }
  if(e.target.id==='mealRecipeType'){refreshMealRecipePicker();return}
  if(e.target.id==='recipeSort'||e.target.id==='recipeTypeFilter'){
   if(e.target.id==='recipeSort')recipeSort=['az','za','type'].includes(e.target.value)?e.target.value:'az';

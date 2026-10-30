@@ -12,6 +12,7 @@ const baseState=()=>({schema:1,recipes:[],products:[],weeks:{},staples:[],storeP
 let state=baseState(), currentTab='menus', currentWeek='', search='', recipeSort='az', recipeTypeFilter='all', productSearch='', productCategory='Toutes', ingredientStoreTab='carrefour', catalogueTypeFilter='all', catalogueStoreFilter='all', db=null, usingFallback=false;
 let pendingRecipeDraftImage='',pendingIngredientLinkId=null;
 let independentProductsOpen=false;const courseOpenSections=new Set();
+let calendarMonthV36='';
 const tabScrollV33={menus:0,plats:0,produits:0,courses:0,drive:0};
 const app=$('#app'), modalRoot=$('#modalRoot');
 const uid=()=>Math.random().toString(36).slice(2,10)+Date.now().toString(36);
@@ -155,6 +156,47 @@ function renderMealContext(index){
 }
 function pageHeading(kicker,title,sub){return '<div class="eyebrow">'+kicker+'</div><h1>'+title+'</h1><p class="muted" style="font-size:13px">'+sub+'</p>'}
 function recipeById(id){return state.recipes.find(r=>r.id===id)}
+
+function weekHasMealsV36(key){
+ const week=state.weeks[key];return !!(week&&Array.isArray(week.meals)&&week.meals.some(Boolean))
+}
+function calendarMarkupV36(){
+ const date=parseDate(calendarMonthV36+'-01'),year=date.getFullYear(),month=date.getMonth();
+ const start=new Date(year,month,1,12),count=new Date(year,month+1,0,12).getDate();
+ const offset=(start.getDay()+6)%7,cells=Math.ceil((offset+count)/7)*7;
+ let out='<div class="v36-calendar-nav"><button class="icon-btn" data-action="calendar-shift" data-shift="-1" aria-label="Mois précédent">‹</button><strong>'+
+ html(start.toLocaleDateString('fr-FR',{month:'long',year:'numeric'}))+
+ '</strong><button class="icon-btn" data-action="calendar-shift" data-shift="1" aria-label="Mois suivant">›</button></div>';
+ out+='<div class="v36-calendar-grid" role="group" aria-label="Calendrier des semaines">'+
+ days.map(d=>'<span class="v36-calendar-weekday">'+d.slice(0,1)+'</span>').join('');
+ for(let i=0;i<cells;i++){
+  const day=new Date(year,month,1-offset+i,12),key=monday(day),iso=localDate(day),planned=weekHasMealsV36(key);
+  out+='<button type="button" class="v36-calendar-day'+(currentWeek===key?' selected':'')+
+   (day.getMonth()!==month?' outside':'')+(iso===localDate(new Date())?' today':'')+
+   '" data-action="calendar-select" data-date="'+iso+'" aria-pressed="'+(currentWeek===key)+'" aria-label="'+
+   html(day.toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long'}))+(planned?', semaine planifiée':'')+
+   '"><span>'+day.getDate()+'</span><i class="'+(planned?'planned':'')+'" aria-hidden="true"></i></button>';
+ }
+ out+='</div><p class="helper v36-calendar-legend">● Point vert : semaine contenant des menus. Touche un jour pour ouvrir sa semaine.</p>'+
+ '<button class="btn secondary wide" data-action="calendar-current">↩ Revenir à la semaine actuelle</button>';
+ return out
+}
+function openCalendarV36(month=null){
+ calendarMonthV36=month||currentWeek.slice(0,7);
+ showModal('📅 Retrouver une semaine',calendarMarkupV36())
+}
+function shiftCalendarV36(shift){
+ if(![-1,1].includes(shift))return;
+ const d=parseDate(calendarMonthV36+'-01'),next=new Date(d.getFullYear(),d.getMonth()+shift,1,12);
+ openCalendarV36(localDate(next).slice(0,7))
+}
+function selectCalendarV36(iso){
+ if(!/^\d{4}-\d{2}-\d{2}$/.test(iso||''))return;
+ const d=parseDate(iso);if(localDate(d)!==iso)return;
+ currentWeek=monday(d);tabScrollV33.menus=0;tabScrollV33.courses=0;tabScrollV33.drive=0;
+ closeModal();render()
+}
+
 function emptyView(emoji,title,description,button){return '<div class="empty"><div class="illustration">'+emoji+'</div><strong>'+title+'</strong><p>'+description+'</p>'+button+'</div>'}
 // Toutes les anciennes cases (un seul plat) restent lisibles après la mise à jour.
 function mealDishes(meal){
@@ -193,7 +235,7 @@ function renderMenus(){const w=getWeek(),count=w.meals.filter(Boolean).length, l
   out+='<div class="section-head week-v32-heading"><h2>Votre semaine</h2><div class="week-v32-heading-actions">'+
   (isThis?'<button class="week-v32-today-link" data-action="jump-today">Aujourd’hui ↓</button>':'')+
   '<span class="pill">'+count+' / 14 repas</span></div></div>';
-  out+='<div class="week-control"><button class="icon-btn" aria-label="Semaine précédente" data-action="week-prev">‹</button><div class="week-label">Du '+niceDate(currentWeek)+' au '+niceDate(last)+(isThis?'<small>Cette semaine</small>':'<small>Planning personnalisé</small>')+'</div><button class="icon-btn" aria-label="Semaine suivante" data-action="week-next">›</button></div>'+
+  out+='<div class="week-control"><button class="icon-btn" aria-label="Semaine précédente" data-action="week-prev">‹</button><button class="week-label v36-week-label" data-action="open-week-calendar" aria-label="Ouvrir le calendrier des semaines">Du '+niceDate(currentWeek)+' au '+niceDate(last)+(isThis?'<small>Cette semaine · 📅</small>':'<small>📅 Choisir une semaine</small>')+'</button><button class="icon-btn" aria-label="Semaine suivante" data-action="week-next">›</button></div>'+
   (!isThis?'<div class="week-v33-return"><button class="week-v33-return-btn" data-action="week-current">↩ Revenir à la semaine actuelle</button></div>':'');
   out+='<div class="status-bar"><span style="width:'+(count/14*100)+'%"></span></div>';
   out+=courseGenerationBanner(w,'menus');
@@ -761,7 +803,7 @@ function migrateLegacyGeneratedCourses(){
 function weekSwitcher(){
  const end=offsetDate(currentWeek,6);
  return '<div class="week-control"><button class="icon-btn" aria-label="Semaine précédente" data-action="week-prev">‹</button>'+
- '<div class="week-label">Du '+niceDate(currentWeek)+' au '+niceDate(end)+'</div>'+
+ '<button class="week-label v36-week-label" data-action="open-week-calendar" aria-label="Ouvrir le calendrier des semaines">Du '+niceDate(currentWeek)+' au '+niceDate(end)+'<small>📅 Calendrier</small></button>'+
  '<button class="icon-btn" aria-label="Semaine suivante" data-action="week-next">›</button></div>'+
  (currentWeek!==monday(new Date())?'<div class="week-v33-return"><button class="week-v33-return-btn" data-action="week-current">↩ Revenir à la semaine actuelle</button></div>':'')
 }
@@ -1691,6 +1733,10 @@ document.addEventListener('click',e=>{
    tabScrollV33.menus=0;tabScrollV33.courses=0;tabScrollV33.drive=0;render()
   }
   else if(mode==='week-current')returnToCurrentWeekV33()
+   else if(mode==='open-week-calendar')openCalendarV36()
+   else if(mode==='calendar-shift')shiftCalendarV36(Number(a.dataset.shift))
+   else if(mode==='calendar-select')selectCalendarV36(a.dataset.date)
+   else if(mode==='calendar-current'){closeModal();returnToCurrentWeekV33()}
   else if(mode==='clear-store-courses'||mode==='clear-all-courses'){
    const target=mode==='clear-all-courses'?'all':a.dataset.store;
    if(!['carrefour','grandfrais','all'].includes(target))return;

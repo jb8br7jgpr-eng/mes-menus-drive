@@ -695,15 +695,15 @@ function productRows(){
 function unifiedCatalogueItems(){
  const linked=new Set((state.ingredientCatalog||[]).map(i=>i.productId).filter(Boolean));
  const items=[
-  ...(state.ingredientCatalog||[]).map(i=>({type:'ingredient',id:i.id,name:i.name,store:ingredientStore(i),item:i})),
-  ...(state.products||[]).filter(p=>!linked.has(p.id)).map(p=>({type:'daily',id:p.id,name:p.name,store:state.storePreferences?.['product:'+p.id]||p.store||'carrefour',item:p}))
+  ...(state.ingredientCatalog||[]).map(i=>({type:'ingredient',id:i.id,name:i.name,store:ingredientStore(i),category:catalogueCategoryV40(i,i.productId),item:i})),
+  ...(state.products||[]).filter(p=>!linked.has(p.id)).map(p=>({type:'daily',id:p.id,name:p.name,store:state.storePreferences?.['product:'+p.id]||p.store||'carrefour',category:catalogueCategoryV40(p),item:p}))
  ];
  const needle=norm(productSearch);
  return items.filter(x=>(catalogueTypeFilter==='all'||catalogueTypeFilter===x.type)&&
   (catalogueStoreFilter==='all'||catalogueStoreFilter===x.store)&&
-  (catalogueCategoryFilter==='all'||(x.item.category||'Autres')===catalogueCategoryFilter)&&
+  (catalogueCategoryFilter==='all'||x.category===catalogueCategoryFilter)&&
   (!needle||[x.name,x.item.brand,x.item.packaging,x.item.category].some(v=>norm(v).includes(needle))))
-  .sort((a,b)=>a.name.localeCompare(b.name,'fr',{sensitivity:'base'})||a.type.localeCompare(b.type));
+  .sort((a,b)=>catalogueSortCompareV40(a,b,catalogueSortV40));
 }
 function unifiedCatalogueRows(){
  const items=unifiedCatalogueItems();
@@ -714,7 +714,7 @@ function unifiedCatalogueRows(){
     ([x.item.brand,x.item.packaging].filter(Boolean).join(' · ')||quantity(x.item.qty||1,x.item.unit||'paquet'));
   return '<article class="catalogue-unified-card"><div class="catalogue-unified-icon">'+(ing?'🥕':productBadge(x.item))+'</div>'+
     '<div class="grow"><strong>'+html(x.name)+'</strong><div class="catalogue-unified-meta"><span class="catalogue-type-badge">'+(ing?'Ingrédient':'Quotidien')+'</span> · '+(x.store==='grandfrais'?'Grand Frais':'Carrefour Drive')+(x.item.frequent?' · ☆ Fréquent':'')+'</div>'+
-    '<div class="v39-category-label">📂 '+html(x.item.category||'Autres')+'</div>'+
+    '<div class="v39-category-label">📂 '+html(x.category)+'</div>'+
     '<div class="catalogue-unified-desc">'+html(description)+'</div></div>'+
     '<div class="catalogue-unified-actions"><button class="btn tiny" data-action="add-unified-courses" data-kind="'+x.type+'" data-id="'+html(x.id)+'">＋ Courses</button>'+
     '<button class="btn tiny secondary" data-action="edit-unified-product" data-kind="'+x.type+'" data-id="'+html(x.id)+'">Gérer</button></div></article>';
@@ -723,24 +723,28 @@ function unifiedCatalogueRows(){
 function renderProduits(){
  const n=unifiedCatalogueItems().length;
  let out=pageHeading('Bibliothèque permanente','Mes produits','Un seul catalogue pour les ingrédients et les achats du quotidien.');
- out+='<div class="catalogue-unified-controls"><div class="field"><label>Type de produit</label><div class="catalogue-filter-bar" role="group" aria-label="Type de produit">'+
- [['all','Tous'],['ingredient','Ingrédients'],['daily','Quotidien']].map(([k,label])=>'<button class="catalogue-filter '+(catalogueTypeFilter===k?'active':'')+'" data-action="catalogue-type-filter" data-value="'+k+'" aria-pressed="'+(catalogueTypeFilter===k)+'">'+label+'</button>').join('')+
- '</div></div><div class="field"><label>Magasin</label><div class="catalogue-filter-bar" role="group" aria-label="Magasin">'+
- [['all','Tous'],['carrefour','Carrefour'],['grandfrais','Grand Frais']].map(([k,label])=>'<button class="catalogue-filter '+(catalogueStoreFilter===k?'active':'')+'" data-action="catalogue-store-filter" data-value="'+k+'" aria-pressed="'+(catalogueStoreFilter===k)+'">'+label+'</button>').join('')+
- '</div></div></div>';
  out+='<div class="catalog-primary-actions"><button class="btn" data-action="add-unified-product">＋ Ajouter un produit</button>'+
  '<button class="btn secondary" data-action="open-carrefour-import">📋 Importer Carrefour</button></div>';
  out+='<button class="btn secondary wide v37-catalogue-add" data-action="v37-open-bulk">☑ Ajouter plusieurs produits aux courses</button>';
- out+='<div class="v39-catalog-search-tools"><div class="field catalog-search"><input class="text-input" id="productSearch" value="'+html(productSearch)+'" placeholder="⌕ Rechercher un produit…" aria-label="Rechercher un produit"></div>'+
- '<div class="field v39-catalog-category"><label for="catalogueCategoryFilter">Catégorie</label><select id="catalogueCategoryFilter" aria-label="Filtrer les produits par catégorie">'+
- '<option value="all">Toutes les catégories</option>'+
- productCategoryChoices().map(cat=>'<option value="'+html(cat)+'" '+(catalogueCategoryFilter===cat?'selected':'')+'>'+html(cat)+'</option>').join('')+'</select></div></div>';
+ out+=catalogueFiltersV40({
+  prefix:'produits',searchId:'productSearch',searchValue:productSearch,
+  storeId:'catalogueStoreSelectV40',storeValue:catalogueStoreFilter,
+  categoryId:'catalogueCategoryFilter',categoryValue:catalogueCategoryFilter,
+  sortId:'catalogueSortV40',sortValue:catalogueSortV40,categories:productCategoryChoices(),
+  extra:'<div class="v40-type-filter"><span>Type</span><div class="catalogue-filter-bar" role="group" aria-label="Type de produit">'+
+   [['all','Tous'],['ingredient','Ingrédients'],['daily','Quotidien']].map(([k,label])=>
+   '<button class="catalogue-filter '+(catalogueTypeFilter===k?'active':'')+'" data-action="catalogue-type-filter" data-value="'+k+'" aria-pressed="'+(catalogueTypeFilter===k)+'">'+label+'</button>').join('')+'</div></div>'
+ });
  out+='<div class="section-head"><h2>Votre catalogue</h2><span class="pill" id="catalogueCount">'+n+' produit'+(n>1?'s':'')+'</span></div>'+
  '<div id="catalogueResults">'+unifiedCatalogueRows()+'</div>'+
- '<p class="helper catalog-footer">Ingrédients : recettes et courses. Quotidien : courses uniquement. Le magasin et le stock maison fonctionnent pour les deux dans Courses.</p>';
- return out;
+ '<p class="helper catalog-footer">Ingrédients : recettes et courses. Quotidien : courses uniquement. Magasin et stock maison se gèrent depuis Courses.</p>';
+ return out
 }
-
+function refreshCatalogueV40(){
+ const result=$('#catalogueResults'),count=$('#catalogueCount');
+ if(result)result.innerHTML=unifiedCatalogueRows();
+ if(count){const n=unifiedCatalogueItems().length;count.textContent=n+' produit'+(n>1?'s':'')}
+}
 function chooseUnifiedProductType(){
  const suggested=catalogueTypeFilter==='daily'?'daily':'ingredient';
  showModal('Ajouter un produit',
@@ -2370,12 +2374,17 @@ document.addEventListener('change',e=>{
   if(e.target.matches('[data-v37-qty]')){const row=e.target.closest('[data-v37-row]');if(row)row.querySelector('[data-v37-select]').checked=true;updateBulkV37();return}
   if(e.target.matches('[data-v36-favorite]')){updateBulkFavoritesCountV36();return}
  if(e.target.id==='catalogueStore'){$('#catalogueReferencePanel')?.toggleAttribute('hidden',e.target.value==='grandfrais');return}
+ if(e.target.id==='catalogueStoreSelectV40'){
+  catalogueStoreFilter=['all','carrefour','grandfrais'].includes(e.target.value)?e.target.value:'all';
+  refreshCatalogueV40();return
+ }
  if(e.target.id==='catalogueCategoryFilter'){
   catalogueCategoryFilter=productCategoryChoices().includes(e.target.value)?e.target.value:'all';
-  const result=$('#catalogueResults'),count=$('#catalogueCount');
-  if(result)result.innerHTML=unifiedCatalogueRows();
-  if(count){const n=unifiedCatalogueItems().length;count.textContent=n+' produit'+(n>1?'s':'')}
-  return
+  refreshCatalogueV40();return
+ }
+ if(e.target.id==='catalogueSortV40'){
+  catalogueSortV40=catalogueSortChoicesV40.some(([k])=>k===e.target.value)?e.target.value:'name';
+  refreshCatalogueV40();return
  }
  if(e.target.id==='mealRecipeType'){refreshMealRecipePicker();return}
  if(e.target.id==='recipeSort'||e.target.id==='recipeTypeFilter'){

@@ -1029,14 +1029,17 @@ function shopping(){
  if(unit==='ml')arr.push('cl','l');
  if(p?.packAmount>0&&p.packUnit){
   const [v,u]=converted(p.packAmount,p.packUnit);
-  if(v>0&&u===unit&&unit!=='paquet')arr.push('paquet')
+  if(v>0&&u===unit&&unit!==(p.unit||'paquet')){
+   arr.push(p.unit||'paquet');
+   if(getWeek().pantryUnits?.[x.stockKey]==='paquet'&&p.unit!=='paquet')arr.push('paquet')
+  }
  }
  return [...new Set(arr)]
 }
 function stockInputToBase(x,amount,unit){
  if(!Number.isFinite(amount)||amount<0)return null;
- if(unit==='paquet'&&x.stockUnit!=='paquet'){
-  const p=productById(x.productId);
+ const p=productById(x.productId);
+ if((unit==='paquet'||(p&&unit===p.unit))&&unit!==x.stockUnit){
   if(!p||!(p.packAmount>0))return null;
   const [size,baseUnit]=converted(p.packAmount,p.packUnit);
   return baseUnit===x.stockUnit?amount*size:null
@@ -1045,8 +1048,9 @@ function stockInputToBase(x,amount,unit){
  return base===x.stockUnit?value:null
 }
 function stockBaseToUnit(x,amount,unit){
- if(unit==='paquet'&&x.stockUnit!=='paquet'){
-  const p=productById(x.productId),[size,base]=converted(p?.packAmount,p?.packUnit);
+ const p=productById(x.productId);
+ if((unit==='paquet'||(p&&unit===p.unit))&&unit!==x.stockUnit){
+  const [size,base]=converted(p?.packAmount,p?.packUnit);
   return size>0&&base===x.stockUnit?amount/size:amount
  }
  if(unit==='kg'&&x.stockUnit==='g')return amount/1000;
@@ -1063,7 +1067,8 @@ function stockPreview(x,amount,unit){
  const [packValue,packUnit]=p?.packAmount>0?converted(p.packAmount,p.packUnit):[0,''];
  if(packValue>0&&packUnit===x.stockUnit){
   const packs=Math.ceil(Math.max(0,left)/packValue-1e-9);
-  remaining+=' · '+packs+' '+(packs>1?'paquets':'paquet')+' Carrefour';
+  const label=p.unit||'paquet';
+  remaining+=' · '+packs+' '+label+(packs>1?'s':'')+' Carrefour';
  }
  if(left===0)remaining='✓ Vous avez déjà tout ce qu’il faut pour ce produit.';
  return 'Besoin : '+quantity(need,x.stockUnit)+' · Stock maison : '+quantity(val,x.stockUnit)+' · '+remaining
@@ -1083,10 +1088,12 @@ function homeStockModal(itemId){
  '<div class="stock-overview"><div><small>Besoin pour les repas</small><strong>'+html(quantity(x.totalNeedAmount,x.totalNeedUnit))+'</strong></div>'+
  '<div><small>Déjà à la maison</small><strong>'+html(quantity(x.stockAmount,x.stockUnit))+'</strong></div></div>'+
  '<div class="row stock-editor-row"><div class="field grow"><label for="homeStockAmount">Quantité disponible</label>'+
- '<input id="homeStockAmount" type="number" min="0" step="any" inputmode="decimal" value="'+html(Number(amount.toFixed(3)))+'"></div>'+
+ '<div class="v38-stock-stepper"><button type="button" data-action="stock-decrease" aria-label="Diminuer le stock">−</button>'+
+ '<input id="homeStockAmount" type="number" min="0" step="any" inputmode="decimal" value="'+html(Number(amount.toFixed(3)))+'">'+
+ '<button type="button" data-action="stock-increase" aria-label="Augmenter le stock">＋</button></div></div>'+
  '<div class="field grow"><label for="homeStockUnit">Unité</label><select id="homeStockUnit" data-previous="'+html(selected)+'">'+
  choices.map(u=>'<option value="'+html(u)+'" '+(selected===u?'selected':'')+'>'+html(u==='paquet'?'paquet':u)+'</option>').join('')+'</select></div></div>';
- if(choices.includes('paquet')&&packSize>0)htmlBody+='<p class="helper">1 paquet = '+html(quantity(packSize,packUnit))+'. Tu peux indiquer un stock en paquets ou dans une unité de poids/volume.</p>';
+ if(choices.includes(p?.unit||'paquet')&&packSize>0)htmlBody+='<p class="helper">1 '+html(p.unit||'paquet')+' = '+html(quantity(packSize,packUnit))+'. Tu peux indiquer le stock en pièces, en grammes ou en unités achetées selon le produit.</p>';
  htmlBody+='<div class="stock-quick-actions"><button class="btn secondary" data-action="stock-zero">Aucun stock</button><button class="btn secondary" data-action="stock-all">✓ J’ai tout</button></div>'+
  '<div id="homeStockPreview" class="stock-preview">'+html(stockPreview(x,Number(amount),selected))+'</div>'+
  '<button class="btn wide" data-action="save-home-stock" data-id="'+html(x.id)+'">✓ Enregistrer mon stock</button>';
@@ -1951,6 +1958,14 @@ document.addEventListener('click',e=>{
   }
   else if(mode==='edit-shopping-item')editShoppingItemModal(id);
   else if(mode==='home-stock')homeStockModal(id);
+  else if(mode==='stock-decrease'||mode==='stock-increase'){
+   const field=$('#homeStockAmount'),unit=$('#homeStockUnit')?.value;
+   if(!field)return;
+   const current=Number(field.value),base=Number.isFinite(current)&&current>0?current:0,
+    step=unit==='g'||unit==='ml'?100:unit==='cl'?10:unit==='kg'||unit==='l'?0.1:1;
+   const next=mode==='stock-increase'?base+step:Math.max(0,base-step);
+   field.value=String(Math.round(next*1000)/1000);refreshStockPreview()
+  }
   else if(mode==='stock-zero'||mode==='stock-all'){
    const x=shopping().find(i=>i.id===$('#homeStockItemId')?.value);if(!x)return;
    const unit=$('#homeStockUnit')?.value,field=$('#homeStockAmount');

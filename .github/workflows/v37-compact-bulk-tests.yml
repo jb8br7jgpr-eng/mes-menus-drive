@@ -1,0 +1,22 @@
+name: "V37 — cartes compactes et courses multi-articles (sans déploiement)"
+on:
+  push:
+    branches: [speedrive-v37-compact-bulk-courses]
+  pull_request:
+    branches: [developpement-v1]
+permissions:
+  contents: read
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Vérifier la syntaxe JavaScript
+        run: node --check app.js
+      - name: Tester V35, V36 et V37
+        run: node --test tests/v35-portions-courses.test.mjs tests/v36-ergonomie.test.mjs tests/v37-compact-bulk-courses.test.mjs
+      - name: Confirmer aucun déploiement et aucune connexion Firebase
+        run: echo "Validation de code uniquement"

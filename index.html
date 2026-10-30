@@ -13,14 +13,15 @@
   <link rel="icon" type="image/png" href="./speedrive-icon-v2.PNG?v=20261029-31">
   <link rel="apple-touch-icon" href="./speedrive-icon-v2.PNG?v=20261029-31">
   <link rel="stylesheet" href="./styles.css?v=20261030-40-1">
+  <link rel="stylesheet" href="./stock-ui-v41.css?v=20261030-41-draft">
   <link rel="stylesheet" href="./firebase/v34-ui.css?v=20261029-34">
   <style>
-    /* Navigation essentielle : 5 cases fixes, même si Safari conserve une ancienne feuille de style. */
-    .bottom-nav { display: grid !important; grid-template-columns: repeat(5, minmax(0, 1fr)) !important; }
+    /* Navigation V41 : six cases fixes et lisibles sur iPhone, en une seule ligne. */
+    .bottom-nav { display: grid !important; grid-template-columns: repeat(6, minmax(0, 1fr)) !important; }
     .bottom-nav > .nav-item { min-width: 0; max-width: 100%; overflow: hidden; }
     .bottom-nav > .nav-item > span:last-child { display: block; max-width: 100%; white-space: nowrap; }
   </style>
-  <script defer src="./app.js?v=20261030-40-1"></script>
+  <script defer src="./app.js?v=20261030-41-draft"></script>
   <script type="module" src="./firebase/v34-ui.js?v=20261029-34"></script>
 </head>
 <body>
@@ -34,10 +35,11 @@
     <main id="app" class="content" aria-live="polite">
       <div class="loading"><span class="spinner"></span>Préparation de l'application…</div>
     </main>
-    <nav class="bottom-nav" aria-label="Navigation principale">
+    <nav class="bottom-nav v41-six-tabs" aria-label="Navigation principale">
       <button data-tab="menus" class="nav-item active" aria-current="page"><span class="nav-icon"><svg class="speedrive-nav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/><path d="M8 14h3v3H8z"/></svg></span><span>Menus</span></button>
       <button data-tab="plats" class="nav-item"><span class="nav-icon"><svg class="speedrive-nav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 3v6M10 3v6M4 3v4a3 3 0 0 0 6 0M7 9v12"/><path d="M17 3c-2 3-3 6-3 10h5V3h-2zM19 13v8"/></svg></span><span>Plats</span></button>
       <button data-tab="produits" class="nav-item"><span class="nav-icon"><svg class="speedrive-nav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 7 9-4 9 4v10l-9 4-9-4z"/><path d="m3 7 9 4 9-4M12 11v10"/></svg></span><span>Produits</span></button>
+      <button data-tab="stock" class="nav-item"><span class="nav-icon"><svg class="speedrive-nav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10l9-7 9 7v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z"/><path d="M9 21v-7h6v7"/></svg></span><span>Stock</span></button>
       <button data-tab="courses" class="nav-item"><span class="nav-icon"><svg class="speedrive-nav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 13l2 2 5-5"/></svg></span><span>Courses</span></button>
       <button data-tab="drive" class="nav-item"><span class="nav-icon"><svg class="speedrive-nav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="20" r="1"/><circle cx="18" cy="20" r="1"/><path d="M2 3h2l2.3 11.4a2 2 0 0 0 2 1.6H19a2 2 0 0 0 2-1.7L22 7H5"/></svg></span><span>Drive</span></button>
     </nav>

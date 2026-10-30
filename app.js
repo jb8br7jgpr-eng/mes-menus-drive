@@ -742,6 +742,58 @@ function migrateFrequentProducts(){
  state.favoritesUnifiedV29=true;
  return true
 }
+
+/* V36 : choix multiple sans nouvelle structure de données et un seul enregistrement. */
+function favoriteExtraV36(kind,id){
+ const ingredient=kind==='ingredient',item=ingredient?ingredientById(id):kind==='daily'?productById(id):null;
+ if(!item)return null;
+ const qty=Number(item.qty)||1,unit=units.includes(item.unit)?item.unit:'pièce';
+ return {id:uid(),name:item.name,qty,unit,productId:ingredient?(item.productId||null):item.id,
+  ingredientId:ingredient?item.id:null,fromCatalogue:true}
+}
+function favoriteAlreadyAddedV36(w,extra){
+ return (w.extras||[]).some(x=>(extra.ingredientId&&x.ingredientId===extra.ingredientId)||
+   (extra.productId&&x.productId===extra.productId))
+}
+function bulkFavoritesV36(){
+ const items=frequentCatalogueItems(),w=getWeek();
+ if(!items.length){toast('Aucun achat habituel enregistré.');return}
+ let out='<p class="helper">Coche les achats habituels à ajouter à cette semaine. Les articles déjà ajoutés ne seront pas dupliqués.</p>'+
+ '<div class="v36-bulk-tools"><button class="btn tiny secondary" data-action="bulk-select-all">Tout sélectionner</button>'+
+ '<button class="btn tiny secondary" data-action="bulk-select-none">Tout désélectionner</button></div>'+
+ '<div class="v36-bulk-list">';
+ out+=items.map(x=>{
+  const extra=favoriteExtraV36(x.kind,x.id);
+  const already=extra&&favoriteAlreadyAddedV36(w,extra);
+  return '<label class="v36-bulk-row'+(already?' already':'')+'"><input type="checkbox" data-v36-favorite data-kind="'+x.kind+
+    '" data-id="'+html(x.id)+'" '+(already?'disabled':'')+'><span class="v36-bulk-name"><strong>'+
+    html(x.name)+'</strong><small>'+html(extra?quantity(extra.qty,extra.unit):'')+(already?' · déjà ajouté':'')+
+    '</small></span></label>'
+ }).join('');
+ out+='</div><button class="btn wide v36-bulk-submit" data-action="bulk-add-favorites" disabled>＋ Ajouter les achats sélectionnés</button>';
+ showModal('☑ Mes achats habituels',out)
+}
+function updateBulkFavoritesCountV36(){
+ const selected=document.querySelectorAll('[data-v36-favorite]:checked').length;
+ const button=$('.v36-bulk-submit');if(!button)return;
+ button.disabled=!selected;
+ button.textContent=selected?'＋ Ajouter '+selected+' achat'+(selected>1?'s':''):'＋ Ajouter les achats sélectionnés'
+}
+function addBulkFavoritesV36(){
+ const checkboxes=[...document.querySelectorAll('[data-v36-favorite]:checked')];
+ if(!checkboxes.length){toast('Coche au moins un achat.');return}
+ const w=getWeek(),before=weekBeforeUndo();
+ let added=0,skipped=0;
+ for(const checkbox of checkboxes){
+  const extra=favoriteExtraV36(checkbox.dataset.kind,checkbox.dataset.id);
+  if(!extra||favoriteAlreadyAddedV36(w,extra)){skipped++;continue}
+  w.extras.push(extra);added++
+ }
+ if(!added){toast('Ces achats sont déjà dans la liste.');return}
+ persist();closeModal();render(true);
+ toastWeekUndo(added+' achat'+(added>1?'s':'')+' ajouté'+(added>1?'s':'')+(skipped?' · '+skipped+' déjà présent'+(skipped>1?'s':''):''),before)
+}
+
 function frequentCatalogueItems(){
  const linked=new Set((state.ingredientCatalog||[]).map(i=>i.productId).filter(Boolean));
  return [
@@ -1076,7 +1128,7 @@ function renderCourses(){
  const favorites=frequentCatalogueItems();
  if(favorites.length){
   out+='<details class="course-optional" data-section="favorites" '+(courseOpenSections.has('favorites')?'open':'')+'><summary>☆ Mes achats fréquents <span class="pill gray">'+favorites.length+'</span></summary>'+
-   '<p class="helper">Des produits du catalogue, sans fiche en double. Retrouve-les ici pour les ajouter ponctuellement.</p><div class="favorites">'+
+   '<p class="helper">Ajoute un article d’un geste ou sélectionne plusieurs achats.</p>'+ '<button class="btn secondary wide v36-bulk-open" data-action="bulk-favorites">☑ Ajouter plusieurs achats d’un coup</button><div class="favorites">'+
    favorites.map(x=>'<button class="favorite-chip" data-action="frequent-to-courses" data-kind="'+x.kind+'" data-id="'+html(x.id)+'">＋ '+html(x.name)+'</button>').join('')+'</div></details>'
  }
  function section(store,title,icon,rows){
@@ -1958,6 +2010,12 @@ document.addEventListener('click',e=>{
   else if(mode==='extra-one-off')extraOneOffModal();
   else if(mode==='select-extra-catalogue')unifiedToCourses(a.dataset.kind,id);
   else if(mode==='frequent-to-courses')unifiedToCourses(a.dataset.kind,id);
+   else if(mode==='bulk-favorites')bulkFavoritesV36();
+   else if(mode==='bulk-select-all'||mode==='bulk-select-none'){
+    document.querySelectorAll('[data-v36-favorite]:not(:disabled)').forEach(cb=>{cb.checked=mode==='bulk-select-all'});
+    updateBulkFavoritesCountV36()
+   }
+   else if(mode==='bulk-add-favorites')addBulkFavoritesV36();
   else if(mode==='edit-manual-row')editManualRowModal(id);
   else if(mode==='edit-manual-extra')editManualExtraModal(id);
   else if(mode==='save-manual-extra'){
@@ -2007,6 +2065,7 @@ document.addEventListener('click',e=>{
   else if(mode==='clear-all'){if(confirm('Effacer toutes les données actuelles ? Une copie locale sera conservée dans les versions précédentes.')){checkpoint('Avant effacement');state=baseState();persist();closeModal();render();toast('Données actuelles effacées.')}}
 });
 document.addEventListener('change',e=>{
+  if(e.target.matches('[data-v36-favorite]')){updateBulkFavoritesCountV36();return}
  if(e.target.id==='catalogueStore'){$('#catalogueReferencePanel')?.toggleAttribute('hidden',e.target.value==='grandfrais');return}
  if(e.target.id==='mealRecipeType'){refreshMealRecipePicker();return}
  if(e.target.id==='recipeSort'||e.target.id==='recipeTypeFilter'){

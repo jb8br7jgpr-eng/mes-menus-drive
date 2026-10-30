@@ -615,6 +615,8 @@ function saveUnifiedCatalogue(e){
  ingredientStoreTab=store;
  if(catalogueStoreFilter!=='all')catalogueStoreFilter=store;
  if(catalogueTypeFilter!=='all'&&catalogueTypeFilter!==kind)catalogueTypeFilter='all';
+ // Un produit modifié doit rester visible, même si le filtre était sur une autre catégorie.
+ if(catalogueCategoryFilter!=='all'&&catalogueCategoryFilter!==category)catalogueCategoryFilter='all';
  persist();closeModal();render();toast('Produit enregistré !')
 }
 function productBadge(p){

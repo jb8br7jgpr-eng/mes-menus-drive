@@ -254,6 +254,56 @@ export function handleStockActionV41(ctx) {
     meal.consumed=true;
   });return true
  }
+ // Plan B explicite lorsque les données historiques ne permettent plus de
+ // reconstruire exactement les ingrédients : déverrouiller SANS remboursement.
+ // L'utilisateur doit alors corriger les quantités dans Stock → Maison.
+ if(mode==='v41-review-validation-recovery'){
+  if(!Number.isInteger(index)||index<0||index>13||!id)return true;
+  const key=index+':'+id,action=w.v41MealActions?.[key];
+  const dish=ctx.mealDishes(w.meals[index]).find(x=>x.recipeId===id);
+  if(!action||!dish){ctx.toast('Ce repas ne comporte plus de validation liée à ce plat.');return true}
+  if(action.status!=='eaten'){
+   ctx.toast('Les congélations doivent être annulées avec leurs portions : réinitialisation sans stock interdite.');return true
+  }
+  const descendants=w.meals.some((meal,i)=>ctx.mealLeftovers(meal).some(left=>
+   left.fromIndex===index&&left.recipeId===id&&w.v41MealActions?.[i+':leftovers:'+index+':'+id]));
+  ctx.showModal('Réparer une validation bloquée',
+   '<p class="helper">La validation de « '+esc(ctx.recipeById(id)?.name||'ce plat')+
+   ' » est encore enregistrée. Si le bouton normal ne fonctionne pas, tu peux retirer uniquement ce verrou.</p>'+
+   '<p class="note">⚠ Le stock maison ne sera pas augmenté : il peut déjà contenir une consommation réelle. Après déblocage, vérifie tes quantités dans Stock → Maison et corrige-les manuellement si ton test les avait diminuées.</p>'+
+   (descendants?'<p class="note">Des restes de ce plat ont aussi été validés. Annule d’abord la validation de ces restes.</p>':
+    '<button class="btn wide" data-action="v41-confirm-validation-recovery" data-index="'+index+
+    '" data-id="'+esc(id)+'">Débloquer ce plat sans changer le stock</button>'));
+  return true
+ }
+ if(mode==='v41-confirm-validation-recovery'){
+  if(!Number.isInteger(index)||index<0||index>13||!id)return true;
+  const key=index+':'+id,action=w.v41MealActions?.[key];
+  const dish=ctx.mealDishes(w.meals[index]).find(x=>x.recipeId===id);
+  if(!action||action.status!=='eaten'||!dish){
+   ctx.toast('Validation absente ou non réinitialisable.');return true
+  }
+  if(w.meals.some((meal,i)=>ctx.mealLeftovers(meal).some(left=>
+   left.fromIndex===index&&left.recipeId===id&&w.v41MealActions?.[i+':leftovers:'+index+':'+id]))){
+   ctx.toast('Annule d’abord les restes déjà validés.');return true
+  }
+  if(!confirm('Débloquer la validation du plat sans modifier le Stock maison ? Il faudra vérifier les quantités du stock et les corriger si des ingrédients ont été déduits pendant ton essai. Cette action ne restaure aucun ingrédient.'))return true;
+  const previousWeeks=JSON.parse(JSON.stringify(state.weeks));
+  try{
+   w.v41RecoveryLog=w.v41RecoveryLog||[];
+   w.v41RecoveryLog.push({key,at:new Date().toISOString(),
+    status:action.status,original:JSON.parse(JSON.stringify(action)),stockAdjusted:false});
+   if(w.v41RecoveryLog.length>30)w.v41RecoveryLog=w.v41RecoveryLog.slice(-30);
+   delete w.v41MealActions[key];
+   if(Array.isArray(w.generatedIngredients))ctx.generateWeekCourses(w);
+   ctx.persist();ctx.closeModal();ctx.render(true);
+   ctx.toast('Repas débloqué. Vérifie les quantités dans Stock maison.');
+  }catch(err){
+   state.weeks=previousWeeks;
+   ctx.toast('Réparation impossible : '+(err.message||err));
+  }
+  return true
+ }
  // Annulation d'une validation accidentelle : jamais un simple retrait du verrou.
  // Le mouvement inverse de stock est atomique, enregistré et conservé dans Firebase.
  // Les validations V41 antérieures à ce correctif n'avaient pas conservé leurs

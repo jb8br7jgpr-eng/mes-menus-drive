@@ -126,3 +126,53 @@ export function availableFreezerV41(stock,recipeId){
  const s=normalizeStockV41(stock);
  return Object.values(s.freezer).filter(l=>l.recipeId===recipeId).reduce((n,l)=>n+l.portions,0)
 }
+
+
+// Lecture SEULE : prépare la reprise éventuelle d'une semaine historique.
+// Ne cumule jamais plusieurs semaines et ne décide pas à la place de l'utilisateur.
+export function previewLegacyPantryV41(week,ingredientCatalog=[],products=[]) {
+ const entries=[],warnings=[],byTarget=new Map();
+ const pantry=week?.pantry;
+ if(!pantry||typeof pantry!=="object"||Array.isArray(pantry))
+  return {entries,warnings,requiresReview:false};
+ for(const [sourceKey,rawQty] of Object.entries(pantry)){
+  const qty=Number(rawQty);
+  if(!positive(qty))continue;
+  const separator=sourceKey.lastIndexOf("|");
+  if(separator<1){warnings.push("Unité inconnue : "+sourceKey);continue}
+  const left=sourceKey.slice(0,separator),unit=sourceKey.slice(separator+1);
+  let identity,name,category,store;
+  if(left.startsWith("ingredient:")){
+   const id=left.slice("ingredient:".length);
+   const ing=ingredientCatalog.find(x=>x.id===id);
+   if(!ing){warnings.push("Ingrédient absent du catalogue : "+sourceKey);continue}
+   identity=stockIdentityV41({ingredientId:id},ingredientCatalog);
+   name=ing.name;category=ing.category;store=ing.store;
+  } else if(left.startsWith("produit:")){
+   const id=left.slice("produit:".length);
+   const product=products.find(x=>x.id===id);
+   if(!product){warnings.push("Produit absent du catalogue : "+sourceKey);continue}
+   identity=stockIdentityV41({productId:id},ingredientCatalog);
+   const linked=ingredientCatalog.find(x=>identity==="ingredient:"+x.id);
+   name=linked?.name||product.name;
+   category=linked?.category||product.category;
+   store=linked?.store||product.store;
+  }else{
+   warnings.push("Article sans référence de catalogue : "+sourceKey);
+   continue
+  }
+  let amount,canonical;
+  try{({amount,unit:canonical}=stockMeasureV41(qty,unit))}
+  catch(e){warnings.push("Quantité ou unité invalide : "+sourceKey);continue}
+  const target=identity+"|"+canonical;
+  const row={sourceKey,identity,name,category:category||"Autres",store:store||null,
+   amount,unit:canonical,requiresReview:false};
+  if(byTarget.has(target)){
+   row.requiresReview=true;
+   byTarget.get(target).requiresReview=true;
+   warnings.push("Plusieurs anciennes lignes pour "+name+" : vérifier avant de transférer, ne pas additionner automatiquement.")
+  }else byTarget.set(target,row);
+  entries.push(row)
+ }
+ return {entries,warnings,requiresReview:entries.some(x=>x.requiresReview)||warnings.length>0}
+}

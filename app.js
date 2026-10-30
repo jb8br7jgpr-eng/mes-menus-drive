@@ -374,7 +374,11 @@ function productCategoryOptions(selected='Autres'){
  return options
 }
 function productCategoryChoices(){
- const values=new Set([...(state.ingredientCatalog||[]),...(state.products||[])].map(p=>String(p.category||'Autres')));
+ // Les filtres doivent présenter toutes les catégories configurées, même
+ // si aucun produit n'y a encore été classé. Les catégories historiques ou
+ // personnalisées sont conservées sans modifier les fiches existantes.
+ const values=new Set([...productCategories,...(state.ingredientCatalog||[]),
+  ...(state.products||[])].filter(Boolean).map(p=>typeof p==='string'?p:String(p.category||'Autres')));
  return [...values].sort((a,b)=>{
   const ia=productCategories.indexOf(a),ib=productCategories.indexOf(b);
   return (ia<0?productCategories.length:ia)-(ib<0?productCategories.length:ib)||a.localeCompare(b,'fr')
@@ -1635,8 +1639,7 @@ function bulkPurchaseExtraV37(kind,id,amount,unit){
 function openBulkCatalogueV37(favoritesOnly=false){
  const items=bulkCatalogueV37();
  if(!items.length){toast('Ajoute d’abord des produits ou ingrédients dans ton catalogue.');return}
- const categories=[...new Set(items.map(item=>item.category||'Autres'))].sort((a,b)=>
-  a.localeCompare(b,'fr',{sensitivity:'base'}));
+ const categories=productCategoryChoices();
  let out='<p class="helper v40-bulk-help">Les quantités sont de simples propositions : sélectionne tes articles et ajuste-les sans modifier les recettes.</p>'+
  catalogueFiltersV40({
   prefix:'courses',searchId:'v37BulkSearch',storeId:'v40BulkStore',

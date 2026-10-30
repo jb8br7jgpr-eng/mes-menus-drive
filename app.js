@@ -1076,14 +1076,15 @@ function courseGenerationBanner(w=getWeek(),where='courses'){
  return '<div class="course-generation '+status+'"><strong>'+title+'</strong><p>'+description+'</p>'+
  '<div class="course-generation-actions">'+button+'</div></div>'
 }
-function stockQuantityV41(key,legacyAmount,productId,ingredientId,unit){
- if(!state.stockV41||!stockModulesV41)return Math.max(0,Number(legacyAmount)||0);
- try{
-  const identity=stockModulesV41.core.stockIdentityV41({ingredientId:ingredientId||null,productId:productId||null},state.ingredientCatalog);
-  return stockModulesV41.core.availableStockV41(state.stockV41,identity,unit)
- }catch(_){return 0}
-}
 function shopping(){
+ function stockQuantityV41(key,legacyAmount,productId,ingredientId,unit){
+  if(!state.stockV41||typeof stockModulesV41==='undefined'||!stockModulesV41)return Math.max(0,Number(legacyAmount)||0);
+  try{
+   const identity=stockModulesV41.core.stockIdentityV41({ingredientId:ingredientId||null,productId:productId||null},state.ingredientCatalog);
+   return stockModulesV41.core.availableStockV41(state.stockV41,identity,unit)
+  }catch(_){return 0}
+ }
+
  const w=getWeek(),map=new Map(),packs=new Map();
  function plain(name,qty,unit,source,productId,ingredientId,store,extraId=null,generatedIndex=null){
   const clean=String(name||'').trim();if(!clean)return;

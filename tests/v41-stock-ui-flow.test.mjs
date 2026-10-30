@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {emptyStockV41,applyStockTransactionV41,availableStockV41,availableFreezerV41,stockIdentityV41} from '../stock-engine-v41.mjs';
 import {freezerReservationsV41} from '../stock-week-v41.mjs';
+import {previewStockMovementsV413,stockConfirmationTextV413} from '../stock-preview-v413.mjs';
 import {renderStockV41} from '../stock-ui-v41.mjs';
 import {handleStockActionV41} from '../stock-actions-v41.mjs';
 import {packState,unpackState} from '../firebase/v34-cloud-codec.js';
@@ -659,4 +660,115 @@ test('Une réparation manuelle bloque tant que les restes sont validés',()=>{
  assert.match(f.message,/Annule d’abord les restes/);
  assert.equal(JSON.stringify(f.state.stockV41),stockBefore);
  assert.ok(f.week.v41MealActions['0:pasta-dinner']);
+});
+
+test('V41.3 : aperçu exact avec conversion boîte/grammes et transaction totalement immuable',()=>{
+ const start=applyStockTransactionV41(emptyStockV41(),{id:'v413-import',movements:[
+  {type:'inventory',direction:'add',identity:'ingredient:pasta',name:'Pâtes',amount:1,unit:'paquet',product:products[0]}
+ ]}).stock;
+ const snapshot=JSON.stringify(start);
+ const take=[{type:'inventory',direction:'consume',identity:'ingredient:pasta',name:'Pâtes',amount:250,unit:'g'}];
+ const preview=previewStockMovementsV413(start,take);
+ assert.equal(preview.lines.length,1);
+ assert.equal(preview.lines[0].before,500);
+ assert.equal(preview.lines[0].after,250);
+ assert.match(preview.lines[0].text,/Pâtes : 500 → 250 g \(−250 g\)/);
+ assert.equal(JSON.stringify(start),snapshot,'l’aperçu ne change aucune quantité ni historique');
+ const add=previewStockMovementsV413(start,[{
+  type:'inventory',direction:'add',identity:'ingredient:pasta',
+  name:'Pâtes',amount:1,unit:'paquet',product:products[0]
+ }]);
+ assert.equal(add.lines[0].before,500);
+ assert.equal(add.lines[0].after,1000);
+ assert.match(stockConfirmationTextV413(start,take,'Plat mangé'),/Valider ces mouvements de stock/);
+ assert.equal(start.applied['v413:preview:never-persisted'],undefined);
+});
+
+test('V41.3 : avant C’est mangé la confirmation montre avant/après et un refus ne déduit rien',()=>{
+ const start=applyStockTransactionV41(emptyStockV41(),{id:'v413-meal-start',movements:[
+  {type:'inventory',direction:'add',identity:'ingredient:pasta',amount:500,unit:'g',name:'Pâtes'}
+ ]}).stock;
+ const f=fixture(start);withInputs(f.inputs);
+ f.week.meals[0]={type:'recipe',recipeId:'pasta-dinner',people:2};
+ let message='';
+ globalThis.confirm=msg=>{message=String(msg);return false};
+ f.invoke('v41-eat-recipe',{index:0,id:'pasta-dinner'});
+ assert.match(message,/Pâtes : 500 → 250 g/);
+ assert.equal(f.saved,0);
+ assert.equal(availableStockV41(f.state.stockV41,'ingredient:pasta','g'),500);
+ assert.equal(f.week.v41MealActions,undefined);
+ globalThis.confirm=()=>true;
+ f.invoke('v41-eat-recipe',{index:0,id:'pasta-dinner'});
+ assert.equal(f.saved,1);
+ assert.equal(availableStockV41(f.state.stockV41,'ingredient:pasta','g'),250);
+});
+
+test('V41.3 : aperçu de courses et congélateur avant confirmation, sans écriture si annulation',()=>{
+ const f=fixture();withInputs({...f.inputs,v41FreezePortions:1});
+ f.week.extras.push({id:'e1',name:'Pâtes',qty:1,unit:'paquet'});
+ f.week.checked=['produit:pack|achat'];
+ let message='';
+ globalThis.confirm=msg=>{message=String(msg);return false};
+ f.invoke('v41-courses-done');
+ assert.match(message,/Pâtes : 0 → 500 g/);
+ assert.equal(f.saved,0);
+ assert.equal(f.state.stockV41,null);
+ // Le congélateur montre aussi l'ajout de portions avant la préparation.
+ const initial=applyStockTransactionV41(emptyStockV41(),{id:'freeze-ingredients',movements:[
+  {type:'inventory',direction:'add',identity:'ingredient:pasta',name:'Pâtes',amount:500,unit:'g'}
+ ]}).stock;
+ f.state.stockV41=initial;
+ f.week.meals[0]={type:'recipe',recipeId:'pasta-dinner',people:2};
+ f.invoke('v41-confirm-freeze-recipe',{index:0,id:'pasta-dinner'});
+ assert.match(message,/Pâtes : 500 → 250 g/);
+ assert.match(message,/❄️ Pâtes : 0 → 1 portion/);
+ assert.equal(f.saved,0);
+ assert.equal(availableFreezerV41(f.state.stockV41,'pasta-dinner'),0);
+});
+
+test('V41.3 : recherche dans ajouter au stock, boutons +/- et raccourci paquet',()=>{
+ const f=fixture();withInputs(f.inputs);
+ f.invoke('v41-add-stock');
+ assert.match(f.modals.at(-1).body,/id="v413StockPickerSearch"/);
+ assert.match(f.modals.at(-1).body,/data-v413-stock-choice/);
+ assert.match(f.modals.at(-1).body,/id="v413StockPickerResults"/);
+ f.invoke('v41-stock-select',{id:'pasta',dataset:{kind:'ingredient'}});
+ assert.match(f.modals.at(-1).body,/data-action="v413-stock-step"/);
+ assert.match(f.modals.at(-1).body,/data-action="v413-stock-one-package"/);
+ const field={value:'1'},unit={value:'g'};
+ globalThis.document={getElementById:id=>({v41StockQuantity:field,v41StockUnit:unit}[id]||null)};
+ f.invoke('v413-stock-step',{dataset:{step:'1'}});
+ assert.equal(field.value,'101');
+ f.invoke('v413-stock-step',{dataset:{step:'-1'}});
+ assert.equal(field.value,'1');
+ f.invoke('v413-stock-one-package',{dataset:{unit:'paquet'}});
+ assert.equal(field.value,'1');
+ assert.equal(unit.value,'paquet');
+ f.invoke('v41-save-stock',{id:'pasta',dataset:{kind:'ingredient'}});
+ assert.equal(availableStockV41(f.state.stockV41,'ingredient:pasta','g'),500);
+ assert.match(style,/v413-meal-quick/);
+ assert.match(style,/data-v413-stock-choice/);
+ assert.match(app,/e\.target\.id==='v413StockPickerSearch'/);
+});
+
+test('V41.3 : les actions du repas changent avec son statut et n’affichent pas de modification bloquée',()=>{
+ const source=app.slice(app.indexOf('function quickMealActionsV413('),app.indexOf('function pickMeal(index)'));
+ const f=fixture();const ctx={
+  getWeek:()=>f.week,mealDishes,mealLeftovers,recipeById:id=>recipes.find(r=>r.id===id),
+  html:x=>String(x)
+ };
+ const actions=runInNewContext(source+';quickMealActionsV413',ctx);
+ f.week.meals[0]={type:'recipe',recipeId:'pasta-dinner',people:2};
+ let row=actions(0,f.week.meals[0]);
+ assert.match(row,/v41-eat-recipe/);
+ assert.match(row,/v41-freeze-recipe/);
+ f.week.v41MealActions={'0:pasta-dinner':{status:'eaten'}};
+ row=actions(0,f.week.meals[0]);
+ assert.equal(row,'','une recette déjà validée ne propose pas de nouvelle consommation');
+ const modal=app.slice(app.indexOf('function pickMeal(index)'),app.indexOf('function extraSearchItems('));
+ assert.match(modal,/if\(validated\)\{/);
+ assert.match(modal,/undoMealValidationControlsV41\(index,meal\)/);
+ assert.match(modal,/Les modifications sont protégées/);
+ assert.match(modal,/remove-meal/);
+ assert.match(modal,/quickMealActionsV413\(index,meal\)/);
 });

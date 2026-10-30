@@ -1081,7 +1081,7 @@ function courseGenerationBanner(w=getWeek(),where='courses'){
 }
 function shopping(){
  function stockQuantityV41(key,legacyAmount,productId,ingredientId,unit){
-  if(!state.stockV41||typeof stockModulesV41==='undefined'||!stockModulesV41)return Math.max(0,Number(legacyAmount)||0);
+  if(typeof state==='undefined'||!state.stockV41||typeof stockModulesV41==='undefined'||!stockModulesV41)return Math.max(0,Number(legacyAmount)||0);
   try{
    const identity=stockModulesV41.core.stockIdentityV41({ingredientId:ingredientId||null,productId:productId||null},state.ingredientCatalog);
    return stockModulesV41.core.availableStockV41(state.stockV41,identity,unit)

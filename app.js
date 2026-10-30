@@ -132,7 +132,7 @@ function undoWeekAction(){
  toast('Action annulée !')
 }
 
-function render(preserveScroll=false){const scrollY=window.scrollY;document.querySelectorAll('.nav-item').forEach(b=>{const active=b.dataset.tab===currentTab;b.classList.toggle('active',active);if(active)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current')});app.innerHTML=({menus:renderMenus,plats:renderPlats,produits:renderProduits,courses:renderCourses,drive:renderDrive,stock:()=>stockModulesV41?stockModulesV41.ui.renderStockV41({state,week:getWeek(),weekId:currentWeek,view:stockViewV41,recipeById,mealDishes}):'<div class="loading">Chargement du stock…</div>'}[currentTab])();window.scrollTo({top:preserveScroll?scrollY:0,behavior:'auto'})}
+function render(preserveScroll=false){const scrollY=window.scrollY;document.querySelectorAll('.nav-item').forEach(b=>{const active=b.dataset.tab===currentTab;b.classList.toggle('active',active);if(active)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current')});app.innerHTML=({menus:renderMenus,plats:renderPlats,produits:renderProduits,courses:renderCourses,drive:renderDrive,stock:()=>stockModulesV41?stockModulesV41.ui.renderStockV41({state,week:getWeek(),weekId:currentWeek,view:stockViewV41,recipeById,mealDishes,mealLeftovers}):'<div class="loading">Chargement du stock…</div>'}[currentTab])();window.scrollTo({top:preserveScroll?scrollY:0,behavior:'auto'})}
 function switchTabV33(destination){
  if(!Object.prototype.hasOwnProperty.call(tabScrollV33,destination))return;
  if(destination===currentTab)return;

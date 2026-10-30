@@ -152,6 +152,16 @@ export function handleStockActionV41(ctx) {
   const key=index+':'+id;
   if(w.v41MealActions?.[key]){ctx.toast('Ce plat a déjà été validé.');return true}
   const freeze=mode==='v41-confirm-freeze-recipe';
+  const relatedLeftovers=w.meals.flatMap((meal,otherIndex)=>ctx.mealLeftovers(meal)
+   .filter(x=>x.fromIndex===index&&x.recipeId===id)
+   .map(x=>({index:otherIndex,people:x.people})));
+  if(freeze){
+   if(relatedLeftovers.some(x=>w.v41MealActions?.[x.index+':leftovers:'+index+':'+id])){
+    ctx.toast('Ces restes ont déjà été mangés : impossible de congeler le même plat une deuxième fois.');return true
+   }
+   if(relatedLeftovers.length&&!confirm('Ce plat a déjà '+relatedLeftovers.length+
+    ' repas de restes prévus. Les congeler retirera ces restes des menus pour éviter de compter deux fois les portions. Continuer ?'))return true;
+  }
   if(!freeze&&!confirm('Confirmer que « '+r.name+' » a bien été préparé ('+dish.people+' portions) ? Les ingrédients de toutes les portions seront déduits du Stock maison.'))return true;
   const frozenPortions=freeze?amount('v41FreezePortions'):0;
   if(freeze&&(!Number.isInteger(frozenPortions)||frozenPortions<1||frozenPortions>Number(dish.people))){

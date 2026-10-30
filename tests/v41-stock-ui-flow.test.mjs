@@ -238,3 +238,19 @@ test('Congélateur : affichage des portions libres et prévues dans les menus',(
  assert.match(view,/3 libres/);
  assert.match(view,/2 prévues dans les menus/);
 });
+
+test('Cette semaine affiche aussi les restes et les repas commandés sans nouvelle consommation',()=>{
+ const f=fixture();
+ f.week.meals[0]={type:'recipe',recipeId:'pasta-dinner',people:4};
+ f.week.meals[2]={type:'leftovers',recipeId:'pasta-dinner',fromIndex:0,leftoverPortions:2};
+ f.week.meals[3]={type:'ordered'};
+ const mealLeftovers=meal=>meal?.type==='leftovers'?
+  [{recipeId:meal.recipeId,people:meal.leftoverPortions,fromIndex:meal.fromIndex}]:[];
+ const view=renderStockV41({state:f.state,week:f.week,weekId,view:'week',
+  recipeById:f.ctx.recipeById,mealDishes,mealLeftovers});
+ assert.match(view,/Restes : Pâtes/);
+ assert.match(view,/sans nouvelle déduction d’ingrédients/);
+ assert.match(view,/À préparer/);
+ assert.match(view,/Repas libre ou commandé/);
+ assert.match(view,/Sans stock/);
+});

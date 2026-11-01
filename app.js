@@ -4,8 +4,8 @@ const $ = (s, root=document) => root.querySelector(s);
 const html = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const days=['Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi','Dimanche'];
 const categories=['Autres','Épicerie','Fruits et légumes','Viandes et poissons','Produits frais','Hygiène','Maison'];
-const recipeTypes=['Pâtes','Viande','Poisson','Légumes','Salades','Soupes','Snacks','Tartes','Crudités','Dessert'];
-const icons={'Pâtes':'🍝','Viande':'🥩','Poisson':'🐟','Légumes':'🥦','Salades':'🥗','Soupes':'🥣','Snacks':'🥪','Tartes':'🥧','Crudités':'🥕','Dessert':'🍰','Salade':'🥗','Autre':'🍽️'};
+const recipeTypes=['Pâtes','Riz & céréales','Accompagnements','Viande','Poisson','Œufs','Légumes','Salades','Crudités','Soupes','Gratins','Tartes','Snacks','Plats mijotés & en sauce','Desserts','Autres'];
+const icons={'Pâtes':'🍝','Riz & céréales':'🍚','Accompagnements':'🥔','Viande':'🥩','Poisson':'🐟','Œufs':'🍳','Légumes':'🥦','Salades':'🥗','Crudités':'🥕','Soupes':'🥣','Gratins':'🧀','Tartes':'🥧','Snacks':'🍕','Plats mijotés & en sauce':'🍲','Desserts':'🍰','Autres':'🍽️'};
 const units=['g','kg','ml','cl','l','pièce','paquet','boîte','rouleau','bouteille','pot','sachet'];
 const contentUnits=['g','kg','ml','cl','l','pièce','rouleau'];
 const baseState=()=>({schema:1,recipes:[],products:[],weeks:{},staples:[],storePreferences:{},ingredientCatalog:[],favoritesUnifiedV29:false,coursesExplicitGenerationV1:false,settings:{people:2}});
@@ -293,10 +293,20 @@ function commitPlannedRecipeV36(recipeId,index,portions){
  return true
 }
 
-function recipeImg(r){return '<span class="recipe-img">'+(r.image?'<img src="'+html(r.image)+'" alt="">':html(icons[r.category]||'🍽️'))+'</span>'}
+function recipeImg(r){return '<span class="recipe-img">'+(r.image?'<img src="'+html(r.image)+'" alt="">':html(icons[normalRecipeType(r.category)]||'🍽️'))+'</span>'}
+// Les anciens intitulés sont affichés sous leurs nouveaux noms, sans modifier
+// les recettes déjà sauvegardées ni provoquer d'écriture Firebase à l'ouverture.
+const legacyRecipeTypeAliases={
+ 'Salade':'Salades','Dessert':'Desserts','Autre':'Autres',
+ 'Accompagnements & purées':'Accompagnements',
+ 'Poisson & fruits de mer':'Poisson',
+ 'Soupes & veloutés':'Soupes',
+ 'Tartes & quiches':'Tartes',
+ 'Pizzas':'Snacks','Burgers & sandwichs':'Snacks'
+};
 function normalRecipeType(value){
- if(value==='Salade')return 'Salades';
- return recipeTypes.includes(value)?value:'legacy'
+ if(recipeTypes.includes(value))return value;
+ return legacyRecipeTypeAliases[value]||'legacy'
 }
 function visibleRecipes(){
  const term=search.trim().toLocaleLowerCase('fr');
@@ -328,7 +338,7 @@ function viewRecipeV33(id){
  const r=recipeById(id);if(!r)return;
  const type=normalRecipeType(r.category),category=type==='legacy'?(r.category||'Autre'):type;
  const photo=r.image?'<img class="recipe-v33-cover" src="'+html(r.image)+'" alt="Photo du plat '+html(r.name)+'">':
-  '<div class="recipe-v33-no-photo">'+html(icons[r.category]||'🍽️')+'</div>';
+  '<div class="recipe-v33-no-photo">'+html(icons[normalRecipeType(r.category)]||'🍽️')+'</div>';
  const ingredients=(r.ingredients||[]).map(i=>{
   const linked=i.ingredientId?ingredientById(i.ingredientId):null;
   return '<li class="recipe-v33-ingredient"><span>'+html(linked?.name||i.name||'Ingrédient')+'</span><strong>'+
@@ -1548,7 +1558,7 @@ function mealRecipePickerResults(index,searchTerm='',type='all'){
   (type==='all'||normalRecipeType(r.category)===type));
  filtered.sort((a,b)=>a.name.localeCompare(b.name,'fr',{sensitivity:'base'}));
  const renderItem=r=>'<button class="picker-item" data-action="choose-recipe" data-id="'+html(r.id)+'" data-index="'+index+'">'+
-  '<span class="emoji">'+html(icons[r.category]||'🍽️')+'</span><span class="grow"><strong>'+html(r.name)+'</strong>'+
+  '<span class="emoji">'+html(icons[normalRecipeType(r.category)]||'🍽️')+'</span><span class="grow"><strong>'+html(r.name)+'</strong>'+
   '<small>'+html(normalRecipeType(r.category)==='legacy'?(r.category||'Autre'):normalRecipeType(r.category))+
   ' · '+r.ingredients.length+' ingrédient'+(r.ingredients.length>1?'s':'')+' · '+r.people+' portions de base</small></span><span class="end">＋</span></button>';
  if(!filtered.length)return '<div class="meal-picker-empty">Aucun plat correspondant. Essaie un autre nom ou type.</div>';
@@ -2104,18 +2114,18 @@ function populate(){
   if(!old||!Array.isArray(old.meals))return;
   old.meals.forEach(m=>mealDishes(m).forEach(d=>{if(recipeById(d.recipeId))history[d.recipeId]=(history[d.recipeId]||0)+(weeksAgo===1?36:weeksAgo===2?16:7)}))
  });
- w.meals.forEach(m=>mealDishes(m).forEach(d=>{const r=recipeById(d.recipeId);if(!r)return;counts[r.id]=(counts[r.id]||0)+1;types[r.category||'Autre']=(types[r.category||'Autre']||0)+1}));
+ w.meals.forEach(m=>mealDishes(m).forEach(d=>{const r=recipeById(d.recipeId);if(!r)return;counts[r.id]=(counts[r.id]||0)+1;const cat=normalRecipeType(r.category);types[cat]=(types[cat]||0)+1}));
  const chosenByDay=day=>[w.meals[day*2],w.meals[day*2+1]].flatMap(mealDishes).map(d=>d.recipeId);
  for(let i=0;i<w.meals.length;i++){
   if(w.meals[i])continue;
   const day=Math.floor(i/2),previousDishes=i>0?mealDishes(w.meals[i-1]):[];
   const scored=state.recipes.map(r=>{
-   const count=counts[r.id]||0,cat=r.category||'Autre',nearby=chosenByDay(day).includes(r.id),sameCategory=previousDishes.some(d=>recipeById(d.recipeId)?.category===cat);
+   const count=counts[r.id]||0,cat=normalRecipeType(r.category),nearby=chosenByDay(day).includes(r.id),sameCategory=previousDishes.some(d=>normalRecipeType(recipeById(d.recipeId)?.category)===cat);
    return {r,score:count*100+(history[r.id]||0)+(types[cat]||0)*5+(nearby?180:0)+(sameCategory?18:0)+Math.random()*7}
   }).sort((a,b)=>a.score-b.score);
   const selected=scored[0].r;
   counts[selected.id]=(counts[selected.id]||0)+1;
-  types[selected.category||'Autre']=(types[selected.category||'Autre']||0)+1;
+  const selectedCat=normalRecipeType(selected.category);types[selectedCat]=(types[selectedCat]||0)+1;
   // Un repas généré correspond à deux personnes, sans placement automatique de restes.
   selectRecipeForMeal(w,i,selected.id,2);
  }

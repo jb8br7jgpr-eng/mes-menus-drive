@@ -965,3 +965,12 @@
  color:#3e7652;font-size:11px;font-weight:800;cursor:pointer
 }
 .v40-filter-reset button:focus-visible{outline:2px solid #b9a366;outline-offset:2px}
+
+/* V41.6 — filtre ingrédient, utilisable à une main sur iPhone. */
+.v416-ingredient-filter{margin:7px 0 14px}
+.v416-ingredient-filter>label{font-size:12px;font-weight:800;color:#315943}
+.v416-ingredient-search-row{display:flex;align-items:center;gap:8px}
+.v416-ingredient-search-row input{flex:1;min-width:0;min-height:44px;font-size:16px}
+.v416-ingredient-search-row button{flex:0 0 auto;min-height:42px}
+.v416-ingredient-filter .helper{font-size:11px;line-height:1.4;margin:5px 0 0}
+@media(max-width:380px){.v416-ingredient-search-row{gap:6px}.v416-ingredient-search-row button{padding:9px 8px}}

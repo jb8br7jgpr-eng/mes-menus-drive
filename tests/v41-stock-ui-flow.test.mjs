@@ -843,3 +843,55 @@ test('V41.4 : le catalogue et les filtres sont identiques entre Courses et Stock
  assert.equal(rows[0].identity,'ingredient:pasta');
  assert.equal(rows[0].product.packAmount,500);
 });
+
+test('V41.5 : 16 types de plats validés, dont Accompagnements et un seul Snacks',()=>{
+ const start=app.indexOf('const recipeTypes='),end=app.indexOf('const units=',start);
+ assert.ok(start>0&&end>start);
+ const fnStart=app.indexOf('const legacyRecipeTypeAliases=');
+ const fnEnd=app.indexOf('function visibleRecipes()',fnStart);
+ assert.ok(fnStart>0&&fnEnd>fnStart);
+ const catalogue=runInNewContext(app.slice(start,end)+'\n'+app.slice(fnStart,fnEnd)+
+  '\n;({types:recipeTypes,normal:normalRecipeType,icons})');
+ const expected=['Pâtes','Riz & céréales','Accompagnements','Viande','Poisson','Œufs',
+  'Légumes','Salades','Crudités','Soupes','Gratins','Tartes','Snacks',
+  'Plats mijotés & en sauce','Desserts','Autres'];
+ assert.deepEqual(Array.from(catalogue.types),expected);
+ assert.equal(new Set(catalogue.types).size,16);
+ assert.equal(catalogue.types.includes('Accompagnements & purées'),false);
+ assert.equal(catalogue.types.includes('Poisson & fruits de mer'),false);
+ assert.equal(catalogue.types.includes('Soupes & veloutés'),false);
+ assert.equal(catalogue.types.includes('Tartes & quiches'),false);
+ assert.equal(catalogue.types.includes('Pizzas'),false);
+ assert.equal(catalogue.types.includes('Burgers & sandwichs'),false);
+ for(const type of expected){
+  assert.equal(catalogue.normal(type),type);
+  assert.ok(catalogue.icons[type],'icône manquante pour '+type);
+ }
+});
+
+test('V41.5 : recettes historiques conservées et types regroupés dans les filtres',()=>{
+ const start=app.indexOf('const recipeTypes='),end=app.indexOf('const units=',start);
+ const fnStart=app.indexOf('const legacyRecipeTypeAliases=');
+ const fnEnd=app.indexOf('function visibleRecipes()',fnStart);
+ const catalogue=runInNewContext(app.slice(start,end)+'\n'+app.slice(fnStart,fnEnd)+
+  '\n;({types:recipeTypes,normal:normalRecipeType})');
+ const examples=[
+  ['Dessert','Desserts'],['Salade','Salades'],['Autre','Autres'],
+  ['Pizzas','Snacks'],['Burgers & sandwichs','Snacks'],
+  ['Accompagnements & purées','Accompagnements'],
+  ['Poisson & fruits de mer','Poisson'],['Soupes & veloutés','Soupes'],
+  ['Tartes & quiches','Tartes'],['Tartes','Tartes'],
+  ['Poisson','Poisson'],['Pâtes','Pâtes']
+ ];
+ const originals=examples.map(([v])=>({name:'Recette',category:v}));
+ const copy=JSON.stringify(originals);
+ for(const [oldValue,newValue] of examples)assert.equal(catalogue.normal(oldValue),newValue);
+ assert.equal(catalogue.normal('Inconnu personnalisé'),'legacy');
+ assert.equal(JSON.stringify(originals),copy,'aucune recette historique n’est modifiée en affichage');
+ assert.match(app,/selectOptions\(recipeTypes,normalRecipeType\(r\?\.category\)/);
+ assert.match(app,/normalRecipeType\(r\.category\)===recipeTypeFilter/);
+ assert.match(app,/normalRecipeType\(r\.category\)===type/);
+ assert.match(app,/normalRecipeType\(selected\.category\)/);
+ assert.match(app,/normalRecipeType\(recipeById\(d\.recipeId\)\?\.category\)/);
+ assert.match(app,/icons\[normalRecipeType\(r\.category\)\]/);
+});

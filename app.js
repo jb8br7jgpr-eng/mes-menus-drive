@@ -1561,8 +1561,8 @@ function ingredientRow(item={name:'',qty:'',unit:'g'}){
   'Aucun produit Carrefour lié : tu pourras l’associer dans la base.')+'</p></div>'
 }
 // V41.7 — réutiliser les ingrédients d'un autre plat sans lien ni sauvegarde.
-function recipeImportResultsV417(query=''){
- const form=$('#recipeForm'),editingId=form?.dataset.id||'',term=norm(query);
+function recipeImportResultsV417(query='',editorId=null){
+ const form=$('#recipeForm'),editingId=editorId===null?(form?.dataset.id||''):editorId,term=norm(query);
  const list=state.recipes.filter(r=>r.id!==editingId&&Array.isArray(r.ingredients)&&r.ingredients.length&&
   (!term||norm(r.name).includes(term)))
   .sort((a,b)=>a.name.localeCompare(b.name,'fr',{sensitivity:'base'}));
@@ -1641,7 +1641,7 @@ function recipeEditor(id,draft=null){
  '<label class="v417-import-scale"><input id="v417ScaleToPortions" type="checkbox" checked> Adapter les quantités aux portions de ce plat</label>'+
  '<label class="v417-import-search-label" for="v417ImportSearch">Rechercher un plat existant</label>'+
  '<input id="v417ImportSearch" type="search" autocomplete="off" placeholder="Ex. ratatouille…" aria-controls="v417ImportResults">'+
- '<div id="v417ImportResults" class="v417-import-options">'+recipeImportResultsV417()+'</div>'+
+ '<div id="v417ImportResults" class="v417-import-options">'+recipeImportResultsV417('',old?.id||'')+'</div>'+
  '<p id="v417ImportFeedback" class="v417-import-feedback" aria-live="polite"></p>'+
  '</div></div>'+
  '<div class="note ingredient-auto-note">✓ Chaque ingrédient sera automatiquement enregistré dans <strong>Produits → Carrefour ou Grand Frais</strong> lorsque tu enregistreras le plat. Si son nom existe déjà, sa fiche sera réutilisée, sans doublon.</div>'+

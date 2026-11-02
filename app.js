@@ -11,6 +11,7 @@ const contentUnits=['g','kg','ml','cl','l','pièce','rouleau'];
 const baseState=()=>({schema:1,recipes:[],products:[],weeks:{},staples:[],storePreferences:{},ingredientCatalog:[],favoritesUnifiedV29:false,coursesExplicitGenerationV1:false,settings:{people:2}});
 let state=baseState(), currentTab='menus', currentWeek='', search='', recipeSort='az', recipeTypeFilter='all', recipeIngredientFilterV416='', productSearch='', productCategory='Toutes', ingredientStoreTab='carrefour', catalogueTypeFilter='all', catalogueStoreFilter='all', catalogueCategoryFilter='all', catalogueSortV40='name', db=null, usingFallback=false;
 let pendingRecipeDraftImage='',pendingIngredientLinkId=null;
+let recipeImportedSourceIdsV417=new Set();
 let independentProductsOpen=false;const courseOpenSections=new Set();
 let calendarMonthV36='';
 let stockModulesV41=null,stockViewV41='home';
@@ -1559,9 +1560,72 @@ function ingredientRow(item={name:'',qty:'',unit:'g'}){
   linked?'Produit Carrefour : '+html(linked.name)+(linked.packAmount?' · '+html(quantity(linked.packAmount,linked.packUnit))+'/paquet':' · contenu du paquet à préciser'):
   'Aucun produit Carrefour lié : tu pourras l’associer dans la base.')+'</p></div>'
 }
+// V41.7 — réutiliser les ingrédients d'un autre plat sans lien ni sauvegarde.
+function recipeImportResultsV417(query=''){
+ const form=$('#recipeForm'),editingId=form?.dataset.id||'',term=norm(query);
+ const list=state.recipes.filter(r=>r.id!==editingId&&Array.isArray(r.ingredients)&&r.ingredients.length&&
+  (!term||norm(r.name).includes(term)))
+  .sort((a,b)=>a.name.localeCompare(b.name,'fr',{sensitivity:'base'}));
+ const results=list.slice(0,20).map(r=>
+  '<button class="v417-import-option" type="button" data-action="v417-import-recipe" data-id="'+html(r.id)+'">'+
+  '<span><strong>'+html(r.name)+'</strong><small>'+r.people+' portion'+(r.people>1?'s':'')+
+  ' · '+r.ingredients.length+' ingrédient'+(r.ingredients.length>1?'s':'')+
+  (recipeImportedSourceIdsV417.has(r.id)?' · déjà importée':'')+'</small></span><span aria-hidden="true">＋</span></button>').join('');
+ return (list.length>20?'<div class="helper">20 résultats sur '+list.length+' : précise le nom du plat.</div>':'')+
+  (results||'<p class="helper">Aucune autre recette correspondante.</p>');
+}
+function refreshRecipeImportResultsV417(){
+ const list=$('#v417ImportResults');
+ if(list)list.innerHTML=recipeImportResultsV417($('#v417ImportSearch')?.value||'');
+}
+async function importRecipeIngredientsV417(id,button){
+ const source=recipeById(id),form=$('#recipeForm'),rowsBox=$('#ingredientRows');
+ if(!source||!form||!rowsBox||form.dataset.id===id)return;
+ if(recipeImportedSourceIdsV417.has(id)&&
+  !confirm('Les ingrédients de ce plat ont déjà été copiés ici. Les importer une deuxième fois et additionner les quantités ?'))return;
+ const portions=Number($('#recipePeople')?.value);
+ if(!Number.isInteger(portions)||portions<1||portions>30){
+  toast('Choisis d’abord un nombre de portions entre 1 et 30.');return
+ }
+ if(button?.disabled)return;
+ if(button)button.disabled=true;
+ try{
+  const {prepareRecipeImportV417,mergeRecipeIngredientsV417}=await import('./recipe-import-v417.mjs');
+  // Si la fenêtre a été fermée entre-temps, aucune action.
+  if($('#recipeForm')!==form||!$('#ingredientRows'))return;
+  const imported=prepareRecipeImportV417(source,portions,{scale:Boolean($('#v417ScaleToPortions')?.checked)})
+   .map(line=>{
+    const ing=ingredientById(line.ingredientId)||ingredientByName(line.name);
+    return {...line,name:ing?.name||line.name,
+     store:ing?ingredientStore(ing):line.store||ingredientDefaultStore(line.name,line.productId)};
+   });
+  const current=[...rowsBox.querySelectorAll('.ingredient-line')].map(row=>{
+   const name=row.querySelector('.ingredient-name')?.value||'';
+   return {name,qty:row.querySelector('.ingredient-qty')?.value||'',
+    unit:row.querySelector('.ingredient-unit')?.value||'g',
+    store:row.querySelector('.ingredient-store')?.value||'carrefour',
+    ingredientId:ingredientByName(name)?.id||null};
+  });
+  const plan=mergeRecipeIngredientsV417(current,imported);
+  // Le changement ne concerne que l'éditeur. Ni persist(), ni menus,
+  // ni achats, ni stock : enregistrer le plat reste une action explicite.
+  rowsBox.innerHTML=plan.rows.map(ingredientRow).join('');
+  recipeImportedSourceIdsV417.add(id);
+  const details=plan.added+' ingrédient'+(plan.added>1?'s':'')+' ajouté'+(plan.added>1?'s':'')+
+   (plan.merged?', '+plan.merged+' quantité'+(plan.merged>1?'s':'')+' cumulée'+(plan.merged>1?'s':''):'')+
+   (plan.separateUnits?' · '+plan.separateUnits+' unité'+(plan.separateUnits>1?'s':'')+
+    ' différente'+(plan.separateUnits>1?'s':'')+' conservée'+(plan.separateUnits>1?'s':''):'');
+  const feedback=$('#v417ImportFeedback');
+  if(feedback)feedback.textContent='✓ '+source.name+' : '+details+'. Vérifie les quantités avant d’enregistrer.';
+  refreshRecipeImportResultsV417();
+  $('#addIngredientBottom')?.scrollIntoView?.({behavior:'smooth',block:'nearest'});
+ }catch(error){toast(error?.message||'Impossible de copier les ingrédients.')}
+ finally{if(button?.isConnected)button.disabled=false}
+}
 function recipeEditor(id,draft=null){
  const old=recipeById(id),r=old||draft,title=old?'Modifier le plat':draft?'Dupliquer un plat':'Ajouter un plat',ingredients=r?.ingredients?.length?r.ingredients:[{name:'',qty:'',unit:'g'}];
- pendingRecipeDraftImage=!old&&draft?draft.image||'':'';
+ pendingRecipeDraftImage=!old&&draft?draft.image||'';
+ recipeImportedSourceIdsV417=new Set();
  let body='<form id="recipeForm" data-id="'+(old?.id||'')+'">'+
  '<div class="field"><label for="recipeName">Nom du plat</label><input required maxlength="90" id="recipeName" placeholder="Ex. Poulet au curry" value="'+html(r?.name||'')+'"></div>'+
  '<div class="row" style="align-items:start;gap:11px"><div class="field grow"><label for="recipeCategory">Type de plat</label><select id="recipeCategory">'+
@@ -1571,6 +1635,15 @@ function recipeEditor(id,draft=null){
  '<div class="field" style="width:115px"><label for="recipePeople">Portions de base</label><input id="recipePeople" type="number" min="1" max="30" required value="'+(r?.people||4)+'"></div></div>'+
  '<div class="field"><label for="recipePhoto">Photo (facultatif)</label><div class="image-input"><input id="recipePhoto" type="file" accept="image/*"><div class="helper">Photo conservée sur ce téléphone. Format allégé automatiquement.</div></div></div>'+
  '<div class="row between" style="margin:15px 0 8px"><h3>Ingrédients</h3></div>'+
+ '<div class="v417-import-recipe"><button type="button" class="btn secondary wide v417-import-toggle" data-action="v417-toggle-recipe-import">＋ Copier les ingrédients d’un autre plat</button>'+
+ '<div id="v417ImportPanel" hidden>'+
+ '<p class="helper">Choisis une recette existante : ses ingrédients seront ajoutés ici sans remplacer les tiens. La recette source restera indépendante.</p>'+
+ '<label class="v417-import-scale"><input id="v417ScaleToPortions" type="checkbox" checked> Adapter les quantités aux portions de ce plat</label>'+
+ '<label class="v417-import-search-label" for="v417ImportSearch">Rechercher un plat existant</label>'+
+ '<input id="v417ImportSearch" type="search" autocomplete="off" placeholder="Ex. ratatouille…" aria-controls="v417ImportResults">'+
+ '<div id="v417ImportResults" class="v417-import-options">'+recipeImportResultsV417()+'</div>'+
+ '<p id="v417ImportFeedback" class="v417-import-feedback" aria-live="polite"></p>'+
+ '</div></div>'+
  '<div class="note ingredient-auto-note">✓ Chaque ingrédient sera automatiquement enregistré dans <strong>Produits → Carrefour ou Grand Frais</strong> lorsque tu enregistreras le plat. Si son nom existe déjà, sa fiche sera réutilisée, sans doublon.</div>'+
  '<datalist id="ingredientNames">'+(state.ingredientCatalog||[]).slice().sort((a,b)=>a.name.localeCompare(b.name,'fr')).map(x=>'<option value="'+html(x.name)+'"></option>').join('')+'</datalist>'+
  '<div class="ingredient-favorites"><span class="helper">Ingrédients fréquents :</span>'+
@@ -2506,6 +2579,13 @@ document.addEventListener('click',e=>{
    // déroulante pour que le nouveau champ et le prochain ajout restent visibles.
    $('#addIngredientBottom')?.scrollIntoView?.({behavior:'smooth',block:'end',inline:'nearest'});
   }
+  else if(mode==='v417-toggle-recipe-import'){
+   const panel=$('#v417ImportPanel');if(!panel)return;
+   panel.hidden=!panel.hidden;if(!panel.hidden){
+    refreshRecipeImportResultsV417();$('#v417ImportSearch')?.focus();
+   }
+  }
+  else if(mode==='v417-import-recipe'){void importRecipeIngredientsV417(id,a)}
   else if(mode==='remove-ingredient')a.closest('.ingredient-line')?.remove();
   else if(mode==='reuse-ingredient'){
    const ing=ingredientById(id),row=a.closest('.ingredient-line');if(!ing||!row)return;
@@ -2686,6 +2766,7 @@ document.addEventListener('change',e=>{
  }
  }else if(e.target.matches('[data-store-item]')){const item=e.target.dataset.storeItem,store=e.target.value;closeModal();setShoppingStore(item,store)}else if(e.target.matches('[data-check]')){const w=getWeek(),id=e.target.dataset.check;w.checked=e.target.checked?[...new Set([...w.checked,id])]:w.checked.filter(x=>x!==id);persist();render(true)}else if(e.target.id==='importFile')importData(e.target.files?.[0])});
 document.addEventListener('input',e=>{
+  if(e.target.id==='v417ImportSearch'){refreshRecipeImportResultsV417();return}
   if(e.target.id==='v413StockPickerSearch'){
    const needle=String(e.target.value||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim().toLocaleLowerCase('fr-FR');
    document.querySelectorAll('#v413StockPickerResults [data-v413-stock-choice]').forEach(row=>{

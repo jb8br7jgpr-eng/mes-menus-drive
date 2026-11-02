@@ -1624,7 +1624,7 @@ async function importRecipeIngredientsV417(id,button){
 }
 function recipeEditor(id,draft=null){
  const old=recipeById(id),r=old||draft,title=old?'Modifier le plat':draft?'Dupliquer un plat':'Ajouter un plat',ingredients=r?.ingredients?.length?r.ingredients:[{name:'',qty:'',unit:'g'}];
- pendingRecipeDraftImage=!old&&draft?draft.image||'';
+ pendingRecipeDraftImage=!old&&draft?draft.image||'':'';
  recipeImportedSourceIdsV417=new Set();
  let body='<form id="recipeForm" data-id="'+(old?.id||'')+'">'+
  '<div class="field"><label for="recipeName">Nom du plat</label><input required maxlength="90" id="recipeName" placeholder="Ex. Poulet au curry" value="'+html(r?.name||'')+'"></div>'+

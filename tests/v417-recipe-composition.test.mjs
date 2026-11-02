@@ -104,6 +104,7 @@ test('V41.7 : import dans le formulaire même pendant une édition, sans stockag
  assert.match(styles,/\.v417-import-options\{[^}]*overflow:visible/);
  const importCode=app.slice(app.indexOf('async function importRecipeIngredientsV417('),
   app.indexOf('function recipeEditor(',app.indexOf('async function importRecipeIngredientsV417(')));
- assert.doesNotMatch(importCode,/\bpersist\s*\(/,'l’import ne doit jamais enregistrer automatiquement');
- assert.doesNotMatch(importCode,/\bcloseModal\s*\(/,'ne doit pas perdre les champs ou la photo en cours');
+ const actualStatements=importCode.replace(/\/\/[^\n]*/g,'');
+ assert.doesNotMatch(actualStatements,/\bpersist\s*\(/,'l’import ne doit jamais enregistrer automatiquement');
+ assert.doesNotMatch(actualStatements,/\bcloseModal\s*\(/,'ne doit pas perdre les champs ou la photo en cours');
 });

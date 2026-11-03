@@ -781,19 +781,119 @@ function unifiedCatalogueItems(){
   (!needle||[x.name,x.item.brand,x.item.packaging,x.item.category].some(v=>norm(v).includes(needle))))
   .sort((a,b)=>catalogueSortCompareV40(a,b,catalogueSortV40));
 }
+// V41.8 — lecture seule : illustrations choisies par nom puis par rayon.
+// Les fiches historiques classées « Autres » restent intactes.
+function catalogueIconV418(name,category){
+ const n=norm(name), c=String(category||'Autres').trim();
+ const names=[
+  [/(^|[^a-z])ail($|[^a-z])/, '🧄'],
+  [/avocats?/, '🥑'],
+  [/basilic|persil|coriandre|ciboulette|menthe|herbes/, '🌿'],
+  [/beurre/, '🧈'],
+  [/poulet|dinde|volaille/, '🍗'],
+  [/bourguignon|ratatouille|curry|chili/, '🍲'],
+  [/boeuf|bœuf|steak|viande hachee|veau|porc/, '🥩'],
+  [/saumon|thon|cabillaud|poisson/, '🐟'],
+  [/crevette|moule|calamar|fruit de mer/, '🦐'],
+  [/oeuf|œuf/, '🥚'],
+  [/fromage|emmental|comte|parmesan|mozzarella/, '🧀'],
+  [/creme|lait|yaourt|yogourt/, '🥛'],
+  [/tomate/, '🍅'],
+  [/carotte/, '🥕'],
+  [/courgette|concombre/, '🥒'],
+  [/aubergine/, '🍆'],
+  [/poivron|piment/, '🫑'],
+  [/oignon|echalote/, '🧅'],
+  [/pomme de terre|patate|puree|frites/, '🥔'],
+  [/champignon/, '🍄'],
+  [/citron/, '🍋'],
+  [/banane/, '🍌'],
+  [/fraise|framboise/, '🍓'],
+  [/pomme|poire/, '🍎'],
+  [/salade|epinard|chou|brocoli/, '🥬'],
+  [/riz|semoule|quinoa/, '🍚'],
+  [/pates|spaghetti|macaroni|lasagne/, '🍝'],
+  [/huile|olive|vinaigre/, '🫒'],
+  [/pain|baguette|brioche/, '🥖'],
+  [/chocolat|cacao/, '🍫'],
+  [/cafe|the\b|infusion/, '☕'],
+  [/sucre|farine|biscuit/, '🍪'],
+  [/papier toilette|sopalin|essuie.?tout|mouchoir/, '🧻'],
+  [/dentifrice|brosse a dent/, '🪥'],
+  [/lessive|liquide vaisselle|nettoyant|savon/, '🧴'],
+  [/shampoing|gel douche/, '🧴'],
+  [/mascara|maquillage/, '💄']
+ ];
+ for(const [pattern,icon] of names)if(pattern.test(n))return icon;
+ const categories={
+  'Fruits':'🍎','Légumes':'🥦','Herbes et aromates':'🌿',
+  'Viandes':'🥩','Volailles':'🍗','Charcuterie':'🥓','Poissons':'🐟','Fruits de mer':'🦐',
+  'Lait':'🥛','Beurre et crème':'🧈','Fromages':'🧀',
+  'Yaourts et desserts frais':'🥣','Œufs':'🥚',
+  'Pâtes, riz et féculents':'🍝','Légumineuses':'🫘','Conserves et bocaux':'🥫',
+  'Sauces et condiments':'🧂','Huiles et vinaigres':'🫒','Épices et assaisonnements':'🌶️',
+  'Apéritifs salés':'🥨','Pains et boulangerie':'🥖','Farines et pâtisserie':'🍪',
+  'Céréales et petit-déjeuner':'🥣','Biscuits et goûters':'🍪',
+  'Chocolats et confiseries':'🍫','Desserts et pâtisseries':'🍰',
+  'Eaux et sodas':'🥤','Jus et sirops':'🧃','Café, thé et infusions':'☕',
+  'Surgelés':'🧊','Plats préparés':'🍱',
+  'Entretien et nettoyage':'🧽','Papier et consommables':'🧻',
+  'Cuisine et accessoires':'🍽️','Hygiène corporelle':'🧴',
+  'Beauté et cosmétiques':'💄','Santé et parapharmacie':'🩹',
+  'Bébé et puériculture':'🍼','Animaux':'🐾',
+  'Fruits et légumes':'🥦','Viandes et poissons':'🥩',
+  'Produits frais':'🥛','Épicerie':'🧂','Hygiène':'🧴','Maison':'🏠'
+ };
+ return categories[c]||'🛍️';
+}
+// N'indiquer « associée » pour un ingrédient Carrefour que si sa référence
+// est réellement liée. Les achats du quotidien sont des fiches produits :
+// leur lien Carrefour est un renseignement distinct de la liaison d'ingrédient.
+function catalogueReferenceV418(item,linkedProduct){
+ const isIngredient=item.type==='ingredient',p=linkedProduct;
+ if(item.store==='grandfrais')return {
+  kind:'grandfrais',label:'Liste Grand Frais',
+  detail:'Aucune référence Carrefour nécessaire'
+ };
+ if(isIngredient){
+  if(!p)return {kind:'missing',label:'Référence à associer',
+    detail:'Aucune référence Carrefour liée'};
+  return {kind:'linked',label:'Référence associée',
+    detail:'Carrefour : '+p.name+
+      (Number(p.packAmount)>0?' · '+quantity(p.packAmount,p.packUnit):' · conditionnement à préciser')};
+ }
+ const details=[p?.brand,p?.packaging].filter(Boolean).join(' · ')||
+  quantity(p?.qty||1,p?.unit||'paquet');
+ return p?.url?
+  {kind:'linked',label:'Lien Carrefour enregistré',detail:details}:
+  {kind:'missing',label:'Lien Carrefour à renseigner',detail:details};
+}
 function unifiedCatalogueRows(){
  const items=unifiedCatalogueItems();
  if(!items.length)return '<div class="note">Aucun produit trouvé pour ces filtres.</div>';
  return items.map(x=>{
-  const ing=x.type==='ingredient',p=ing?productById(x.item.productId):x.item;
-  const description=ing?(x.store==='grandfrais'?'Liste Grand Frais':p?'Référence Carrefour : '+p.name+(p.packAmount>0?' · '+quantity(p.packAmount,p.packUnit):' · contenu à préciser'):'Référence Carrefour à associer'):
-    ([x.item.brand,x.item.packaging].filter(Boolean).join(' · ')||quantity(x.item.qty||1,x.item.unit||'paquet'));
-  return '<article class="catalogue-unified-card"><div class="catalogue-unified-icon">'+(ing?'🥕':productBadge(x.item))+'</div>'+
-    '<div class="grow"><strong>'+html(x.name)+'</strong><div class="catalogue-unified-meta"><span class="catalogue-type-badge">'+(ing?'Ingrédient':'Quotidien')+'</span> · '+(x.store==='grandfrais'?'Grand Frais':'Carrefour Drive')+(x.item.frequent?' · ☆ Fréquent':'')+'</div>'+
-    '<div class="v39-category-label">📂 '+html(x.category)+'</div>'+
-    '<div class="catalogue-unified-desc">'+html(description)+'</div></div>'+
-    '<div class="catalogue-unified-actions"><button class="btn tiny" data-action="add-unified-courses" data-kind="'+x.type+'" data-id="'+html(x.id)+'">＋ Courses</button>'+
-    '<button class="btn tiny secondary" data-action="edit-unified-product" data-kind="'+x.type+'" data-id="'+html(x.id)+'">Gérer</button></div></article>';
+  const ing=x.type==='ingredient',p=ing?productById(x.item.productId):x.item,
+   isGrandFrais=x.store==='grandfrais',
+   storeClass=isGrandFrais?'grandfrais':'carrefour',
+   reference=catalogueReferenceV418(x,p),
+   productIcon=catalogueIconV418(x.name,x.category);
+  return '<article class="catalogue-unified-card v418-card v418-card--'+storeClass+'">'+
+   '<div class="catalogue-unified-icon v418-product-icon" aria-hidden="true">'+productIcon+'</div>'+
+   '<div class="grow v418-card-main"><strong class="v418-product-name">'+html(x.name)+'</strong>'+
+   '<div class="catalogue-unified-meta v418-card-meta">'+
+    '<span class="catalogue-type-badge">'+(ing?'Ingrédient':'Quotidien')+'</span>'+
+    '<span class="v418-store-badge v418-store-badge--'+storeClass+'">'+
+      '<span aria-hidden="true">'+(isGrandFrais?'🥬':'🛒')+'</span> '+
+      (isGrandFrais?'Grand Frais':'Carrefour Drive')+'</span>'+
+    (x.item.frequent?'<span class="v418-frequent">☆ Fréquent</span>':'')+
+   '</div>'+
+   '<div class="v418-reference-line"><span class="v418-reference-badge v418-reference-badge--'+reference.kind+'">'+
+    '<span aria-hidden="true">'+(reference.kind==='linked'?'✓':reference.kind==='missing'?'!':'✓')+'</span> '+
+    html(reference.label)+'</span></div>'+
+   '<div class="catalogue-unified-desc v418-reference-detail">'+html(reference.detail)+'</div>'+
+   '<div class="v39-category-label v418-category-label">📂 '+html(x.category)+'</div></div>'+
+   '<div class="catalogue-unified-actions"><button class="btn tiny" data-action="add-unified-courses" data-kind="'+x.type+'" data-id="'+html(x.id)+'">＋ Courses</button>'+
+   '<button class="btn tiny secondary" data-action="edit-unified-product" data-kind="'+x.type+'" data-id="'+html(x.id)+'">Gérer</button></div></article>';
  }).join('');
 }
 function renderProduits(){

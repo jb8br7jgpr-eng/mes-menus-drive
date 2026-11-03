@@ -995,3 +995,81 @@
 .v417-import-option:active{background:#e6f2e4}
 .v417-import-option:disabled{opacity:.55}
 .v417-import-feedback{min-height:0;margin:0;color:#246641;font-size:11px;font-weight:750;line-height:1.45}
+
+
+/* V41.8 — Hiérarchie visuelle du catalogue, sans changement des flux métier.
+   Couleurs de magasins identifiables et statut réel des références Carrefour. */
+.catalogue-unified-card.v418-card{
+ position:relative;isolation:isolate;overflow:hidden;
+ border-width:1px;border-style:solid;
+ padding:12px 10px 12px 12px;
+ align-items:center;gap:10px;
+ box-shadow:0 2px 8px rgba(28,64,42,.045);
+}
+.catalogue-unified-card.v418-card::before{
+ content:"";position:absolute;inset:0 auto 0 0;width:3px;
+ border-radius:15px 0 0 15px;
+}
+.v418-card--grandfrais{border-color:#d4e8d8;background:linear-gradient(95deg,#f9fdf9 0,#fff 19%)}
+.v418-card--grandfrais::before{background:#3b8a5e}
+.v418-card--carrefour{border-color:#d7e2f0;background:linear-gradient(95deg,#f8fbff 0,#fff 19%)}
+.v418-card--carrefour::before{background:#457fbf}
+.v418-card>.v418-card-main{min-width:0;flex:1 1 auto}
+.v418-card .v418-product-name{font-size:14px;line-height:1.3;letter-spacing:-.01em}
+.v418-card .v418-product-icon{
+ display:grid;place-items:center;flex:0 0 43px;width:43px;height:43px;
+ border:1px solid #e3e8df;border-radius:12px;
+ font-size:25px;line-height:1;
+ box-shadow:inset 0 1px 0 rgba(255,255,255,.75);
+}
+.v418-card--grandfrais .v418-product-icon{background:linear-gradient(145deg,#e8f4e8,#fff7e9)}
+.v418-card--carrefour .v418-product-icon{background:linear-gradient(145deg,#e8f0fa,#f6f9ff)}
+.v418-card .v418-card-meta{
+ display:flex;flex-wrap:wrap;align-items:center;
+ gap:4px 5px;margin-top:6px;font-size:11px;line-height:1.3;
+}
+.v418-card .catalogue-type-badge{
+ display:inline-flex;align-items:center;padding:3px 6px;
+ white-space:nowrap;background:#eef2ec;color:#4b6655;
+ border:1px solid #e4eae1;font-size:10px;line-height:1.25;
+}
+.v418-store-badge{
+ display:inline-flex;align-items:center;max-width:100%;
+ gap:3px;border-radius:7px;padding:3px 7px;
+ font-size:10px;font-weight:850;line-height:1.25;
+ border:1px solid transparent;white-space:normal;
+}
+.v418-store-badge--grandfrais{background:#dff1e4;color:#215b3c;border-color:#c8e5d0}
+.v418-store-badge--carrefour{background:#e3efff;color:#21578a;border-color:#cbdff7}
+.v418-frequent{font-size:10px;color:#7e6840;font-weight:700}
+.v418-reference-line{margin-top:7px;display:flex;align-items:center;min-width:0}
+.v418-reference-badge{
+ display:inline-flex;align-items:center;gap:5px;
+ min-width:0;max-width:100%;
+ border:1px solid transparent;border-radius:8px;
+ padding:4px 7px;font-size:10px;font-weight:850;
+ line-height:1.35;overflow-wrap:anywhere;white-space:normal;
+}
+.v418-reference-badge>span{font-size:11px;flex:0 0 auto;font-weight:900}
+.v418-reference-badge--linked{background:#e4f4e9;border-color:#c5e5cf;color:#226039}
+.v418-reference-badge--missing{background:#fff2df;border-color:#efd0a0;color:#84510d}
+.v418-reference-badge--grandfrais{background:#ecf5ed;border-color:#d6e8d9;color:#416d4e}
+.v418-card .v418-reference-detail{
+ color:#567060;font-size:10px;line-height:1.4;
+ margin-top:5px;overflow-wrap:anywhere;
+}
+.v418-card--carrefour .v418-reference-detail{color:#587083}
+.v418-card .v418-category-label{
+ color:#7b8c80;font-size:9.5px;font-weight:650;
+ margin-top:5px;line-height:1.3;overflow-wrap:anywhere;
+}
+.v418-card .catalogue-unified-actions{flex:0 0 89px;gap:6px}
+.v418-card .catalogue-unified-actions .btn{min-height:36px;padding:7px 5px}
+@media(max-width:370px){
+ .catalogue-unified-card.v418-card{gap:7px;padding:10px 7px 10px 10px}
+ .v418-card .v418-product-icon{flex-basis:36px;width:36px;height:36px;font-size:21px}
+ .v418-card .catalogue-unified-actions{flex-basis:77px}
+ .v418-store-badge{padding:3px 5px;font-size:9px}
+ .v418-reference-badge{padding:4px 5px;font-size:9.5px}
+ .v418-card .v418-product-name{font-size:13px}
+}

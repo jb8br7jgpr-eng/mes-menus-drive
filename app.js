@@ -7,7 +7,10 @@ const categories=['Autres','Épicerie','Fruits et légumes','Viandes et poissons
 const recipeTypes=['Pâtes','Riz & céréales','Accompagnements','Viande','Poisson','Œufs','Légumes','Salades','Crudités','Soupes','Gratins','Tartes','Snacks','Plats mijotés & en sauce','Desserts','Autres'];
 const icons={'Pâtes':'🍝','Riz & céréales':'🍚','Accompagnements':'🥔','Viande':'🥩','Poisson':'🐟','Œufs':'🍳','Légumes':'🥦','Salades':'🥗','Crudités':'🥕','Soupes':'🥣','Gratins':'🧀','Tartes':'🥧','Snacks':'🍕','Plats mijotés & en sauce':'🍲','Desserts':'🍰','Autres':'🍽️'};
 const units=['g','kg','ml','cl','l','pièce','paquet','boîte','rouleau','bouteille','pot','sachet'];
-const contentUnits=['g','kg','ml','cl','l','pièce','rouleau'];
+// V41.10 — mêmes unités de contenu que dans les ingrédients de recettes.
+// Unités achetées et contenu restent deux notions distinctes, et les
+// conversions continuent d'exiger une unité compatible déclarée.
+const contentUnits=units;
 const baseState=()=>({schema:1,recipes:[],products:[],weeks:{},staples:[],storePreferences:{},ingredientCatalog:[],favoritesUnifiedV29:false,coursesExplicitGenerationV1:false,settings:{people:2}});
 let state=baseState(), currentTab='menus', currentWeek='', search='', recipeSort='az', recipeTypeFilter='all', recipeIngredientFilterV416='', productSearch='', productCategory='Toutes', ingredientStoreTab='carrefour', catalogueTypeFilter='all', catalogueStoreFilter='all', catalogueCategoryFilter='all', catalogueSortV40='name', db=null, usingFallback=false;
 let pendingRecipeDraftImage='',pendingIngredientLinkId=null;
@@ -641,7 +644,8 @@ function catalogueEditor(kind,id=null,draft=null,linkedIngredientId=null){
    '<div class="field"><label for="cataloguePackaging">Conditionnement</label><input id="cataloguePackaging" maxlength="80" value="'+html(record.packaging||'')+'"></div>'+
    '<div class="catalogue-reference-panel" id="catalogueReferencePanel" '+(store==='grandfrais'?'hidden':'')+'>'+
    '<div class="row stock-editor-row"><div class="field grow"><label for="cataloguePackAmount">Contenu d’une unité achetée</label><input id="cataloguePackAmount" type="number" inputmode="decimal" min=".01" step="any" placeholder="Ex. 6" value="'+html(record.packAmount??'')+'"></div>'+
-   '<div class="field grow"><label for="cataloguePackUnit">Mesuré en</label><select id="cataloguePackUnit">'+selectOptions(contentUnits,record.packUnit||'pièce')+'</select></div></div>'+
+   '<div class="field grow"><label for="cataloguePackUnit">Unité du contenu</label><select id="cataloguePackUnit">'+selectOptions(contentUnits,record.packUnit||'pièce')+'</select></div></div>'+
+   '<p class="helper">Toutes les unités des recettes sont disponibles (paquet, boîte, pot, sachet, bouteille…). Par exemple : une boîte contenant 2 paquets de jambon → 2 paquets. Si tu achètes directement un paquet, choisis « paquet » dans « Unité achetée ».</p>'+
    '<div id="v38PackPreview" class="v38-pack-preview" aria-live="polite"></div>'+
    '<div class="field"><label for="catalogueEan">Code-barres EAN-13 (facultatif)</label><input id="catalogueEan" inputmode="numeric" maxlength="13" pattern="[0-9]{13}" value="'+html(record.ean||'')+'"></div>'+
    '<div class="field"><label for="catalogueUrl">Lien Carrefour (facultatif)</label><input id="catalogueUrl" type="url" maxlength="2000" value="'+html(record.url||'')+'"></div>'+
@@ -665,7 +669,7 @@ function previewCarrefourPackV38(){
   amount=raw.trim()===''?NaN:Number(raw),contentUnit=$('#cataloguePackUnit')?.value||'',
   purchaseUnit=$('#catalogueUnit')?.value||'paquet';
  if(!(Number.isFinite(amount)&&amount>0&&contentUnits.includes(contentUnit))){
-  target.textContent='⚠️ Contenu inconnu : impossible de convertir automatiquement les besoins en pièces ou grammes en nombre de '+purchaseUnit+'.';
+  target.textContent='⚠️ Contenu inconnu : impossible de convertir automatiquement les besoins de la recette en '+purchaseUnit+' sans quantité et unité compatibles.';
   target.classList.add('unconfigured');return
  }
  target.classList.remove('unconfigured');

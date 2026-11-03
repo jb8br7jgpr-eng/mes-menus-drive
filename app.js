@@ -1966,6 +1966,40 @@ function bulkPurchaseExtraV37(kind,id,amount,unit){
   productId:ingredient?(item.productId||null):item.id,
   ingredientId:ingredient?item.id:null,fromCatalogue:true}
 }
+// V41.9 — même identité visuelle que Produits V41.8 pour les deux sélecteurs.
+// Lecture seule ; toutes les sélections, filtres, quantités et actions V37 restent intactes.
+function bulkCatalogueItemV419(x,matched=false){
+ const isIngredient=x.kind==='ingredient',isGrandFrais=x.store==='grandfrais',
+  storeClass=isGrandFrais?'grandfrais':'carrefour',
+  item=isIngredient?ingredientById(x.id):productById(x.id),
+  product=isIngredient?productById(item?.productId):item,
+  ref=catalogueReferenceV418({type:x.kind,store:x.store},product),
+  symbol=catalogueIconV418(x.name,x.category);
+ return '<div class="v37-bulk-item v419-bulk-card v419-bulk-card--'+storeClass+
+  '" data-v37-row data-kind="'+x.kind+'" data-id="'+html(x.id)+
+  '" data-store="'+html(x.store)+'" data-category="'+html(x.category||'Autres')+
+  '" data-frequent="'+x.frequent+'" data-search="'+html(norm(x.name))+'" data-name="'+html(x.name)+'">'+
+  '<label class="v37-bulk-choice v419-bulk-choice">'+
+   '<input type="checkbox" data-v37-select aria-label="Sélectionner '+html(x.name)+'">'+
+   '<span class="v419-bulk-icon" aria-hidden="true">'+symbol+'</span>'+
+   '<span class="v37-bulk-item-info"><strong>'+html(x.name)+'</strong>'+
+    '<span class="v419-bulk-badges">'+
+     '<span class="catalogue-type-badge">'+(isIngredient?'Ingrédient':'Quotidien')+'</span>'+
+     '<span class="v418-store-badge v418-store-badge--'+storeClass+'"><span aria-hidden="true">'+
+      (isGrandFrais?'🥬':'🛒')+'</span> '+(isGrandFrais?'Grand Frais':'Carrefour Drive')+'</span>'+
+    '</span>'+
+    '<span class="v419-bulk-reference"><span class="v418-reference-badge v418-reference-badge--'+ref.kind+'">'+
+     '<span aria-hidden="true">'+(ref.kind==='missing'?'!':'✓')+'</span> '+html(ref.label)+'</span></span>'+
+    (isIngredient&&ref.kind==='linked'?'<span class="v419-bulk-reference-detail">'+html(ref.detail)+'</span>':'')+
+    '<small class="v419-bulk-category">📂 '+html(x.category||'Autres')+
+     (x.frequent?' · ☆ Fréquent':'')+'</small>'+
+    (matched?'<span class="v419-already-in-courses">✓ Déjà dans les courses</span>':'')+
+   '</span></label>'+
+  '<div class="v37-bulk-amount"><button type="button" class="v37-bulk-step" data-action="v37-qty-minus" aria-label="Diminuer la quantité de '+html(x.name)+'">−</button>'+
+  '<input type="number" inputmode="decimal" min="0.01" max="100000" step="any" data-v37-qty value="'+html(x.qty)+'" aria-label="Quantité de '+html(x.name)+'">'+
+  '<button type="button" class="v37-bulk-step" data-action="v37-qty-plus" aria-label="Augmenter la quantité de '+html(x.name)+'">＋</button>'+
+  '<select data-v37-unit aria-label="Unité de '+html(x.name)+'">'+selectOptions(units,x.unit)+'</select></div></div>';
+}
 function openBulkCatalogueV37(favoritesOnly=false,stockMode=false){
  const items=bulkCatalogueV37();
  if(!items.length){toast('Ajoute d’abord des produits ou ingrédients dans ton catalogue.');return}
@@ -1985,18 +2019,7 @@ function openBulkCatalogueV37(favoritesOnly=false,stockMode=false){
  out+=items.map(x=>{
   const matched=!stockMode&&existing.some(row=>(x.kind==='ingredient'&&row.ingredientId===x.id)||
    (x.kind==='daily'&&row.productId===x.id));
-  return '<div class="v37-bulk-item" data-v37-row data-kind="'+x.kind+'" data-id="'+html(x.id)+
-   '" data-store="'+html(x.store)+'" data-category="'+html(x.category||'Autres')+
-   '" data-frequent="'+x.frequent+'" data-search="'+html(norm(x.name))+'" data-name="'+html(x.name)+'">'+
-   '<label class="v37-bulk-choice"><input type="checkbox" data-v37-select aria-label="Sélectionner '+html(x.name)+'">'+
-   '<span class="v37-bulk-item-info"><strong>'+html(x.name)+'</strong><small>'+
-   (x.kind==='ingredient'?'🥕 Ingrédient':'🛍️ Quotidien')+' · '+
-   catalogueStoreLabelV40(x.store)+' · 📂 '+html(x.category||'Autres')+
-   (matched?' · déjà dans les courses':'')+'</small></span></label>'+
-   '<div class="v37-bulk-amount"><button type="button" class="v37-bulk-step" data-action="v37-qty-minus" aria-label="Diminuer la quantité de '+html(x.name)+'">−</button>'+
-   '<input type="number" inputmode="decimal" min="0.01" max="100000" step="any" data-v37-qty value="'+html(x.qty)+'" aria-label="Quantité de '+html(x.name)+'">'+
-   '<button type="button" class="v37-bulk-step" data-action="v37-qty-plus" aria-label="Augmenter la quantité de '+html(x.name)+'">＋</button>'+
-   '<select data-v37-unit aria-label="Unité de '+html(x.name)+'">'+selectOptions(units,x.unit)+'</select></div></div>';
+  return bulkCatalogueItemV419(x,matched);
  }).join('');
  out+='</div><div class="v37-bulk-footer"><div class="v37-bulk-status" id="v37BulkStatus">Aucun article sélectionné</div>'+
  '<button class="btn wide" data-action="'+(stockMode?'v41-bulk-stock-add':'v37-bulk-add')+'" id="v37BulkSubmit" disabled>'+

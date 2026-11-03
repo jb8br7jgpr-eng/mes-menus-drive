@@ -27,9 +27,11 @@ test('La quantité habituelle est remplacée par une quantité proposée, facult
  assert.match(editor,/Contenu d’une unité achetée/);
  assert.match(css,/\.v38-course-defaults/);
  const bulk=between('openBulkCatalogueV37','filterBulkV37');
+ const row=between('bulkCatalogueItemV419','openBulkCatalogueV37');
  assert.match(bulk,/simples propositions/);
- assert.match(bulk,/data-v37-qty/);
- assert.match(bulk,/data-v37-unit/);
+ assert.match(bulk,/bulkCatalogueItemV419\(x,matched\)/,'la liste utilise les mêmes champs pour Courses et Stock');
+ assert.match(row,/data-v37-qty/,'la quantité est conservée par carte');
+ assert.match(row,/data-v37-unit/,'les unités sont conservées par carte');
 });
 test('Une quantité et une unité déjà définies sont respectées dans les achats multiples',()=>{
  const state={ingredientCatalog:[

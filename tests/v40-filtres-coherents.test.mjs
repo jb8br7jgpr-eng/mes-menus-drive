@@ -106,9 +106,10 @@ test('Catégories V39, stock V38, achats V37 et Firebase conservés',()=>{
  assert.match(js,/const V34_CLOUD_ACTIVE = true/);
  assert.match(js,/const baseState=\(\)=>\(\{schema:1/);
  assert.match(js,/v34CloudRuntime\.commitLocalModification\(snapshot\)/);
- const bulk=fragment('function openBulkCatalogueV37','function updateBulkV37');
- assert.match(bulk,/data-category/);
+ const bulk=fragment('function bulkCatalogueItemV419','function updateBulkV37');
+ assert.match(bulk,/data-category/,'le filtre par catégorie est conservé sur chaque ligne');
  assert.match(bulk,/v40BulkCategory/);
  assert.match(bulk,/v40BulkFrequent/);
  assert.match(bulk,/v37-bulk-add/);
+ assert.match(bulk,/bulkCatalogueItemV419\(x,matched\)/,'le sélecteur appelle le nouveau rendu commun');
 });

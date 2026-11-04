@@ -2023,7 +2023,7 @@ function pickMeal(index){
  out+='<button class="btn secondary wide v412-add-product" data-action="v412-pick-product" data-index="'+index+
   '">＋ Ajouter un produit du catalogue à ce repas</button>';
  if(meal)out+='<div class="meal-transfer-actions">'+
- '<button class="btn secondary" data-action="move-copy-meal" data-mode="copy" data-index="'+index+'" '+(!dishes.length?'disabled':'')+'>⧉ Copier</button>'+
+ '<button class="btn secondary" data-action="move-copy-meal" data-mode="copy" data-index="'+index+'" '+(!dishes.length&&!products.length?'disabled':'')+'>⧉ Copier</button>'+
  '<button class="btn secondary" data-action="move-copy-meal" data-mode="move" data-index="'+index+'">↔ Déplacer</button></div>';
  showModal(menuMealLabelV411(index),out)
 }
@@ -2468,7 +2468,7 @@ function moveCopyMeal(w,source,target,mode){
 function moveCopyMealModal(index,mode){
  const w=getWeek(),source=w.meals[index];if(!source)return;
  const dishes=mealDishes(source);
- if(mode==='copy'&&!dishes.length){toast('Les restes ne peuvent pas être copiés : utilise Déplacer.');return}
+ if(mode==='copy'&&!dishes.length&&!mealProductsV412(source).length){toast('Les restes seuls ne peuvent pas être copiés : utilise Déplacer.');return}
  let out='<p class="helper">'+(mode==='move'?'Déplacer les plats et leurs portions, en mettant à jour les restes liés.':'Copier les plats et leurs portions sans dupliquer les restes déjà consommés.')+' Choisis une case ci-dessous.</p><div class="meal-targets">';
  for(let i=0;i<14;i++)if(i!==index){
   out+='<button class="meal-target" data-action="apply-meal-transfer" data-index="'+index+'" data-target="'+i+'" data-mode="'+mode+'">'+

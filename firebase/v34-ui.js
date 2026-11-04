@@ -6,13 +6,36 @@ import {
 } from "./v34-auth.js";
 import { previewLocalMigration } from "./v34-model.js";
 import { inspectFirstCloudImport } from "./v34-import-preflight.js";
-import { currentCloudStatus, confirmFirstCloudImport, retryUnconfirmedSave } from "./v34-cloud-runtime.js";
+import {
+  currentCloudStatus,confirmFirstCloudImport,retryUnconfirmedSave,
+  loadServerDiscardingLocalDraft,readSavedRecoveryArchivesV4121
+} from "./v34-cloud-runtime.js";
 
 const ENABLE_ACCOUNT_SETUP = true; // DO NOT ENABLE before security tests.
 const root = document.getElementById("v34SyncRoot");
 let user = null, ready = false, loading = false;
 let error = "", info = "", localPreview = null;
 let cloudStatus = {phase:"idle"};
+let hasRecoveredDraftV4121 = false;
+
+async function checkRecoveryArchiveV4121() {
+  try {
+    const archives=await readSavedRecoveryArchivesV4121();
+    hasRecoveredDraftV4121=archives.some(x=>x?.draft?.state);
+    if(enabled())render();
+  } catch (_) { /* Compte ou stockage non prêt : aucun effacement. */ }
+}
+async function exportArchivedDraftV4121() {
+  const archives=await readSavedRecoveryArchivesV4121();
+  const saved=archives?.[0]?.draft?.state;
+  if(!saved)throw Error("Aucun ancien brouillon archivé sur cet iPhone.");
+  const url=URL.createObjectURL(new Blob([JSON.stringify(saved,null,2)],{type:"application/json"}));
+  const link=document.createElement("a");
+  link.href=url;
+  link.download="speedrive-ancien-brouillon-"+new Date().toISOString().slice(0,10)+".json";
+  document.body.appendChild(link);link.click();link.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),60000);
+}
 
 const escapeHtml = value => String(value ?? "").replace(/[&<>"']/g, c =>
   ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[c]));
@@ -61,9 +84,18 @@ function render() {
         une version plus récente présente sur l'autre iPhone.</p></div>
         ${button("Réessayer la sauvegarde", "retry-draft", "v34-primary")}
         <p class="v34-small">Si Firebase a changé entre-temps, le brouillon sera préservé
-        pour une résolution ultérieure, sans suppression automatique.</p>`;
+        pour une résolution ultérieure, sans suppression automatique.</p>
+        <div class="v34-note"><strong>Un autre iPhone possède une version plus récente ?</strong>
+          <p>Commence par exporter le JSON de secours de cet iPhone (bouton en haut).
+          Tu peux ensuite reprendre la dernière version Firebase. L'ancien brouillon
+          sera archivé localement avant le remplacement ; aucune donnée du serveur
+          ne sera écrasée.</p></div>
+        ${button("Récupérer la version du serveur sur cet iPhone","restore-server")}
+        <p class="v34-small">Cette action nécessite ta confirmation. Elle ne modifie pas
+        le premier iPhone et ne peut pas s'exécuter si la sauvegarde de sécurité échoue.</p>`;
     } else if(phase==="ready") {
-      cloudArea='<div class="v34-good"><strong>Enregistré sur Firebase</strong><span>Dernière version du serveur confirmée.</span></div>';
+      cloudArea='<div class="v34-good"><strong>Enregistré sur Firebase</strong><span>Dernière version du serveur confirmée.</span></div>'+
+        (hasRecoveredDraftV4121?button("Exporter l’ancien brouillon archivé","export-recovery-archive"):'');
     } else if(phase==="readonly") {
       cloudArea='<div class="v34-note"><strong>Serveur indisponible</strong><p>Consultation uniquement. Les modifications restent bloquées.</p></div>';
     }
@@ -162,6 +194,26 @@ root?.addEventListener("click", e => {
       : "Sauvegarde confirmée sur Firebase.";});
     return;
   }
+  if (action==="restore-server") {
+    if (!ENABLE_ACCOUNT_SETUP||cloudStatus.phase!=="recovery") return;
+    if (!confirm("Récupérer la dernière version Firebase sur CE deuxième iPhone ?"+
+      "\\n\\nLa version locale sera archivée avant d'être remplacée. Aucune"+
+      " modification ne sera envoyée au serveur. Vérifie d'abord que ton"+
+      " export JSON de secours est bien sauvegardé.")) return;
+    act(async()=>{
+      await loadServerDiscardingLocalDraft("ABANDONNER_LE_BROUILLON");
+      hasRecoveredDraftV4121=true;
+      info="Version récente de Firebase récupérée. Ancien brouillon archivé sur cet iPhone.";
+    });
+    return;
+  }
+  if(action==="export-recovery-archive"){
+    act(async()=>{
+      await exportArchivedDraftV4121();
+      info="Téléchargement du brouillon archivé demandé. Vérifie le fichier dans Fichiers.";
+    });
+    return;
+  }
   if (action==="verify") act(async()=>{if(!await refreshVerifiedAccount())throw Error("Adresse e-mail non encore vérifiée.");});
   if (action==="resend") act(async()=>{await resendVerification();info="Courriel renvoyé.";});
   if (action==="logout") act(async()=>{await signOutAccount();info="Compte déconnecté.";});
@@ -195,7 +247,7 @@ document.addEventListener("click",e=>{
 document.addEventListener("keydown",e=>{
   if(e.key==="Escape"&&enabled()){e.stopImmediatePropagation();closePanel();}
 },true);
-if(root)observeLogin(account=>{user=account;ready=true;render();},
+if(root)observeLogin(account=>{user=account;ready=true;render();if(account?.emailVerified)void checkRecoveryArchiveV4121();},
   e=>{ready=true;error=errorText(e);render();});
 
 window.addEventListener("speedrive-v34-cloud-status",e=>{

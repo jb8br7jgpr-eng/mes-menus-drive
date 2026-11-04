@@ -1994,9 +1994,9 @@ function pickMeal(index){
    const p=productById(x.productId);
    out+='<div class="meal-dish v412-product"><div class="grow"><strong>🛒 '+html(p?.name||'Produit supprimé')+
     '</strong><div class="helper">'+x.qty+' '+html(x.unit)+' · '+html(p?.store==='grandfrais'?'Grand Frais':'Carrefour')+
-    '</div></div><button class="btn tiny secondary" data-action="v412-edit-meal-product" data-index="'+index+
+    '</div></div><div class="meal-dish-actions"><button class="btn tiny secondary" data-action="v412-edit-meal-product" data-index="'+index+
     '" data-id="'+html(x.productId)+'">Modifier</button><button class="btn tiny ghost" data-action="v412-remove-meal-product" data-index="'+index+
-    '" data-id="'+html(x.productId)+'">Retirer</button></div>';
+    '" data-id="'+html(x.productId)+'">Retirer</button></div></div>';
   });
  }
  out+='<div class="field"><label for="mealPeople">'+(dishes.length?'Portions à préparer pour le plat supplémentaire':'Combien de portions veux-tu préparer ?')+'</label>'+

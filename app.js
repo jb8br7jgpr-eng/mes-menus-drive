@@ -278,7 +278,7 @@ function mealCard(meal,i){
  return '<button class="meal-tile'+classes+'" data-action="pick-meal" data-index="'+i+'" aria-label="'+html(days[Math.floor(i/2)])+' '+(i%2?'soir':'midi')+', '+html(names.join(' et ')||'ajouter un plat')+'"><span class="meal-type">'+(i%2?'Soir':'Midi')+(note?' · '+html(note):'')+'</span>'+
  (names.length?names.map(n=>'<strong>'+html(n)+'</strong>').join(''):'<span class="add">＋ Ajouter un plat</span>')+(available?'<span class="v36-leftover-pill">🍱 '+available+' portion'+(available>1?'s':'')+' disponible'+(available>1?'s':'')+'</span>':'')+'</button>';
 }
-function renderMenus(){const w=getWeek(),count=w.meals.filter(Boolean).length, last=offsetDate(currentWeek,6),isThis=currentWeek===currentMenuWeekV411(new Date());
+function renderMenus(){const w=getWeek(),count=w.meals.filter(Boolean).length,isThis=currentWeek===currentMenuWeekV411(new Date());
   let out='<div class="hero"><div class="eyebrow">Planificateur hebdomadaire</div><h1>Qu’est-ce qu’on mange cette semaine ?</h1><p>Planifie tes repas, cuisine pour deux ou plus et place les restes quand tu veux.</p>'+
   '<div class="hero-menu-actions">'+
   (count<14?'<button class="btn cream" data-action="complete-week">✦ Générer les repas</button>':'<div class="week-complete-note">✓ Les 14 repas sont renseignés</div>')+
@@ -286,18 +286,18 @@ function renderMenus(){const w=getWeek(),count=w.meals.filter(Boolean).length, l
   out+='<div class="section-head week-v32-heading"><h2>Votre semaine</h2><div class="week-v32-heading-actions">'+
   (isThis?'<button class="week-v32-today-link" data-action="jump-today">Aujourd’hui ↓</button>':'')+
   '<span class="pill">'+count+' / 14 repas</span></div></div>';
-  out+='<div class="week-control"><button class="icon-btn" aria-label="Semaine précédente" data-action="week-prev">‹</button><button class="week-label v36-week-label" data-action="open-week-calendar" aria-label="Ouvrir le calendrier des semaines">Du '+niceDate(currentWeek)+' au '+niceDate(last)+(isThis?'<small>Cette semaine · 📅</small>':'<small>📅 Choisir une semaine</small>')+'</button><button class="icon-btn" aria-label="Semaine suivante" data-action="week-next">›</button></div>'+
+  out+='<div class="week-control"><button class="icon-btn" aria-label="Semaine précédente" data-action="week-prev">‹</button><button class="week-label v36-week-label" data-action="open-week-calendar" aria-label="Ouvrir le calendrier des semaines">'+menuWeekRangeV411(currentWeek)+(isThis?'<small>Cette semaine · 📅</small>':'<small>📅 Choisir une semaine</small>')+'</button><button class="icon-btn" aria-label="Semaine suivante" data-action="week-next">›</button></div>'+
   (!isThis?'<div class="week-v33-return"><button class="week-v33-return-btn" data-action="week-current">↩ Revenir à la semaine actuelle</button></div>':'');
   out+='<div class="status-bar"><span style="width:'+(count/14*100)+'%"></span></div>';
   out+=courseGenerationBanner(w,'menus');
   const availableThisWeek=w.meals.reduce((total,meal,i)=>total+mealDishes(meal).reduce((n,d)=>n+Math.max(0,sourceBudget(w,i,d.recipeId)-usedLeftovers(w,i,d.recipeId)),0),0);
   if(availableThisWeek)out+='<div class="v36-leftovers-summary">🍱 <strong>'+availableThisWeek+' portion'+(availableThisWeek>1?'s':'')+' disponible'+(availableThisWeek>1?'s':'')+'</strong> à placer dans les prochains repas si tu le souhaites.</div>';
   out+='<div class="meal-list">';
-  for(let day=0;day<7;day++){
-   const d=offsetDate(currentWeek,day),isToday=d===localDate(new Date()),hasMeals=Boolean(w.meals[day*2]||w.meals[day*2+1]);
-   out+='<section class="day-card'+(isToday?' day-card-today':'')+'" data-meal-day="'+day+'"><div class="day-card-head"><div class="day-title">'+days[day]+' <small>'+niceDate(d)+'</small>'+(isToday?'<span class="day-today-label">Aujourd’hui</span>':'')+'</div>'+
-   '<button class="day-clear-btn" data-action="clear-day" data-day="'+day+'" aria-label="Vider les repas du '+html(days[day])+'" '+(!hasMeals?'disabled':'')+'>✕ Vider le jour</button></div>'+
-   '<div class="day-meals">'+mealCard(w.meals[day*2],day*2)+mealCard(w.meals[day*2+1],day*2+1)+'</div></section>'
+  for(let day=0;day<8;day++){
+   const indices=menuDayMealsV411(day),d=offsetDate(currentWeek,day),isToday=d===localDate(new Date()),hasMeals=indices.some(i=>Boolean(w.meals[i]));
+   out+='<section class="day-card'+(isToday?' day-card-today':'')+'" data-meal-day="'+day+'"><div class="day-card-head"><div class="day-title">'+menuDaysV411[day]+' <small>'+niceDate(d)+'</small>'+(isToday?'<span class="day-today-label">Aujourd’hui</span>':'')+'</div>'+
+   '<button class="day-clear-btn" data-action="clear-day" data-day="'+day+'" aria-label="Vider les repas du '+html(menuDaysV411[day])+'" '+(!hasMeals?'disabled':'')+'>✕ Vider le jour</button></div>'+
+   '<div class="day-meals">'+indices.map(i=>mealCard(w.meals[i],i)).join('')+'</div></section>'
   }
   out+='</div><button class="btn danger wide clear-week-btn" data-action="clear-week" '+(!count?'disabled':'')+'>🗑️ Vider tous les repas de cette semaine</button>';
   out+='<p class="helper">Choisis librement quand manger les restes : touche le repas souhaité, puis « Placer des restes ici ». La sélection indique les plats cuisinés et les portions encore disponibles. Aucun repas de restes n’est rempli automatiquement.</p>';
@@ -306,9 +306,9 @@ function renderMenus(){const w=getWeek(),count=w.meals.filter(Boolean).length, l
 
 function planRecipeV36(recipeId){
  const recipe=recipeById(recipeId);if(!recipe)return;
- const w=getWeek(),end=offsetDate(currentWeek,6);
+ const w=getWeek();
  let out='<p class="helper">Choisis où ajouter <strong>'+html(recipe.name)+'</strong>. Les plats déjà prévus restent en place.</p>'+
- '<div class="v36-plan-week">📅 Du '+niceDate(currentWeek)+' au '+niceDate(end)+' <small>· semaine sélectionnée</small></div>'+
+ '<div class="v36-plan-week">📅 '+menuWeekRangeV411(currentWeek)+' <small>· semaine sélectionnée</small></div>'+
  '<div class="field"><label for="v36PlanPortions">Portions à préparer</label>'+
  '<input id="v36PlanPortions" type="number" min="1" max="30" value="'+Number(recipe.people||2)+'">'+
  '<span class="helper">Portions de base proposées automatiquement.</span></div>'+
@@ -316,7 +316,7 @@ function planRecipeV36(recipeId){
  for(let i=0;i<14;i++){
   const meal=w.meals[i],already=mealDishes(meal).some(d=>d.recipeId===recipeId);
   out+='<button class="v36-plan-target" data-action="plan-recipe-to-meal" data-id="'+html(recipeId)+'" data-index="'+i+'" '+(already?'disabled':'')+'>'+
-  '<strong>'+days[Math.floor(i/2)]+' '+(i%2?'soir':'midi')+'</strong><small>'+
+  '<strong>'+menuMealLabelV411(i)+'</strong><small>'+
   (already?'Déjà prévu':meal?'Ajouter au repas':'Repas libre')+'</small></button>'
  }
  showModal('＋ Ajouter aux menus',out+'</div>')
@@ -1249,9 +1249,8 @@ function migrateLegacyGeneratedCourses(){
  return true
 }
 function weekSwitcher(){
- const end=offsetDate(currentWeek,6);
  return '<div class="week-control"><button class="icon-btn" aria-label="Semaine précédente" data-action="week-prev">‹</button>'+
- '<button class="week-label v36-week-label" data-action="open-week-calendar" aria-label="Ouvrir le calendrier des semaines">Du '+niceDate(currentWeek)+' au '+niceDate(end)+'<small>📅 Calendrier</small></button>'+
+ '<button class="week-label v36-week-label" data-action="open-week-calendar" aria-label="Ouvrir le calendrier des semaines"> '+menuWeekRangeV411(currentWeek)+'<small>📅 Calendrier</small></button>'+
  '<button class="icon-btn" aria-label="Semaine suivante" data-action="week-next">›</button></div>'+
  (currentWeek!==currentMenuWeekV411(new Date())?'<div class="week-v33-return"><button class="week-v33-return-btn" data-action="week-current">↩ Revenir à la semaine actuelle</button></div>':'')
 }

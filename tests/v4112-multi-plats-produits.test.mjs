@@ -62,7 +62,7 @@ test('V41.12 : les recettes et les produits cohabitent sans modifier le catalogu
  assert.equal(w.meals[0].people,2);
  assert.equal(w.meals[0].products[0].qty,2);
  assert.equal(collect(w).length,2);
- assert.deepEqual(collect(w).map(x=>x.name),['Patates','Cordons-bleus']);
+ assert.deepEqual(Array.from(collect(w),x=>x.name),['Patates','Cordons-bleus']);
  assert.equal(JSON.stringify(catalog),before);
 });
 

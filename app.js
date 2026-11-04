@@ -3155,7 +3155,7 @@ $('#settingsBtn').addEventListener('click',settingsModal);
   render();importCarrefourProductFromHash();
   if(V34_CLOUD_ACTIVE) {
    try {
-    v34CloudRuntime=await import('./firebase/v34-cloud-runtime.js');
+    v34CloudRuntime=await import('./firebase/v34-cloud-runtime.js?v=20261104-41-12-2');
     v34CloudRuntime.setupCloudV34({
      readLocalState:()=>JSON.parse(JSON.stringify(state)),
      installCloudState:async remote=>{

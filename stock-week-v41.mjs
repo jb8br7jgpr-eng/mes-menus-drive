@@ -115,7 +115,12 @@ export function repeatWeekMealsV41(weeks,stock,sourceWeekId,targetWeekId) {
       // silencieusement ; aucun sous-plat réservé sans contrôle des portions.
       const keep=meal.dishes.filter(d=>d&&d.type!=='frozen').map(copy);
       skippedFrozen+=meal.dishes.length-keep.length;
-      if(keep.length||meal.products?.length)updated[targetWeekId].meals[i]={...copy(meal),type:keep.length?'multi':'products',dishes:keep,products:copy(meal.products||[])};
+      if(keep.length||meal.products?.length){
+        const copied={...copy(meal),type:keep.length?'multi':'products'};
+        if(keep.length)copied.dishes=keep;else delete copied.dishes;
+        if(meal.products?.length)copied.products=copy(meal.products);
+        updated[targetWeekId].meals[i]=copied;
+      }
     }else{
       updated[targetWeekId].meals[i]=copy(meal);
       // Ne pas reprendre les drapeaux de consommation d'une semaine passée.

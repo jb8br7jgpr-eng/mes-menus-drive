@@ -259,6 +259,8 @@ function mealCard(meal,i){
   note=meal.portions+' portion'+(meal.portions>1?'s':'')+' du congélateur'+(meal.consumed?' · mangé':'');
  }else if(meal?.type==='ordered'){
   names=['🍕 Repas commandé / libre'];classes=' filled';note='Aucun ingrédient à acheter';
+ }else if(meal?.type==='no-meal'){
+  names=['🍽️ Pas de repas'];classes=' filled v411-no-meal';note='Sortie, restaurant ou invitation · aucune course';
  }else{
   const dishes=mealDishes(meal);
   if(dishes.length){
@@ -275,7 +277,7 @@ function mealCard(meal,i){
   if(names.length){classes=' filled';note=names.length===1?'1 plat':names.length+' plats pour ce repas'}
  }
  const available=mealDishes(meal).reduce((n,d)=>n+Math.max(0,sourceBudget(getWeek(),i,d.recipeId)-usedLeftovers(getWeek(),i,d.recipeId)),0);
- return '<button class="meal-tile'+classes+'" data-action="pick-meal" data-index="'+i+'" aria-label="'+html(menuMealLabelV411(i))+', '+html(names.join(' et ')||'ajouter un plat')+'"><span class="meal-type">'+(i%2?'Soir':'Midi')+(note?' · '+html(note):'')+'</span>'+
+ return '<button class="meal-tile'+classes+'" data-action="pick-meal" data-index="'+i+'" aria-label="'+html(menuMealLabelV411(i))+', '+html(names.join(' et ')||'ajouter un plat')+'"><span class="meal-type">'+(menuMealPeriodV411(i)==='soir'?'Soir':'Midi')+(note?' · '+html(note):'')+'</span>'+
  (names.length?names.map(n=>'<strong>'+html(n)+'</strong>').join(''):'<span class="add">＋ Ajouter un plat</span>')+(available?'<span class="v36-leftover-pill">🍱 '+available+' portion'+(available>1?'s':'')+' disponible'+(available>1?'s':'')+'</span>':'')+'</button>';
 }
 function renderMenus(){const w=getWeek(),count=w.meals.filter(Boolean).length,isThis=currentWeek===currentMenuWeekV411(new Date());
@@ -1219,7 +1221,7 @@ function collectRecipeIngredients(w){
  return lines
 }
 function menuGenerationSignature(w){
- return JSON.stringify((w.meals||[]).map((meal,index)=>mealDishes(meal).map(d=>{
+ return JSON.stringify((w.meals||[]).map((meal,index)=>meal?.type==='no-meal'?['no-meal']:mealDishes(meal).map(d=>{
   const r=recipeById(d.recipeId);
   return [d.recipeId,d.people,r?.people||null,w.v41MealActions?.[index+':'+d.recipeId]?.status||null,
    (r?.ingredients||[]).map(i=>[i.ingredientId,i.name,i.qty,i.unit,i.productId])]
@@ -1898,7 +1900,7 @@ function pickMeal(index){
  const meal=getWeek().meals[index],dishes=mealDishes(meal),leftovers=mealLeftovers(meal);
  const title=menuMealLabelV411(index);
  const validated=isMealDoneV41(getWeek(),index);
- const summary=meal?.type==='frozen'?'❄️ Plat du congélateur':meal?.type==='ordered'?'🍕 Repas libre / commandé':
+ const summary=meal?.type==='frozen'?'❄️ Plat du congélateur':meal?.type==='ordered'?'🍕 Repas libre / commandé':meal?.type==='no-meal'?'🍽️ Pas de repas · sortie, restaurant ou invitation':
   dishes.map(d=>html(recipeById(d.recipeId)?.name||'Plat')).concat(leftovers.map(d=>'🍱 Restes')).join(' · ')||'Repas libre';
  const quick=quickMealActionsV413(index,meal);
  if(validated){
@@ -1909,8 +1911,9 @@ function pickMeal(index){
  }
  let out='<div class="v413-meal-top">'+
   '<button class="btn secondary" data-action="v41-replace-meal" data-index="'+index+'">↔ '+(meal?'Remplacer':'Choisir un repas')+'</button>'+
-  (meal?'<button class="btn secondary" data-action="remove-meal" data-index="'+index+'">Vider le repas</button>':'')+'</div>'+quick;
- if(meal?.type==='frozen'||meal?.type==='ordered'){
+  (meal?'<button class="btn secondary" data-action="remove-meal" data-index="'+index+'">Vider le repas</button>':'')+'</div>'+quick+
+  (meal?.type==='no-meal'?'':'<button type="button" class="btn secondary wide v411-no-meal-button" data-action="mark-no-meal" data-index="'+index+'">🍽️ Pas de repas <small>Restaurant, invitation, sortie…</small></button>');
+ if(meal?.type==='frozen'||meal?.type==='ordered'||meal?.type==='no-meal'){
   showModal(title,'<p class="helper">'+summary+'</p>'+out);
   return
  }
@@ -2616,6 +2619,19 @@ document.addEventListener('click',e=>{
    document.querySelector('[data-meal-day="'+day+'"]')?.scrollIntoView({behavior:'smooth',block:'start'});
   }
   else if(mode==='pick-meal')pickMeal(index);
+  else if(mode==='mark-no-meal'){
+   if(!Number.isInteger(index)||index<0||index>13)return;
+   if(isMealDoneV41(w,index)){
+    toast('Ce repas est déjà validé dans le stock. Annule la validation pour le remplacer.');return
+   }
+   if(w.meals[index]?.type==='no-meal')return;
+   if(w.meals[index]&&!confirm('Remplacer le repas prévu par « Pas de repas » ? Les éventuels restes liés à ce plat seront retirés du planning.'))return;
+   const before=weekBeforeUndo();
+   clearMealWithPair(w,index);
+   w.meals[index]={type:'no-meal'};
+   persist();closeModal();renderMealContext(index);
+   toastWeekUndo('Créneau marqué « Pas de repas ».',before,index)
+  }
   else if(mode==='move-copy-meal')moveCopyMealModal(index,a.dataset.mode);
   else if(mode==='apply-meal-transfer'){
    const target=Number(a.dataset.target),action=a.dataset.mode;

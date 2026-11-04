@@ -26,6 +26,40 @@ function parseDate(s){const [y,m,d]=s.split('-').map(Number);return new Date(y,m
 function monday(d){const x=new Date(d.getFullYear(),d.getMonth(),d.getDate(),12);x.setDate(x.getDate()-((x.getDay()+6)%7));return localDate(x)}
 function offsetDate(s,n){const d=parseDate(s);d.setDate(d.getDate()+n);return localDate(d)}
 function niceDate(s){return parseDate(s).toLocaleDateString('fr-FR',{day:'numeric',month:'short'})}
+// V41.11 — période de 14 repas du samedi soir au samedi midi suivant.
+// Les données des recettes, produits et du stock ne sont jamais modifiées ici.
+// Samedi jusqu'à 13 h 59 appartient encore à la période du déjeuner final.
+const menuDaysV411=['Samedi','Dimanche','Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi'];
+function saturdayV411(d){
+ const x=new Date(d.getFullYear(),d.getMonth(),d.getDate(),12);
+ x.setDate(x.getDate()-((x.getDay()+1)%7));
+ return localDate(x)
+}
+function currentMenuWeekV411(now=new Date()){
+ const saturday=saturdayV411(now);
+ return now.getDay()===6&&now.getHours()<14?offsetDate(saturday,-7):saturday
+}
+function menuMealDayV411(index){
+ if(!Number.isInteger(index)||index<0||index>13)return -1;
+ return index===0?0:index===13?7:Math.ceil(index/2)
+}
+function menuMealPeriodV411(index){
+ return index===0||(index>0&&index<13&&index%2===0)?'soir':'midi'
+}
+function menuMealLabelV411(index){
+ const day=menuMealDayV411(index);
+ return day<0?'Repas':menuDaysV411[day]+' '+menuMealPeriodV411(index)
+}
+function menuDayMealsV411(day){
+ if(!Number.isInteger(day)||day<0||day>7)return [];
+ return day===0?[0]:day===7?[13]:[2*day-1,2*day]
+}
+function currentMenuDayV411(now=new Date()){
+ return now.getDay()===6&&now.getHours()<14?7:(now.getDay()+1)%7
+}
+function menuWeekRangeV411(start){
+ return 'Du '+niceDate(start)+' (soir) au '+niceDate(offsetDate(start,7))+' (midi)'
+}
 function getWeek(key=currentWeek){if(!state.weeks[key])state.weeks[key]={meals:Array(14).fill(null),extras:[],checked:[],excluded:[]};const w=state.weeks[key];if(!Array.isArray(w.meals))w.meals=Array(14).fill(null);if(!Array.isArray(w.extras))w.extras=[];if(!Array.isArray(w.checked))w.checked=[];if(!Array.isArray(w.excluded))w.excluded=[];if(!w.pantry||typeof w.pantry!=='object'||Array.isArray(w.pantry))w.pantry={};if(!w.pantryUnits||typeof w.pantryUnits!=='object'||Array.isArray(w.pantryUnits))w.pantryUnits={};return w}
 // Données principales dans IndexedDB ; historique de points de restauration indépendants.
 function openDatabase(){return new Promise((resolve,reject)=>{const r=indexedDB.open('menus-drive-v1',2);r.onupgradeneeded=()=>{if(!r.result.objectStoreNames.contains('records'))r.result.createObjectStore('records');if(!r.result.objectStoreNames.contains('snapshots'))r.result.createObjectStore('snapshots',{keyPath:'id',autoIncrement:true})};r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error)})}
@@ -145,7 +179,7 @@ function switchTabV33(destination){
  requestAnimationFrame(()=>window.scrollTo({top:tabScrollV33[destination]||0,behavior:'auto'}));
 }
 function returnToCurrentWeekV33(){
- currentWeek=monday(new Date());
+ currentWeek=currentMenuWeekV411(new Date());
  tabScrollV33.menus=0;tabScrollV33.courses=0;tabScrollV33.drive=0;
  render();
 }
@@ -154,7 +188,7 @@ function renderMealContext(index){
  // Retourne au jour modifié sans perturber la position si la carte est déjà visible.
  if(currentTab!=='menus'||!Number.isInteger(index)||index<0||index>13)return;
  requestAnimationFrame(()=>{
-  const card=document.querySelector('[data-meal-day="'+Math.floor(index/2)+'"]');if(!card)return;
+  const card=document.querySelector('[data-meal-day="'+menuMealDayV411(index)+'"]');if(!card)return;
   const rect=card.getBoundingClientRect(),view=window.innerHeight||document.documentElement.clientHeight;
   if(rect.bottom<65||rect.top>view-105)card.scrollIntoView({behavior:'auto',block:'nearest'});
  });
@@ -168,21 +202,21 @@ function weekHasMealsV36(key){
 function calendarMarkupV36(){
  const date=parseDate(calendarMonthV36+'-01'),year=date.getFullYear(),month=date.getMonth();
  const start=new Date(year,month,1,12),count=new Date(year,month+1,0,12).getDate();
- const offset=(start.getDay()+6)%7,cells=Math.ceil((offset+count)/7)*7;
+ const offset=(start.getDay()+1)%7,cells=Math.ceil((offset+count)/7)*7;
  let out='<div class="v36-calendar-nav"><button class="icon-btn" data-action="calendar-shift" data-shift="-1" aria-label="Mois précédent">‹</button><strong>'+
  html(start.toLocaleDateString('fr-FR',{month:'long',year:'numeric'}))+
  '</strong><button class="icon-btn" data-action="calendar-shift" data-shift="1" aria-label="Mois suivant">›</button></div>';
  out+='<div class="v36-calendar-grid" role="group" aria-label="Calendrier des semaines">'+
- days.map(d=>'<span class="v36-calendar-weekday">'+d.slice(0,1)+'</span>').join('');
+ menuDaysV411.slice(0,7).map(d=>'<span class="v36-calendar-weekday">'+d.slice(0,1)+'</span>').join('');
  for(let i=0;i<cells;i++){
-  const day=new Date(year,month,1-offset+i,12),key=monday(day),iso=localDate(day),planned=day.getDay()===1&&weekHasMealsV36(key);
+  const day=new Date(year,month,1-offset+i,12),key=saturdayV411(day),iso=localDate(day),planned=day.getDay()===6&&weekHasMealsV36(key);
   out+='<button type="button" class="v36-calendar-day'+(currentWeek===key?' selected':'')+
    (day.getMonth()!==month?' outside':'')+(iso===localDate(new Date())?' today':'')+
    '" data-action="calendar-select" data-date="'+iso+'" aria-pressed="'+(currentWeek===key)+'" aria-label="'+
    html(day.toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long'}))+(planned?', semaine planifiée':'')+
    '"><span>'+day.getDate()+'</span><i class="'+(planned?'planned':'')+'" aria-hidden="true"></i></button>';
  }
- out+='</div><p class="helper v36-calendar-legend">● Point vert : semaine contenant des menus. Touche un jour pour ouvrir sa semaine.</p>'+
+ out+='</div><p class="helper v36-calendar-legend">● Point vert : période avec menus. Une période couvre samedi soir → samedi midi suivant. Touche un jour pour la choisir.</p>'+
  '<button class="btn secondary wide" data-action="calendar-current">↩ Revenir à la semaine actuelle</button>';
  return out
 }
@@ -198,7 +232,7 @@ function shiftCalendarV36(shift){
 function selectCalendarV36(iso){
  if(!/^\d{4}-\d{2}-\d{2}$/.test(iso||''))return;
  const d=parseDate(iso);if(localDate(d)!==iso)return;
- currentWeek=monday(d);tabScrollV33.menus=0;tabScrollV33.courses=0;tabScrollV33.drive=0;
+ currentWeek=saturdayV411(d);tabScrollV33.menus=0;tabScrollV33.courses=0;tabScrollV33.drive=0;
  closeModal();render()
 }
 
@@ -244,7 +278,7 @@ function mealCard(meal,i){
  return '<button class="meal-tile'+classes+'" data-action="pick-meal" data-index="'+i+'" aria-label="'+html(days[Math.floor(i/2)])+' '+(i%2?'soir':'midi')+', '+html(names.join(' et ')||'ajouter un plat')+'"><span class="meal-type">'+(i%2?'Soir':'Midi')+(note?' · '+html(note):'')+'</span>'+
  (names.length?names.map(n=>'<strong>'+html(n)+'</strong>').join(''):'<span class="add">＋ Ajouter un plat</span>')+(available?'<span class="v36-leftover-pill">🍱 '+available+' portion'+(available>1?'s':'')+' disponible'+(available>1?'s':'')+'</span>':'')+'</button>';
 }
-function renderMenus(){const w=getWeek(),count=w.meals.filter(Boolean).length, last=offsetDate(currentWeek,6),isThis=currentWeek===monday(new Date());
+function renderMenus(){const w=getWeek(),count=w.meals.filter(Boolean).length, last=offsetDate(currentWeek,6),isThis=currentWeek===currentMenuWeekV411(new Date());
   let out='<div class="hero"><div class="eyebrow">Planificateur hebdomadaire</div><h1>Qu’est-ce qu’on mange cette semaine ?</h1><p>Planifie tes repas, cuisine pour deux ou plus et place les restes quand tu veux.</p>'+
   '<div class="hero-menu-actions">'+
   (count<14?'<button class="btn cream" data-action="complete-week">✦ Générer les repas</button>':'<div class="week-complete-note">✓ Les 14 repas sont renseignés</div>')+
@@ -1219,7 +1253,7 @@ function weekSwitcher(){
  return '<div class="week-control"><button class="icon-btn" aria-label="Semaine précédente" data-action="week-prev">‹</button>'+
  '<button class="week-label v36-week-label" data-action="open-week-calendar" aria-label="Ouvrir le calendrier des semaines">Du '+niceDate(currentWeek)+' au '+niceDate(end)+'<small>📅 Calendrier</small></button>'+
  '<button class="icon-btn" aria-label="Semaine suivante" data-action="week-next">›</button></div>'+
- (currentWeek!==monday(new Date())?'<div class="week-v33-return"><button class="week-v33-return-btn" data-action="week-current">↩ Revenir à la semaine actuelle</button></div>':'')
+ (currentWeek!==currentMenuWeekV411(new Date())?'<div class="week-v33-return"><button class="week-v33-return-btn" data-action="week-current">↩ Revenir à la semaine actuelle</button></div>':'')
 }
 function courseGenerationBanner(w=getWeek(),where='courses'){
  const status=coursesStatus(w),hasMenus=hasCookedMeals(w);
@@ -2578,8 +2612,8 @@ document.addEventListener('click',e=>{
    clearCalendarWeek(w);persist();render();toast('Calendrier de la semaine vidé !')
   }
   else if(mode==='jump-today'){
-   if(currentTab!=='menus'||currentWeek!==monday(new Date()))return;
-   const day=(new Date().getDay()+6)%7;
+   if(currentTab!=='menus'||currentWeek!==currentMenuWeekV411(new Date()))return;
+   const day=currentMenuDayV411(new Date());
    document.querySelector('[data-meal-day="'+day+'"]')?.scrollIntoView({behavior:'smooth',block:'start'});
   }
   else if(mode==='pick-meal')pickMeal(index);
@@ -2925,7 +2959,7 @@ document.addEventListener('submit',e=>{if(e.target.id==='recipeForm')saveRecipe(
 window.addEventListener('hashchange',()=>importCarrefourProductFromHash());
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal()});
 $('#settingsBtn').addEventListener('click',settingsModal);
-(async function boot(){currentWeek=monday(new Date());try{db=await openDatabase();const stored=await readRecord();if(stored?.schema===1)state={...baseState(),...stored,products:Array.isArray(stored.products)?stored.products:[]}}catch(err){usingFallback=true;try{const raw=localStorage.getItem('menus-drive-backup');if(raw){const saved=JSON.parse(raw);state={...baseState(),...saved,products:Array.isArray(saved.products)?saved.products:[]}}}catch(e){}toast('Mode de sauvegarde local de secours activé.')}
+(async function boot(){currentWeek=currentMenuWeekV411(new Date());try{db=await openDatabase();const stored=await readRecord();if(stored?.schema===1)state={...baseState(),...stored,products:Array.isArray(stored.products)?stored.products:[]}}catch(err){usingFallback=true;try{const raw=localStorage.getItem('menus-drive-backup');if(raw){const saved=JSON.parse(raw);state={...baseState(),...saved,products:Array.isArray(saved.products)?saved.products:[]}}}catch(e){}toast('Mode de sauvegarde local de secours activé.')}
   if(!V34_CLOUD_ACTIVE) {
    const ingredientMigration=normalizeIngredientCatalog(),favoriteMigration=migrateFrequentProducts(),courseMigration=migrateLegacyGeneratedCourses();
    if(ingredientMigration||favoriteMigration||courseMigration)persist();

@@ -1,5 +1,5 @@
-const CACHE='menus-drive-v41-12-1-recuperation-cloud-20261104';
-const ASSETS=['./','./index.html','./styles.css?v=20261104-41-12-release','./stock-ui-v41.css?v=20261101-41-5-release','./app.js?v=20261104-41-12-1-release','./stock-engine-v41.mjs','./stock-week-v41.mjs','./stock-ui-v41.mjs','./stock-actions-v41.mjs','./stock-preview-v413.mjs','./recipe-import-v417.mjs','./manifest.webmanifest?v=20261029-31','./speedrive-logo-v2.PNG?v=20261029-31','./speedrive-icon-v2.PNG?v=20261029-31'];
+const CACHE='menus-drive-v41-12-2-synchronisation-firebase-20261104';
+const ASSETS=['./','./index.html','./styles.css?v=20261104-41-12-release','./stock-ui-v41.css?v=20261101-41-5-release','./app.js?v=20261104-41-12-2-release','./stock-engine-v41.mjs','./stock-week-v41.mjs','./stock-ui-v41.mjs','./stock-actions-v41.mjs','./stock-preview-v413.mjs','./recipe-import-v417.mjs','./manifest.webmanifest?v=20261029-31','./speedrive-logo-v2.PNG?v=20261029-31','./speedrive-icon-v2.PNG?v=20261029-31'];
 self.addEventListener('install',event=>{
   event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(ASSETS)).then(()=>self.skipWaiting()));
 });

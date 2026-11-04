@@ -197,7 +197,7 @@ root?.addEventListener("click", e => {
   if (action==="restore-server") {
     if (!ENABLE_ACCOUNT_SETUP||cloudStatus.phase!=="recovery") return;
     if (!confirm("Récupérer la dernière version Firebase sur CE deuxième iPhone ?"+
-      "\\n\\nLa version locale sera archivée avant d'être remplacée. Aucune"+
+      "\n\nLa version locale sera archivée avant d'être remplacée. Aucune"+
       " modification ne sera envoyée au serveur. Vérifie d'abord que ton"+
       " export JSON de secours est bien sauvegardé.")) return;
     act(async()=>{

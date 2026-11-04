@@ -275,7 +275,7 @@ function mealCard(meal,i){
   if(names.length){classes=' filled';note=names.length===1?'1 plat':names.length+' plats pour ce repas'}
  }
  const available=mealDishes(meal).reduce((n,d)=>n+Math.max(0,sourceBudget(getWeek(),i,d.recipeId)-usedLeftovers(getWeek(),i,d.recipeId)),0);
- return '<button class="meal-tile'+classes+'" data-action="pick-meal" data-index="'+i+'" aria-label="'+html(days[Math.floor(i/2)])+' '+(i%2?'soir':'midi')+', '+html(names.join(' et ')||'ajouter un plat')+'"><span class="meal-type">'+(i%2?'Soir':'Midi')+(note?' · '+html(note):'')+'</span>'+
+ return '<button class="meal-tile'+classes+'" data-action="pick-meal" data-index="'+i+'" aria-label="'+html(menuMealLabelV411(i))+', '+html(names.join(' et ')||'ajouter un plat')+'"><span class="meal-type">'+(i%2?'Soir':'Midi')+(note?' · '+html(note):'')+'</span>'+
  (names.length?names.map(n=>'<strong>'+html(n)+'</strong>').join(''):'<span class="add">＋ Ajouter un plat</span>')+(available?'<span class="v36-leftover-pill">🍱 '+available+' portion'+(available>1?'s':'')+' disponible'+(available>1?'s':'')+'</span>':'')+'</button>';
 }
 function renderMenus(){const w=getWeek(),count=w.meals.filter(Boolean).length,isThis=currentWeek===currentMenuWeekV411(new Date());
@@ -1896,7 +1896,7 @@ function quickMealActionsV413(index,meal){
 }
 function pickMeal(index){
  const meal=getWeek().meals[index],dishes=mealDishes(meal),leftovers=mealLeftovers(meal);
- const title=days[Math.floor(index/2)]+' '+(index%2?'soir':'midi');
+ const title=menuMealLabelV411(index);
  const validated=isMealDoneV41(getWeek(),index);
  const summary=meal?.type==='frozen'?'❄️ Plat du congélateur':meal?.type==='ordered'?'🍕 Repas libre / commandé':
   dishes.map(d=>html(recipeById(d.recipeId)?.name||'Plat')).concat(leftovers.map(d=>'🍱 Restes')).join(' · ')||'Repas libre';
@@ -1917,7 +1917,7 @@ function pickMeal(index){
  if(leftovers.length){
   out+='<div class="section-head"><h3>Restes prévus pour ce repas</h3></div>';
   leftovers.forEach((left,n)=>{
-   const r=recipeById(left.recipeId),source=Number.isInteger(left.fromIndex)?' · préparé '+days[Math.floor(left.fromIndex/2)]+' '+(left.fromIndex%2?'soir':'midi'):'';
+   const r=recipeById(left.recipeId),source=Number.isInteger(left.fromIndex)?' · préparé '+menuMealLabelV411(left.fromIndex):'';
    out+='<div class="meal-dish"><div class="grow"><strong>🍱 '+html(r?.name||'Restes')+'</strong><div class="helper">'+left.people+' portion'+(left.people>1?'s':'')+html(source)+' · sans courses supplémentaires</div></div><button class="btn tiny secondary" data-action="remove-leftover" data-index="'+index+'" data-leftover="'+n+'">Retirer</button></div>'
   })
  }
@@ -1955,7 +1955,7 @@ function pickMeal(index){
  if(meal)out+='<div class="meal-transfer-actions">'+
  '<button class="btn secondary" data-action="move-copy-meal" data-mode="copy" data-index="'+index+'" '+(!dishes.length?'disabled':'')+'>⧉ Copier</button>'+
  '<button class="btn secondary" data-action="move-copy-meal" data-mode="move" data-index="'+index+'">↔ Déplacer</button></div>';
- showModal(days[Math.floor(index/2)]+' '+(index%2?'soir':'midi'),out)
+ showModal(menuMealLabelV411(index),out)
 }
 function extraSearchItems(term=''){
  const needle=norm(term);
@@ -2294,11 +2294,9 @@ function clearMealWithPair(w,index){
 // On efface seulement le calendrier, jamais les recettes, les produits,
 // ni les ajouts manuels de courses. Les restes liés sont réconciliés.
 function clearCalendarDay(w,day){
- if(!Number.isInteger(day)||day<0||day>6)return false;
- const first=day*2;
- if(!w.meals[first]&&!w.meals[first+1])return false;
- clearMealWithPair(w,first);
- clearMealWithPair(w,first+1);
+ const indexes=menuDayMealsV411(day);
+ if(!indexes.length||!indexes.some(i=>Boolean(w.meals[i])))return false;
+ indexes.forEach(i=>clearMealWithPair(w,i));
  return true
 }
 function clearCalendarWeek(w){
@@ -2341,7 +2339,7 @@ function moveCopyMealModal(index,mode){
  let out='<p class="helper">'+(mode==='move'?'Déplacer les plats et leurs portions, en mettant à jour les restes liés.':'Copier les plats et leurs portions sans dupliquer les restes déjà consommés.')+' Choisis une case ci-dessous.</p><div class="meal-targets">';
  for(let i=0;i<14;i++)if(i!==index){
   out+='<button class="meal-target" data-action="apply-meal-transfer" data-index="'+index+'" data-target="'+i+'" data-mode="'+mode+'">'+
-   html(days[Math.floor(i/2)])+' '+(i%2?'soir':'midi')+(w.meals[i]?' · occupé':' · libre')+'</button>'
+   html(menuMealLabelV411(i))+(w.meals[i]?' · occupé':' · libre')+'</button>'
  }
  out+='</div>';
  showModal(mode==='move'?'Déplacer ce repas':'Copier ce repas',out)
@@ -2374,7 +2372,7 @@ function pickLeftoverSource(index){
   body+='<div class="field"><label for="leftoverPeople">Portions à manger ici</label><input type="number" id="leftoverPeople" min="1" max="30" value="'+Math.min(2,Math.max(...choices.map(x=>x.available)))+'"><div class="helper">Regarde la quantité disponible sous chaque plat.</div></div><div class="recipe-picker">';
   choices.forEach(x=>{
    const r=recipeById(x.recipeId);
-   body+='<button class="picker-item" data-action="apply-leftovers" data-index="'+index+'" data-source="'+x.sourceIndex+'" data-id="'+html(x.recipeId)+'"><span class="emoji">🍱</span><span class="grow"><strong>'+html(r.name)+'</strong><small>Préparé '+html(days[Math.floor(x.sourceIndex/2)]+' '+(x.sourceIndex%2?'soir':'midi'))+' · '+x.available+' portion'+(x.available>1?'s':'')+' disponible'+(x.available>1?'s':'')+'</small></span><span class="end">＋</span></button>'
+   body+='<button class="picker-item" data-action="apply-leftovers" data-index="'+index+'" data-source="'+x.sourceIndex+'" data-id="'+html(x.recipeId)+'"><span class="emoji">🍱</span><span class="grow"><strong>'+html(r.name)+'</strong><small>Préparé '+html(menuMealLabelV411(x.sourceIndex))+' · '+x.available+' portion'+(x.available>1?'s':'')+' disponible'+(x.available>1?'s':'')+'</small></span><span class="end">＋</span></button>'
   });
   body+='</div>'
  }else body+='<div class="note">Aucun reste disponible avant ce repas. Prévois davantage de portions lors de la cuisson d’un plat (par exemple 4 pour deux personnes), puis choisis ici le jour où manger les restes.</div>';
@@ -2395,10 +2393,10 @@ function populate(){
   old.meals.forEach(m=>mealDishes(m).forEach(d=>{if(recipeById(d.recipeId))history[d.recipeId]=(history[d.recipeId]||0)+(weeksAgo===1?36:weeksAgo===2?16:7)}))
  });
  w.meals.forEach(m=>mealDishes(m).forEach(d=>{const r=recipeById(d.recipeId);if(!r)return;counts[r.id]=(counts[r.id]||0)+1;const cat=normalRecipeType(r.category);types[cat]=(types[cat]||0)+1}));
- const chosenByDay=day=>[w.meals[day*2],w.meals[day*2+1]].flatMap(mealDishes).map(d=>d.recipeId);
+ const chosenByDay=day=>menuDayMealsV411(day).flatMap(i=>mealDishes(w.meals[i])).map(d=>d.recipeId);
  for(let i=0;i<w.meals.length;i++){
   if(w.meals[i])continue;
-  const day=Math.floor(i/2),previousDishes=i>0?mealDishes(w.meals[i-1]):[];
+  const day=menuMealDayV411(i),previousDishes=i>0?mealDishes(w.meals[i-1]):[];
   const scored=state.recipes.map(r=>{
    const count=counts[r.id]||0,cat=normalRecipeType(r.category),nearby=chosenByDay(day).includes(r.id),sameCategory=previousDishes.some(d=>normalRecipeType(recipeById(d.recipeId)?.category)===cat);
    return {r,score:count*100+(history[r.id]||0)+(types[cat]||0)*5+(nearby?180:0)+(sameCategory?18:0)+Math.random()*7}
@@ -2596,12 +2594,14 @@ document.addEventListener('click',e=>{
   }
   else if(mode==='clear-day'){
    const day=Number(a.dataset.day);
-   if(!Number.isInteger(day)||day<0||day>6||!w.meals[day*2]&&!w.meals[day*2+1])return;
-   if(isMealDoneV41(w,day*2)||isMealDoneV41(w,day*2+1)){toast('Cette journée contient un repas déjà validé dans le stock.');return}
-   if(!confirm('Vider les repas du '+days[day]+' (midi et soir) ? Les éventuels restes liés à ces plats seront aussi retirés. Les recettes et les produits resteront enregistrés.'))return;
-   checkpoint('Avant suppression des repas du '+days[day]);
+   const indexes=menuDayMealsV411(day);
+   if(!indexes.length||!indexes.some(i=>Boolean(w.meals[i])))return;
+   if(indexes.some(i=>isMealDoneV41(w,i))){toast('Cette journée contient un repas déjà validé dans le stock.');return}
+   const when=day===0?'samedi soir':day===7?'samedi midi':menuDaysV411[day]+' (midi et soir)';
+   if(!confirm('Vider les repas du '+when+' ? Les éventuels restes liés à ces plats seront aussi retirés. Les recettes et les produits resteront enregistrés.'))return;
+   checkpoint('Avant suppression des repas du '+when);
    const before=weekBeforeUndo();clearCalendarDay(w,day);persist();render(true);
-   toastWeekUndo('Repas du '+days[day]+' retirés.',before,day*2)
+   toastWeekUndo('Repas du '+when+' retirés.',before,indexes[0])
   }
   else if(mode==='clear-week'){
    if(!w.meals.some(Boolean))return;

@@ -37,6 +37,6 @@ test('V41.12.2 : le document et le service worker forcent bien la nouvelle versi
 });
 test('V41.12.2 : le compte Firebase et les catalogues ne sont pas modifiés par le correctif',()=>{
  assert.match(app,/readLocalState:\(\)=>JSON\.parse\(JSON\.stringify\(state\)\)/);
- assert.match(runtime,/await cloudRecoveryStore\.saveRecoveryArchive/);
+ assert.match(read('firebase/v4121-recovery-guard.js'),/await storage\.saveRecoveryArchive\(userId,draft\)/);
  assert.match(recovery,/reason:"Avant récupération explicite de la dernière version Firebase"/);
 });

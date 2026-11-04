@@ -139,7 +139,11 @@ export function repeatWeekMealsV41(weeks,stock,sourceWeekId,targetWeekId) {
     if(meal?.type==='leftovers'&&!hasSource(meal.fromIndex,meal.recipeId))updated[targetWeekId].meals[i]=null;
     if(meal?.type==='multi'){
       const kept=meal.dishes.filter(d=>d.type!=='leftovers'||hasSource(d.fromIndex,d.recipeId));
-      updated[targetWeekId].meals[i]=kept.length?{type:'multi',dishes:kept}:null;
+      if(kept.length)updated[targetWeekId].meals[i]={...meal,dishes:kept};
+      else if(meal.products?.length)updated[targetWeekId].meals[i]={
+       type:'products',products:copy(meal.products),...(meal.guests?{guests:meal.guests}:{})
+      };
+      else updated[targetWeekId].meals[i]=null;
     }
   }
   return {weeks:updated,skippedFrozen,copiedFrozen};

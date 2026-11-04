@@ -299,7 +299,7 @@ function renderMenus(){const w=getWeek(),count=w.meals.filter(Boolean).length,is
    const indices=menuDayMealsV411(day),d=offsetDate(currentWeek,day),isToday=d===localDate(new Date()),hasMeals=indices.some(i=>Boolean(w.meals[i]));
    out+='<section class="day-card'+(isToday?' day-card-today':'')+'" data-meal-day="'+day+'"><div class="day-card-head"><div class="day-title">'+menuDaysV411[day]+' <small>'+niceDate(d)+'</small>'+(isToday?'<span class="day-today-label">Aujourd’hui</span>':'')+'</div>'+
    '<button class="day-clear-btn" data-action="clear-day" data-day="'+day+'" aria-label="Vider les repas du '+html(menuDaysV411[day])+'" '+(!hasMeals?'disabled':'')+'>✕ Vider le jour</button></div>'+
-   '<div class="day-meals">'+indices.map(i=>mealCard(w.meals[i],i)).join('')+'</div></section>'
+   '<div class="day-meals'+(indices.length===1?' v411-one-meal':'')+'">'+indices.map(i=>mealCard(w.meals[i],i)).join('')+'</div></section>'
   }
   out+='</div><button class="btn danger wide clear-week-btn" data-action="clear-week" '+(!count?'disabled':'')+'>🗑️ Vider tous les repas de cette semaine</button>';
   out+='<p class="helper">Choisis librement quand manger les restes : touche le repas souhaité, puis « Placer des restes ici ». La sélection indique les plats cuisinés et les portions encore disponibles. Aucun repas de restes n’est rempli automatiquement.</p>';

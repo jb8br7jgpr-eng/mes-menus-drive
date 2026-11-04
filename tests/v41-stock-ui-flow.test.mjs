@@ -553,7 +553,7 @@ test('Une validation orpheline bloque le repas : l’interface propose une répa
  const source=app.slice(app.indexOf('function undoMealValidationControlsV41('),app.indexOf('function pickMeal(index)'));
  assert.ok(source.startsWith('function undoMealValidationControlsV41('));
  const controls=runInNewContext(source+';undoMealValidationControlsV41',{
-  getWeek:()=>f.week,mealDishes,mealLeftovers,
+  getWeek:()=>f.week,mealDishes,mealLeftovers,mealProductsV412:()=>[],
   recipeById:id=>recipes.find(r=>r.id===id),
   html:x=>String(x)
  });
@@ -607,7 +607,7 @@ test('Un repas réellement présent mais bloqué offre une réparation sans cré
  assert.equal(availableStockV41(f.state.stockV41,'ingredient:pasta','g'),250);
  const source=app.slice(app.indexOf('function undoMealValidationControlsV41('),app.indexOf('function pickMeal(index)'));
  const controls=runInNewContext(source+';undoMealValidationControlsV41',{
-  getWeek:()=>f.week,mealDishes,mealLeftovers,
+  getWeek:()=>f.week,mealDishes,mealLeftovers,mealProductsV412:()=>[],
   recipeById:id=>recipes.find(r=>r.id===id),html:x=>String(x)
  });
  const shown=controls(2,f.week.meals[2]);
@@ -757,7 +757,7 @@ test('V41.3 : recherche dans ajouter au stock, boutons +/- et raccourci paquet',
 test('V41.3 : les actions du repas changent avec son statut et n’affichent pas de modification bloquée',()=>{
  const source=app.slice(app.indexOf('function quickMealActionsV413('),app.indexOf('function pickMeal(index)'));
  const f=fixture();const ctx={
-  getWeek:()=>f.week,mealDishes,mealLeftovers,recipeById:id=>recipes.find(r=>r.id===id),
+  getWeek:()=>f.week,mealDishes,mealLeftovers,mealProductsV412:()=>[],recipeById:id=>recipes.find(r=>r.id===id),
   html:x=>String(x)
  };
  const actions=runInNewContext(source+';quickMealActionsV413',ctx);

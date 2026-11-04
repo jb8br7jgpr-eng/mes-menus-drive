@@ -1,0 +1,29 @@
+name: "V41.12 — repas composés et produits (tests sans déploiement)"
+on:
+  push:
+    branches:
+      - speedrive-v41-12-repas-multi-plats-produits
+  pull_request:
+    branches:
+      - developpement-v1
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Vérifier la syntaxe des modules
+        run: |
+          node --check app.js
+          node --check stock-actions-v41.mjs
+          node --check stock-ui-v41.mjs
+          node --check stock-week-v41.mjs
+          node --check stock-engine-v41.mjs
+      - name: Exécuter les tests de non-régression et V41.12
+        run: node --test tests/*.test.mjs
+      - name: Aucun déploiement ou écriture Firebase
+        run: echo "V41.12 : tests isolés uniquement"

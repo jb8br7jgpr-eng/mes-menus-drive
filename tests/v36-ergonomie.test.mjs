@@ -67,7 +67,7 @@ test('Les restes indiquent le stock disponible et conservent le placement manuel
  assert.match(source,/v36-leftover-pill/);
  assert.match(source,/availableLeftoverSources\(getWeek\(\),index\)/);
  assert.match(source,/data-action="choose-leftovers"/);
- assert.match(source,/if\(prepared<=2\)return prepared/);
+ assert.match(source,/return Math\.min\(prepared,atTable\)/);
 });
 
 test('Cloud-first Firebase et données inchangés',()=>{

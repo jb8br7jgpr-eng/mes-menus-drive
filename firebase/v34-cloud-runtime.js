@@ -4,6 +4,7 @@ import { firebaseAuth } from "../firebase-v34.js";
 import { observeLogin } from "./v34-auth.js";
 import { cloudRecoveryStore } from "./v34-cloud-recovery-store.js";
 import { createCloudSession } from "./v34-session-core.js";
+import { restoreLatestServerSafely } from "./v4121-recovery-guard.js";
 import { assertFirstCloudImportReady } from "./v34-import-preflight.js";
 import { isReadOnlySafeAction } from "./v34-readonly-actions.js";
 import { loadAuthoritativeState, saveAuthoritativeState } from "./v34-cloud-first.js";
@@ -184,6 +185,17 @@ export async function retryUnconfirmedSave() {
   return session.retryDraft();
 }
 export async function loadServerDiscardingLocalDraft(confirmation) {
-  if (!session) throw Error("Connexion familiale absente.");
-  return session.resolveWithServer({confirmation});
+  if (!session||!userId||previousStatus.phase!=="recovery")
+    throw Error("Aucune récupération serveur à confirmer.");
+  // Le brouillon est d'abord archivé dans une zone IndexedDB distincte.
+  // Si cette sauvegarde échoue (quota ou stockage inaccessible),
+  // l'opération est refusée et aucune donnée n'est effacée.
+  return restoreLatestServerSafely({
+    storage:cloudRecoveryStore,session,userId,confirmation
+  });
+}
+export async function readSavedRecoveryArchivesV4121() {
+  if (!userId) throw Error("Compte familial non identifié.");
+  const records=await cloudRecoveryStore.readRecoveryArchives(userId);
+  return Array.isArray(records)?records:[];
 }

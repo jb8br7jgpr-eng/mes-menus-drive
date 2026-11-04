@@ -54,6 +54,19 @@ async function remove(uid,kind) {
 }
 export const cloudRecoveryStore = {
   readDraft(uid) { return read(uid,"draft"); },
+  // Archive distincte des brouillons en attente : jamais effacée par
+  // l'adoption de la dernière version serveur. Cinq copies maximum.
+  async saveRecoveryArchive(uid,draft) {
+    if(!draft?.state||typeof draft.state!=="object")
+      throw Error("Impossible d'archiver un brouillon vide.");
+    const previous=await read(uid,"recovery-archives")||[];
+    if(!Array.isArray(previous))throw Error("Archives locales corrompues.");
+    const entries=[{draft:structuredClone(draft),archivedAt:Date.now(),
+      reason:"Avant récupération explicite de la dernière version Firebase"},...previous].slice(0,5);
+    await put(uid,"recovery-archives",entries);
+    return entries.length;
+  },
+  readRecoveryArchives(uid) { return read(uid,"recovery-archives"); },
   saveDraft(uid,draft) { return put(uid,"draft",draft); },
   clearDraft(uid) { return remove(uid,"draft"); },
   readConfirmed(uid) { return read(uid,"confirmed"); },

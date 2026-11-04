@@ -26,4 +26,5 @@ jobs:
       - name: Exécuter les tests de non-régression et V41.12
         run: node --test tests/*.test.mjs
       - name: Aucun déploiement ou écriture Firebase
-        run: echo "V41.12 : tests isolés uniquement"
+        run: |
+          echo "V41.12 : tests isolés uniquement"

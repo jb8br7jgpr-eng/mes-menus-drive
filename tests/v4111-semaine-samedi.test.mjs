@@ -103,7 +103,7 @@ test('V41.11 : noms, retour au jour, restes et groupes du générateur adaptés'
  assert.match(meal,/menuMealLabelV411\(i\)/);
  const context=take('renderMealContext','pageHeading');
  assert.match(context,/menuMealDayV411\(index\)/);
- const generator=take('populate','compressImage');
+ const generator=app.slice(app.indexOf('function populate('),app.indexOf('async function compressImage(',app.indexOf('function populate(')));
  assert.match(generator,/menuMealDayV411\(i\)/);
  assert.match(generator,/menuDayMealsV411\(day\)/);
  for(const term of ['menuMealLabelV411(index)','menuMealLabelV411(left.fromIndex)',

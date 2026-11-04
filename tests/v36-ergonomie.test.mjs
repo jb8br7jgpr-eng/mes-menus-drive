@@ -11,12 +11,14 @@ const between=(from,to)=>{
  return source.slice(start,end)
 };
 
-test('Le calendrier utilise les semaines du lundi au dimanche, y compris aux changements de mois',()=>{
- const f=runInNewContext(between('localDate','getWeek')+';({monday,localDate,parseDate})',{});
- assert.equal(f.monday(f.parseDate('2026-10-30')),'2026-10-26');
- assert.equal(f.monday(f.parseDate('2026-11-01')),'2026-10-26');
- assert.equal(f.monday(f.parseDate('2026-11-02')),'2026-11-02');
- assert.equal(f.monday(f.parseDate('2027-01-01')),'2026-12-28');
+test('Le calendrier sélectionne une période du samedi soir au samedi midi, même aux changements de mois',()=>{
+ const f=runInNewContext(between('localDate','getWeek')+';({saturdayV411,currentMenuWeekV411,localDate,parseDate})',{});
+ assert.equal(f.saturdayV411(f.parseDate('2026-10-30')),'2026-10-24');
+ assert.equal(f.saturdayV411(f.parseDate('2026-11-01')),'2026-10-31');
+ assert.equal(f.saturdayV411(f.parseDate('2026-11-02')),'2026-10-31');
+ assert.equal(f.saturdayV411(f.parseDate('2027-01-01')),'2026-12-26');
+ assert.equal(f.currentMenuWeekV411(new Date(2026,10,7,10)),'2026-10-31');
+ assert.equal(f.currentMenuWeekV411(new Date(2026,10,7,15)),'2026-11-07');
 });
 
 test('Semaines déjà remplies signalées sans modifier les données',()=>{

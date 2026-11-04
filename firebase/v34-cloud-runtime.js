@@ -2,7 +2,7 @@
 // No Firebase writes happen until the app explicitly enables cloud mode.
 import { firebaseAuth } from "../firebase-v34.js";
 import { observeLogin } from "./v34-auth.js";
-import { cloudRecoveryStore } from "./v34-cloud-recovery-store.js";
+import { cloudRecoveryStore } from "./v34-cloud-recovery-store.js?v=20261104-41-12-2";
 import { createCloudSession } from "./v34-session-core.js";
 import { restoreLatestServerSafely } from "./v4121-recovery-guard.js";
 import { assertFirstCloudImportReady } from "./v34-import-preflight.js";

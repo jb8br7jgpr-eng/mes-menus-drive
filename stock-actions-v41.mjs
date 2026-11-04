@@ -1,6 +1,6 @@
 // Speedrive V41 — actions du stock en mode brouillon. Aucune migration automatique.
 import {emptyStockV41,applyStockTransactionV41,availableStockV41,
- stockIdentityV41,previewLegacyPantryV41} from './stock-engine-v41.mjs';
+ stockIdentityV41,stockMeasureV41,previewLegacyPantryV41} from './stock-engine-v41.mjs';
 import {kitchenMovementsV41,purchasedMovementsV41,planFrozenMealV41,
  remainingFreezerPortionsV41} from './stock-week-v41.mjs';
 import {stockConfirmationTextV413} from './stock-preview-v413.mjs';
@@ -103,10 +103,23 @@ function orphanValidationKeys(ctx,week,index) {
  const meal=week.meals[index],known=new Set();
  if(meal?.type==='frozen')known.add(index+':frozen');
  for(const d of ctx.mealDishes(meal))known.add(index+':'+d.recipeId);
+ for(const product of (ctx.mealProductsV412?.(meal)||[]))known.add(index+':product:'+product.productId);
  for(const d of ctx.mealLeftovers(meal))
   known.add(index+':leftovers:'+d.fromIndex+':'+d.recipeId);
  return Object.keys(week.v41MealActions||{}).filter(k=>
   k.startsWith(index+':')&&!known.has(k));
+}
+// V41.12 — consommer une référence du catalogue directement prévue dans Menus.
+// Les conditionnements connus sont convertis par le moteur de stock existant.
+function mealProductMovementV412(ctx,item){
+ const p=ctx.state.products.find(x=>x.id===item?.productId);
+ if(!p||!ctx.units.includes(item.unit)||!(Number(item.qty)>0))
+  throw Error('Produit du repas introuvable ou quantité invalide.');
+ const identity=stockIdentityV41({productId:p.id},ctx.state.ingredientCatalog);
+ const measured=stockMeasureV41(Number(item.qty),item.unit,p);
+ return {type:'inventory',direction:'consume',identity,
+  name:p.name,amount:measured.amount,unit:measured.unit,
+  category:p.category||'Autres',store:p.store||'carrefour'};
 }
 function replaceModal(ctx,index) {
  const meal=ctx.getWeek().meals[index],actions=ctx.getWeek().v41MealActions||{};
@@ -131,7 +144,7 @@ export function handleStockActionV41(ctx) {
  const {mode,a,id,index}=ctx,w=ctx.getWeek(),state=ctx.state,stock=stockOf(state);
  const tx=(label,movements)=>({id:'v41:'+ctx.uid(),label,movements});
  const requiresInventory=['v41-add-stock','v41-add-frozen','v41-save-stock','v41-save-frozen',
-  'v41-courses-done','v41-eat-recipe','v41-confirm-freeze-recipe',
+  'v41-courses-done','v41-eat-recipe','v41-eat-product','v41-confirm-freeze-recipe',
   'v41-adjust-stock','v41-confirm-stock','v41-correct-freezer','v41-confirm-freezer'];
  if(requiresInventory.includes(mode)&&migrationGate(ctx))return true;
  if(mode==='v41-add-stock'){ctx.openStockBulkV414();return true}
@@ -239,6 +252,24 @@ export function handleStockActionV41(ctx) {
    '<p class="helper">Les ingrédients de la recette seront retirés du stock pour les '+dish.people+' portions préparées. Indique combien tu en mets au congélateur ; les autres portions sont considérées comme mangées.</p>'+
    input('v41FreezePortions','Portions à congeler',dish.people,1,dish.people)+
    '<button class="btn wide" data-action="v41-confirm-freeze-recipe" data-index="'+index+'" data-id="'+esc(id)+'">❄️ Confirmer la préparation</button>');
+  return true
+ }
+ if(mode==='v41-eat-product'){
+  if(!Number.isInteger(index)||index<0||index>13||!id)return true;
+  const item=ctx.mealProductsV412(w.meals[index]).find(x=>x.productId===id),key=index+':product:'+id;
+  if(!item){ctx.toast('Ce produit n’est pas prévu dans le repas.');return true}
+  if(w.v41MealActions?.[key]){ctx.toast('Ce produit a déjà été consommé.');return true}
+  try{
+   const movement=mealProductMovementV412(ctx,item),movements=[movement];
+   if(!confirm(stockConfirmationTextV413(stock,movements,
+    'Confirmer la consommation de '+item.qty+' '+item.unit+' de « '+movement.name+' » ?')))return true;
+   commit(ctx,tx('Produit du repas consommé · '+movement.name,movements),()=>{
+    w.v41MealActions=w.v41MealActions||{};
+    w.v41MealActions[key]={status:'eaten',at:new Date().toISOString(),
+     movements:JSON.parse(JSON.stringify(movements))};
+    if(Array.isArray(w.generatedIngredients))ctx.generateWeekCourses(w);
+   });
+  }catch(err){ctx.toast(err.message||'Impossible de mettre le stock à jour.')}
   return true
  }
  if(mode==='v41-eat-recipe'||mode==='v41-confirm-freeze-recipe'){
@@ -373,7 +404,8 @@ export function handleStockActionV41(ctx) {
   const kind=a.dataset.kind;
   const sourceIndex=Number(a.dataset.source);
   const key=kind==='frozen'?index+':frozen':
-   kind==='leftovers'?index+':leftovers:'+sourceIndex+':'+id:index+':'+id;
+   kind==='leftovers'?index+':leftovers:'+sourceIndex+':'+id:
+   kind==='product'?index+':product:'+id:index+':'+id;
   const action=w.v41MealActions?.[key];
   if(!action){ctx.toast('Aucune validation à annuler pour ce repas.');return true}
   if(kind==='leftovers'){
@@ -400,6 +432,23 @@ export function handleStockActionV41(ctx) {
    commit(ctx,tx('Annulation du repas congelé',[{type:'freezer',direction:'add',
     lotId:meal.lotId,recipeId:meal.recipeId,name:lot.name,portions:meal.portions}]),()=>{
     delete w.v41MealActions[key];delete meal.consumed;
+   });
+   return true
+  }
+  if(kind==='product'){
+   const item=ctx.mealProductsV412(w.meals[index]).find(x=>x.productId===id);
+   if(!item){ctx.toast('Ce produit n’est plus présent dans le repas.');return true}
+   const original=action.movements;
+   if(!Array.isArray(original)||original.length!==1||
+    original[0].type!=='inventory'||original[0].direction!=='consume'){
+    ctx.toast('Consommation d’origine introuvable : le stock n’a pas été modifié.');return true
+   }
+   const inverse=original.map(x=>({...x,direction:'add'}));
+   if(!confirm('Annuler la consommation du produit « '+(productOf(ctx,id)?.name||id)+
+    ' » ? Sa quantité sera rétablie dans le Stock maison.'))return true;
+   commit(ctx,tx('Annulation du produit consommé · '+(productOf(ctx,id)?.name||id),inverse),()=>{
+    delete w.v41MealActions[key];
+    if(Array.isArray(w.generatedIngredients))ctx.generateWeekCourses(w);
    });
    return true
   }

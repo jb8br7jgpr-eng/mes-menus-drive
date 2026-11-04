@@ -1,0 +1,42 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+const read=path=>readFileSync(new URL('../'+path,import.meta.url),'utf8');
+const app=read('app.js'),ui=read('firebase/v34-ui.js'),
+ runtime=read('firebase/v34-cloud-runtime.js'),recovery=read('firebase/v34-cloud-recovery-store.js'),
+ index=read('index.html'),sw=read('sw.js');
+const v='20261104-41-12-2';
+test('V41.12.2 : l’app et le panneau chargent une unique instance du runtime Firebase',()=>{
+ const appImport=app.match(/import\(['"]\.\/firebase\/v34-cloud-runtime\.js\?v=([^'"]+)['"]\)/);
+ const uiImport=ui.match(/from ["']\.\/v34-cloud-runtime\.js\?v=([^'"]+)["']/);
+ assert.ok(appImport,'l’application doit forcer la nouvelle version Firebase');
+ assert.ok(uiImport,'le panneau doit forcer la même version Firebase');
+ assert.equal(appImport[1],v);
+ assert.equal(uiImport[1],appImport[1],'ne jamais créer deux sessions Firebase différentes');
+ assert.equal((app.match(/v34-cloud-runtime\.js\?v=/g)||[]).length,1);
+ assert.equal((ui.match(/v34-cloud-runtime\.js\?v=/g)||[]).length,1);
+});
+test('V41.12.2 : le stockage local des brouillons charge lui aussi sa nouvelle version',()=>{
+ assert.match(runtime,/from ["']\.\/v34-cloud-recovery-store\.js\?v=20261104-41-12-2["']/);
+ assert.match(runtime,/export async function readSavedRecoveryArchivesV4121\(/);
+ assert.match(recovery,/async saveRecoveryArchive\(uid,draft\)/);
+ assert.match(recovery,/readRecoveryArchives\(uid\)/);
+});
+test('V41.12.2 : le bouton Compte et sauvegardes garde un gestionnaire quand le module charge',()=>{
+ assert.match(ui,/if\(e\.target\.closest\("\[data-v34-open\]"\)\)openPanel\(\)/);
+ assert.match(ui,/const root = document\.getElementById\("v34SyncRoot"\)/);
+ assert.match(ui,/Récupérer la version du serveur sur cet iPhone/);
+ assert.match(ui,/loadServerDiscardingLocalDraft\("ABANDONNER_LE_BROUILLON"\)/);
+});
+test('V41.12.2 : le document et le service worker forcent bien la nouvelle version',()=>{
+ assert.match(index,/app\.js\?v=20261104-41-12-2-release/);
+ assert.match(index,/firebase\/v34-ui\.js\?v=20261104-41-12-2-release/);
+ assert.match(sw,/CACHE='menus-drive-v41-12-2-synchronisation-firebase-20261104'/);
+ assert.match(sw,/app\.js\?v=20261104-41-12-2-release/);
+ assert.doesNotMatch(index,/v34-ui\.js\?v=20261104-41-12-1-release/);
+});
+test('V41.12.2 : le compte Firebase et les catalogues ne sont pas modifiés par le correctif',()=>{
+ assert.match(app,/readLocalState:\(\)=>JSON\.parse\(JSON\.stringify\(state\)\)/);
+ assert.match(runtime,/await cloudRecoveryStore\.saveRecoveryArchive/);
+ assert.match(recovery,/reason:"Avant récupération explicite de la dernière version Firebase"/);
+});

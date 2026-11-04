@@ -13,7 +13,7 @@ const between=(from,to)=>{
 };
 const mealDishes=runInNewContext(between('mealDishes','mealCard')+';mealDishes',{});
 const recipe={id:'r1',people:2,ingredients:[{name:'Riz',qty:200,unit:'g',ingredientId:'riz'}]};
-const context={mealDishes,recipeById:id=>id==='r1'?recipe:null};
+const context={mealDishes,mealProductsV412:()=>[],recipeById:id=>id==='r1'?recipe:null};
 const signature=runInNewContext(between('menuGenerationSignature','hasCookedMeals')+';menuGenerationSignature',context);
 const ingredients=runInNewContext(between('collectRecipeIngredients','menuGenerationSignature')+';collectRecipeIngredients',context);
 const meal={type:'recipe',recipeId:'r1',people:2};

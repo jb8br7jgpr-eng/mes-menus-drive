@@ -9,7 +9,7 @@ import { inspectFirstCloudImport } from "./v34-import-preflight.js";
 import {
   currentCloudStatus,confirmFirstCloudImport,retryUnconfirmedSave,
   loadServerDiscardingLocalDraft,readSavedRecoveryArchivesV4121
-} from "./v34-cloud-runtime.js";
+} from "./v34-cloud-runtime.js?v=20261104-41-12-2";
 
 const ENABLE_ACCOUNT_SETUP = true; // DO NOT ENABLE before security tests.
 const root = document.getElementById("v34SyncRoot");

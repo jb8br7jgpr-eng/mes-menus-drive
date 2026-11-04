@@ -1175,3 +1175,32 @@
  color:#2b5264!important;font-weight:800!important;
 }
 .v411-no-meal-button small{font-size:10px;color:#648096;font-weight:600}
+
+/* V41.12 — convives partagés, portions de cuisson individuelles et produits de repas. */
+.v412-guests{
+ display:flex;flex-direction:column;gap:8px;
+ margin:14px 0 16px;padding:12px 14px;
+ border:1px solid #dbe9dd;border-radius:12px;
+ background:linear-gradient(120deg,#f6faf5,#fdfefd);
+}
+.v412-guests label{font-size:13px;color:#264b39;font-weight:800}
+.v412-guests small{font-size:11px;line-height:1.45;color:#587464}
+.v412-guests-controls{display:flex;align-items:center;gap:9px}
+.v412-guests-controls input{
+ flex:1;max-width:110px;min-width:0;
+ border:1px solid #cbded0;border-radius:9px;
+ background:#fff;padding:9px 10px;color:#244835;
+ font-size:16px;font-weight:750;
+}
+.v412-guests-controls .btn{min-height:39px}
+.v412-product{
+ border-left:3px solid #7b9cb5;
+ background:linear-gradient(110deg,#f8fbfe,#fff);
+}
+.v412-add-product{
+ margin:12px 0 8px;min-height:45px;
+ border:1px solid #cbdce9!important;
+ background:#f5f9fc!important;
+ color:#24516b!important;
+ font-weight:750!important;
+}

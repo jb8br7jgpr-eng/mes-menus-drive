@@ -39,7 +39,7 @@ export function renderStockV41({state,week,weekId,view='home',recipeById,mealDis
  }else{
   const w=week||{meals:[]},actions=w.v41MealActions||{},entries=[];
   const mealLabelFor=i=>typeof mealLabel==='function'?mealLabel(i):
-   i===0?'Samedi soir':i===13?'Samedi midi':days[Math.floor((i+1)/2)]+' '+(i%2?'midi':'soir');
+   i===0?'Samedi soir':i===13?'Samedi midi':['Samedi','Dimanche','Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi'][Math.ceil(i/2)]+' '+(i%2?'midi':'soir');
   (w.meals||[]).forEach((meal,i)=>{
    if(meal?.type==='frozen'){
     const lot=stock.freezer?.[meal.lotId];

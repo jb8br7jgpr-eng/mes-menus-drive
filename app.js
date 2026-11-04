@@ -245,6 +245,17 @@ function mealDishes(meal){
      .map(d=>({recipeId:d.recipeId,people:Number(d.people)}));
  return []
 }
+// V41.12 — produits directement associés à un repas, sans recette fictive.
+// Les produits restent référencés par ID ; le catalogue n'est jamais modifié.
+function mealProductsV412(meal){
+ if(!Array.isArray(meal?.products))return [];
+ return meal.products.filter(x=>x?.productId&&Number(x.qty)>0&&units.includes(x.unit))
+  .map(x=>({productId:x.productId,qty:Number(x.qty),unit:x.unit}));
+}
+function mealGuestsV412(meal){
+ const n=Number(meal?.guests),defaultGuests=Number(state.settings?.people)||2;
+ return Number.isInteger(n)&&n>=1&&n<=30?n:Math.max(1,Math.min(30,defaultGuests));
+}
 function mealCard(meal,i){
  let names=[],note='',classes='';
  if(meal?.type==='leftovers'){
@@ -265,7 +276,7 @@ function mealCard(meal,i){
   const dishes=mealDishes(meal);
   if(dishes.length){
    names=dishes.map(d=>{
-    const r=recipeById(d.recipeId),here=portionsEatenHere(d,dishes),left=Math.max(0,d.people-here);
+    const r=recipeById(d.recipeId),here=portionsEatenHere(d,dishes,mealGuestsV412(meal)),left=Math.max(0,d.people-here);
     const completed=getWeek().v41MealActions?.[i+':'+d.recipeId];
     if(completed?.status==='frozen')return (r?r.name:'Plat supprimé')+' · ✓ préparé · ❄️ '+completed.frozenPortions+' portion'+(completed.frozenPortions>1?'s':'')+' congelée'+(completed.frozenPortions>1?'s':'');
     if(completed?.status==='eaten')return (r?r.name:'Plat supprimé')+' · ✓ cuisiné'+(left?' · '+left+' reste'+(left>1?'s':''):'');
@@ -275,6 +286,18 @@ function mealCard(meal,i){
   }
   mealLeftovers(meal).forEach(x=>{const r=recipeById(x.recipeId);names.push('🍱 Restes : '+(r?.name||'Autre plat')+' · '+x.people+' portion'+(x.people>1?'s':''))});
   if(names.length){classes=' filled';note=names.length===1?'1 plat':names.length+' plats pour ce repas'}
+ }
+ const productLines=mealProductsV412(meal);
+ for(const x of productLines){
+  const p=productById(x.productId),done=getWeek().v41MealActions?.[i+':product:'+x.productId];
+  names.push((done?'✓ ':'🛒 ')+(p?.name||'Produit supprimé')+' · '+x.qty+' '+x.unit);
+ }
+ if(productLines.length){
+  classes=' filled';
+  note=(note?note+' · ':'')+productLines.length+' produit'+(productLines.length>1?'s':'');
+ }
+ if((mealDishes(meal).length+productLines.length)>1){
+  note='👥 '+mealGuestsV412(meal)+' convives · '+note;
  }
  const available=mealDishes(meal).reduce((n,d)=>n+Math.max(0,sourceBudget(getWeek(),i,d.recipeId)-usedLeftovers(getWeek(),i,d.recipeId)),0);
  return '<button class="meal-tile'+classes+'" data-action="pick-meal" data-index="'+i+'" aria-label="'+html(menuMealLabelV411(i))+', '+html(names.join(' et ')||'ajouter un plat')+'"><span class="meal-type">'+(menuMealPeriodV411(i)==='soir'?'Soir':'Midi')+(note?' · '+html(note):'')+'</span>'+
@@ -1218,6 +1241,13 @@ function collectRecipeIngredients(w){
    if(qty>0&&Number.isFinite(qty))lines.push({name:x.name,qty,unit:x.unit,productId:x.productId||null,ingredientId:x.ingredientId||null});
   })
  }));
+ (w.meals||[]).forEach((meal,index)=>mealProductsV412(meal).forEach(x=>{
+  if(w.v41MealActions?.[index+':product:'+x.productId])return;
+  const p=productById(x.productId);if(!p)return;
+  const linked=(state.ingredientCatalog||[]).filter(i=>i.productId===p.id);
+  lines.push({name:p.name,qty:x.qty,unit:x.unit,productId:p.id,
+   ingredientId:linked.length===1?linked[0].id:null});
+ }));
  return lines
 }
 function menuGenerationSignature(w){
@@ -1225,9 +1255,10 @@ function menuGenerationSignature(w){
   const r=recipeById(d.recipeId);
   return [d.recipeId,d.people,r?.people||null,w.v41MealActions?.[index+':'+d.recipeId]?.status||null,
    (r?.ingredients||[]).map(i=>[i.ingredientId,i.name,i.qty,i.unit,i.productId])]
- })))
+ }).concat(mealProductsV412(meal).map(x=>['product',x.productId,x.qty,x.unit,
+  w.v41MealActions?.[index+':product:'+x.productId]?.status||null]))))
 }
-function hasCookedMeals(w){return (w.meals||[]).some(m=>mealDishes(m).length>0)}
+function hasCookedMeals(w){return (w.meals||[]).some(m=>mealDishes(m).length>0||mealProductsV412(m).length>0)}
 function coursesStatus(w=getWeek()){
  if(!Array.isArray(w.generatedIngredients))return 'not-generated';
  if(w.generatedSignature!==menuGenerationSignature(w))return 'outdated';
@@ -1852,6 +1883,13 @@ function undoMealValidationControlsV41(index,meal){
   recognizedKeys.add(index+':frozen');
   make('frozen',null,null,'Congélateur')
  }
+ for(const item of mealProductsV412(meal)){
+  const key=index+':product:'+item.productId;
+  if(actions[key]){
+   recognizedKeys.add(key);
+   make('product',item.productId,null,productById(item.productId)?.name||'Produit');
+  }
+ }
  for(const dish of mealDishes(meal)){
   const key=index+':'+dish.recipeId;
   if(actions[key]){
@@ -1888,6 +1926,13 @@ function quickMealActionsV413(index,meal){
   out.push(button('v41-eat-recipe','✓ C’est mangé · '+title,id));
   out.push(button('v41-freeze-recipe','❄️ Au congélateur · '+title,id,true));
  }
+ for(const item of mealProductsV412(meal)){
+  const key=index+':product:'+item.productId;
+  if(done[key])continue;
+  const p=productById(item.productId);
+  out.push(button('v41-eat-product','✓ C’est mangé · '+html(p?.name||'Produit'),
+   ' data-id="'+html(item.productId)+'"'));
+ }
  for(const leftover of mealLeftovers(meal)){
   const key=index+':leftovers:'+leftover.fromIndex+':'+leftover.recipeId;
   if(done[key])continue;
@@ -1897,11 +1942,13 @@ function quickMealActionsV413(index,meal){
  return out.length?'<div class="v413-meal-quick"><strong>Actions du repas</strong><div class="v413-meal-quick-buttons">'+out.join('')+'</div></div>':'';
 }
 function pickMeal(index){
- const meal=getWeek().meals[index],dishes=mealDishes(meal),leftovers=mealLeftovers(meal);
+ const meal=getWeek().meals[index],dishes=mealDishes(meal),leftovers=mealLeftovers(meal),products=mealProductsV412(meal);
  const title=menuMealLabelV411(index);
  const validated=isMealDoneV41(getWeek(),index);
  const summary=meal?.type==='frozen'?'❄️ Plat du congélateur':meal?.type==='ordered'?'🍕 Repas libre / commandé':meal?.type==='no-meal'?'🍽️ Pas de repas · sortie, restaurant ou invitation':
-  dishes.map(d=>html(recipeById(d.recipeId)?.name||'Plat')).concat(leftovers.map(d=>'🍱 Restes')).join(' · ')||'Repas libre';
+  dishes.map(d=>html(recipeById(d.recipeId)?.name||'Plat'))
+   .concat(products.map(x=>html(productById(x.productId)?.name||'Produit')))
+   .concat(leftovers.map(d=>'🍱 Restes')).join(' · ')||'Repas libre';
  const quick=quickMealActionsV413(index,meal);
  if(validated){
   showModal(title,'<div class="v413-meal-state"><strong>✓ Repas déjà validé dans le stock</strong><p>'+summary+
@@ -1917,6 +1964,12 @@ function pickMeal(index){
   showModal(title,'<p class="helper">'+summary+'</p>'+out);
   return
  }
+ if(dishes.length||products.length||leftovers.length){
+  out+='<div class="v412-guests"><label for="v412MealGuests">👥 Personnes à table (pour tout le repas)</label>'+
+   '<div class="v412-guests-controls"><input id="v412MealGuests" type="number" min="1" max="30" value="'+mealGuestsV412(meal)+'">'+
+   '<button class="btn tiny secondary" data-action="v412-save-guests" data-index="'+index+'">✓ Modifier</button></div>'+
+   '<small>Ce nombre ne multiplie jamais les ingrédients de tes recettes. Chaque plat conserve ses propres portions préparées et ses restes.</small></div>';
+ }
  if(leftovers.length){
   out+='<div class="section-head"><h3>Restes prévus pour ce repas</h3></div>';
   leftovers.forEach((left,n)=>{
@@ -1928,11 +1981,22 @@ function pickMeal(index){
   out+='<div class="section-head"><h3>Plats prévus pour ce repas</h3><span class="pill">'+dishes.length+' plat'+(dishes.length>1?'s':'')+'</span></div>';
   dishes.forEach((d,n)=>{
    const r=recipeById(d.recipeId);
-   const here=portionsEatenHere(d,dishes),remaining=sourceBudget(getWeek(),index,d.recipeId)-usedLeftovers(getWeek(),index,d.recipeId);
+   const here=portionsEatenHere(d,dishes,mealGuestsV412(meal)),remaining=sourceBudget(getWeek(),index,d.recipeId)-usedLeftovers(getWeek(),index,d.recipeId);
    out+='<div class="meal-dish"><div class="grow"><strong>'+html(r?.name||'Plat supprimé')+'</strong><label class="helper" for="dishPortions'+n+'">Portions préparées (pour les courses)</label><input id="dishPortions'+n+'" class="meal-dish-qty" data-dish-qty="'+n+'" type="number" min="1" max="30" value="'+d.people+'">'+
    '<div class="meal-portions-explainer">'+here+' mangée'+(here>1?'s':'')+' ici · '+Math.max(0,d.people-here)+' reste'+(d.people-here>1?'s':'')+' au total'+
    (d.people>here?' · '+Math.max(0,remaining)+' encore disponible'+(remaining>1?'s':''):'')+'</div></div><div class="meal-dish-actions"><button class="btn tiny secondary" data-action="save-dish-portions" data-index="'+index+'" data-dish="'+n+'">✓ Modifier</button><button class="btn tiny ghost" data-action="remove-dish" data-index="'+index+'" data-dish="'+n+'">Retirer</button></div></div>'
   })
+ }
+ if(products.length){
+  out+='<div class="section-head"><h3>Produits ajoutés à ce repas</h3><span class="pill">'+products.length+'</span></div>';
+  products.forEach(x=>{
+   const p=productById(x.productId);
+   out+='<div class="meal-dish v412-product"><div class="grow"><strong>🛒 '+html(p?.name||'Produit supprimé')+
+    '</strong><div class="helper">'+x.qty+' '+html(x.unit)+' · '+html(p?.store==='grandfrais'?'Grand Frais':'Carrefour')+
+    '</div></div><button class="btn tiny secondary" data-action="v412-edit-meal-product" data-index="'+index+
+    '" data-id="'+html(x.productId)+'">Modifier</button><button class="btn tiny ghost" data-action="v412-remove-meal-product" data-index="'+index+
+    '" data-id="'+html(x.productId)+'">Retirer</button></div>';
+  });
  }
  out+='<div class="field"><label for="mealPeople">'+(dishes.length?'Portions à préparer pour le plat supplémentaire':'Combien de portions veux-tu préparer ?')+'</label>'+
  '<input type="number" id="mealPeople" min="1" max="30" value="" placeholder="Auto : portions de base">'+
@@ -1955,10 +2019,46 @@ function pickMeal(index){
  '<span class="end">＋</span></button>'+
  '<div id="mealRecipeResults" data-index="'+index+'">'+mealRecipePickerResults(index)+'</div></div>';
  if(!state.recipes.length)out+='<div class="note" style="margin-top:10px">Ajoute d’abord tes plats au catalogue, puis retrouve-les ici.</div>';
+ out+='<button class="btn secondary wide v412-add-product" data-action="v412-pick-product" data-index="'+index+
+  '">＋ Ajouter un produit du catalogue à ce repas</button>';
  if(meal)out+='<div class="meal-transfer-actions">'+
  '<button class="btn secondary" data-action="move-copy-meal" data-mode="copy" data-index="'+index+'" '+(!dishes.length?'disabled':'')+'>⧉ Copier</button>'+
  '<button class="btn secondary" data-action="move-copy-meal" data-mode="move" data-index="'+index+'">↔ Déplacer</button></div>';
  showModal(menuMealLabelV411(index),out)
+}
+function mealProductPickerResultsV412(index,term=''){
+ const already=new Set(mealProductsV412(getWeek().meals[index]).map(x=>x.productId));
+ const products=(state.products||[]).filter(p=>!already.has(p.id)&&
+  (!norm(term)||norm(p.name).includes(norm(term)))).sort((a,b)=>a.name.localeCompare(b.name,'fr',{sensitivity:'base'}));
+ return products.length?products.map(p=>'<button class="picker-item" data-action="v412-select-product" data-index="'+index+
+  '" data-id="'+html(p.id)+'"><span class="emoji">🛒</span><span class="grow"><strong>'+html(p.name)+
+  '</strong><small>'+html(p.store==='grandfrais'?'Grand Frais':'Carrefour')+
+  ' · '+html(p.unit||'pièce')+'</small></span><span class="end">＋</span></button>').join(''):
+  '<div class="meal-picker-empty">Aucun produit disponible avec cette recherche.</div>';
+}
+function openMealProductPickerV412(index){
+ if(!Number.isInteger(index)||index<0||index>13||isMealDoneV41(getWeek(),index))return;
+ if(!state.products?.length){toast('Ajoute d’abord un produit dans le catalogue Produits.');return}
+ showModal('🛒 Ajouter un produit au repas','<p class="helper">Choisis une référence déjà enregistrée. Les quantités seront ajoutées aux courses lorsque tu les généreras.</p>'+
+  '<div class="field"><label for="v412ProductSearch">Rechercher un produit</label>'+
+  '<input id="v412ProductSearch" type="search" placeholder="Ex. cordons-bleus…" autocomplete="off"></div>'+
+  '<div class="recipe-picker meal-picker-scroll" id="v412ProductResults" data-index="'+index+'">'+
+  mealProductPickerResultsV412(index)+'</div>');
+}
+function editMealProductV412(index,productId){
+ const p=productById(productId),existing=mealProductsV412(getWeek().meals[index]).find(x=>x.productId===productId);
+ if(!p||isMealDoneV41(getWeek(),index))return;
+ const preferred=existing?.unit||(p.packUnit==='pièce'?'pièce':(units.includes(p.unit)?p.unit:'pièce'));
+ const qty=existing?.qty||(preferred==='pièce'?2:1);
+ showModal((existing?'Modifier':'Ajouter')+' · '+p.name,
+  '<p class="helper">Indique la quantité réellement prévue pour ce repas. Par exemple, 2 pièces de cordons-bleus.</p>'+
+  '<div class="field"><label for="v412ProductQty">Quantité consommée</label>'+
+  '<input id="v412ProductQty" type="number" min="0.01" max="100000" step="any" value="'+qty+'"></div>'+
+  '<div class="field"><label for="v412ProductUnit">Unité</label><select id="v412ProductUnit">'+
+   selectOptions(units,preferred)+'</select></div>'+
+  '<p class="helper">La liste de courses tient compte du conditionnement indiqué dans la fiche Produit. Le stock sera retiré une seule fois après « C’est mangé ».</p>'+
+  '<button class="btn wide" data-action="v412-save-meal-product" data-index="'+index+'" data-id="'+html(productId)+'">✓ Enregistrer dans le repas</button>'+
+  '<button class="btn secondary wide" data-action="pick-meal" data-index="'+index+'">← Retour au repas</button>');
 }
 function extraSearchItems(term=''){
  const needle=norm(term);
@@ -2233,20 +2333,47 @@ function mealLeftovers(meal){
 }
 function mealParts(meal){return [...mealDishes(meal),...mealLeftovers(meal)]}
 function storeMealParts(w,index,parts){
+ const old=w.meals[index],attached=mealProductsV412(old),guests=old?.guests;
  const valid=parts.filter(p=>p&&Number.isInteger(Number(p.people))&&Number(p.people)>=1&&Number(p.people)<=30);
- if(!valid.length){w.meals[index]=null;return}
+ if(!valid.length){w.meals[index]=attached.length?{type:'products',products:attached}:null;
+  if(w.meals[index]&&guests)w.meals[index].guests=guests;return}
  if(valid.length===1){
   const p=valid[0];
   if(p.type==='leftovers')w.meals[index]={type:'leftovers',recipeId:p.recipeId||undefined,fromIndex:Number.isInteger(p.fromIndex)?p.fromIndex:undefined,leftoverPortions:Number(p.people)};
   else w.meals[index]={type:'recipe',recipeId:p.recipeId,people:Number(p.people)}
- }else w.meals[index]={type:'multi',dishes:valid.map(p=>p.type==='leftovers'?{type:'leftovers',recipeId:p.recipeId||null,fromIndex:p.fromIndex,people:Number(p.people)}:{recipeId:p.recipeId,people:Number(p.people)})}
+ }else w.meals[index]={type:'multi',dishes:valid.map(p=>p.type==='leftovers'?{type:'leftovers',recipeId:p.recipeId||null,fromIndex:p.fromIndex,people:Number(p.people)}:{recipeId:p.recipeId,people:Number(p.people)})};
+ if(attached.length)w.meals[index].products=attached;
+ if(guests)w.meals[index].guests=guests;
+}
+function setMealProductsV412(w,index,items){
+ if(!Number.isInteger(index)||index<0||index>13)return false;
+ const cleaned=items.filter(x=>x&&productById(x.productId)&&Number.isFinite(Number(x.qty))&&
+  Number(x.qty)>0&&Number(x.qty)<=100000&&units.includes(x.unit))
+  .map(x=>({productId:x.productId,qty:Number(x.qty),unit:x.unit}));
+ if(cleaned.length!==items.length||new Set(cleaned.map(x=>x.productId)).size!==cleaned.length)return false;
+ const previous=w.meals[index];
+ if(!previous&&cleaned.length){w.meals[index]={type:'products',products:cleaned};return true}
+ if(!previous)return true;
+ if(['ordered','no-meal'].includes(previous.type))return false;
+ if(previous.type==='products'&&!cleaned.length){w.meals[index]=null;return true}
+ const next={...previous};
+ if(cleaned.length)next.products=cleaned;else delete next.products;
+ w.meals[index]=next;return true
+}
+function setMealGuestsV412(w,index,guests){
+ if(!Number.isInteger(guests)||guests<1||guests>30||!w.meals[index]||
+  isMealDoneV41(w,index))return false;
+ w.meals[index]={...w.meals[index],guests};
+ reconcileLeftovers(w,index);return true
 }
 // « Préparées » = quantités cuisinées et achetées ; « ici » = portions mangées.
 // Pour un plat de 4 personnes : 2 ici, 2 portions de restes à placer librement.
-function portionsEatenHere(d,dishes){
+function portionsEatenHere(d,dishes,guests=2){
  const prepared=Math.max(0,Number(d?.people)||0);
- if(prepared<=2)return prepared; // 1 ou 2 portions préparées : aucun reste, même avec plusieurs plats.
- return Math.min(prepared,prepared>=4?2:(dishes.length===1?2:1))
+ const atTable=Math.max(1,Math.min(30,Number(guests)||2));
+ // Chaque préparation a ses propres portions ; deux plats ne doublent
+ // jamais le nombre de convives, et les restes restent indépendants.
+ return Math.min(prepared,atTable)
 }
 function isMealDoneV41(w,index){return Object.keys(w?.v41MealActions||{}).some(key=>key.startsWith(index+':'))}
 function sourceBudget(w,fromIndex,recipeId){
@@ -2254,7 +2381,7 @@ function sourceBudget(w,fromIndex,recipeId){
  const dishes=mealDishes(w.meals[fromIndex]);
  const d=dishes.find(x=>x.recipeId===recipeId);
  if(!d)return 0;
- return Math.max(0,d.people-portionsEatenHere(d,dishes))
+ return Math.max(0,d.people-portionsEatenHere(d,dishes,mealGuestsV412(w.meals[fromIndex])))
 }
 function usedLeftovers(w,fromIndex,recipeId,exceptIndex=-1){
  let used=0;w.meals.forEach((m,i)=>{if(i!==exceptIndex)mealLeftovers(m).forEach(x=>{
@@ -2312,10 +2439,12 @@ function moveCopyMeal(w,source,target,mode){
  const original=w.meals[source];if(!original)return false;
  const parts=mealParts(original),dishes=mealDishes(original),leftovers=mealLeftovers(original);
  if(isMealDoneV41(w,source)||isMealDoneV41(w,target))return false;
- if(mode==='copy'&&!dishes.length)return false; // Les mêmes restes ne peuvent pas être consommés deux fois.
+ if(mode==='copy'&&!dishes.length&&!mealProductsV412(original).length)return false; // Ne jamais recopier des restes seuls.
  if(mode==='copy'){
   clearMealWithPair(w,target);
   storeMealParts(w,target,dishes.map(x=>({...x})));
+  setMealProductsV412(w,target,mealProductsV412(original));
+  if(w.meals[target]&&original.guests)w.meals[target].guests=original.guests;
   return true
  }
  if(mode!=='move')return false;
@@ -2492,7 +2621,7 @@ document.addEventListener('click',e=>{
  }
  if(mode.startsWith('v41-')&&stockModulesV41?.actions.handleStockActionV41({
    mode,a,id,index,state,currentWeek,uid,units,toast,persist,render,renderMealContext,
-   closeModal,showModal,getWeek,recipeById,mealDishes,mealLeftovers,shopping,
+   closeModal,showModal,getWeek,recipeById,mealDishes,mealLeftovers,mealProductsV412,shopping,
    reconcileLeftovers,clearMealWithPair,selectRecipeForMeal,generateWeekCourses,
    freezerReservationsV41:stockModulesV41.week.freezerReservationsV41,
    openStockBulkV414:()=>openBulkCatalogueV37(false,true),readBulkStockV414
@@ -2770,6 +2899,34 @@ document.addEventListener('click',e=>{
    refreshIngredientEntry(row);row.querySelector('.ingredient-qty')?.focus()
   }
   else if(mode==='choose-recipe'){if(isMealDoneV41(w,index)){toast('Ce repas a déjà été validé.');return}const portions=peopleInput(id);if(portions===null){toast('Choisis entre 1 et 30 portions.');return}if(!addRecipeToMeal(w,index,id,portions)){toast('Ce plat est déjà présent dans ce repas. Modifie plutôt ses portions.');return}persist();closeModal();renderMealContext(index)}
+  else if(mode==='v412-pick-product')openMealProductPickerV412(index);
+  else if(mode==='v412-select-product'||mode==='v412-edit-meal-product')editMealProductV412(index,id);
+  else if(mode==='v412-save-meal-product'){
+   if(isMealDoneV41(w,index)){toast('Annule la validation du repas avant de le modifier.');return}
+   const qty=Number($('#v412ProductQty')?.value),unit=$('#v412ProductUnit')?.value;
+   if(!productById(id)||!Number.isFinite(qty)||qty<=0||qty>100000||!units.includes(unit)){
+    toast('Vérifie la quantité et l’unité du produit.');return
+   }
+   const previous=mealProductsV412(w.meals[index]),next=previous.filter(x=>x.productId!==id);
+   next.push({productId:id,qty,unit});
+   const before=weekBeforeUndo();
+   if(!setMealProductsV412(w,index,next)){toast('Impossible d’ajouter ce produit à ce repas.');return}
+   persist();closeModal();renderMealContext(index);
+   toastWeekUndo('Produit enregistré pour le repas.',before,index)
+  }
+  else if(mode==='v412-remove-meal-product'){
+   if(isMealDoneV41(w,index)){toast('Annule la validation avant de retirer le produit.');return}
+   const before=weekBeforeUndo(),remaining=mealProductsV412(w.meals[index]).filter(x=>x.productId!==id);
+   if(!setMealProductsV412(w,index,remaining))return;
+   persist();closeModal();renderMealContext(index);
+   toastWeekUndo('Produit retiré du repas.',before,index)
+  }
+  else if(mode==='v412-save-guests'){
+   const guests=Number($('#v412MealGuests')?.value),before=weekBeforeUndo();
+   if(!setMealGuestsV412(w,index,guests)){toast('Choisis entre 1 et 30 personnes.');return}
+   persist();closeModal();renderMealContext(index);
+   toastWeekUndo('Nombre de convives enregistré.',before,index)
+  }
   else if(mode==='choose-leftovers')pickLeftoverSource(index);
   else if(mode==='apply-leftovers'){
    if(isMealDoneV41(w,index)){toast('Ce repas a déjà été validé.');return}
@@ -2942,6 +3099,11 @@ document.addEventListener('change',e=>{
  }
  }else if(e.target.matches('[data-store-item]')){const item=e.target.dataset.storeItem,store=e.target.value;closeModal();setShoppingStore(item,store)}else if(e.target.matches('[data-check]')){const w=getWeek(),id=e.target.dataset.check;w.checked=e.target.checked?[...new Set([...w.checked,id])]:w.checked.filter(x=>x!==id);persist();render(true)}else if(e.target.id==='importFile')importData(e.target.files?.[0])});
 document.addEventListener('input',e=>{
+  if(e.target.id==='v412ProductSearch'){
+   const target=$('#v412ProductResults');
+   if(target)target.innerHTML=mealProductPickerResultsV412(Number(target.dataset.index),e.target.value);
+   return
+  }
   if(e.target.id==='v417ImportSearch'){refreshRecipeImportResultsV417();return}
   if(e.target.id==='v413StockPickerSearch'){
    const needle=String(e.target.value||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim().toLocaleLowerCase('fr-FR');

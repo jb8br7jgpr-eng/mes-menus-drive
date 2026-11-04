@@ -124,7 +124,7 @@ test('V41.12 : boutons et validations produits accessibles dans les menus et le 
  assert.match(src,/data-action="v412-save-meal-product"/);
  assert.match(src,/data-action="v412-remove-meal-product"/);
  assert.match(src,/data-action="v412-save-guests"/);
- assert.match(src,/data-action="v41-eat-product"/);
+ assert.match(src,/button\\('v41-eat-product'/);
  assert.match(stockUI,/data-action="v41-eat-product"/);
  assert.match(stockUI,/data-kind="product"/);
  assert.match(stockActions,/if\(mode==='v41-eat-product'\)/);

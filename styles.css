@@ -1157,3 +1157,21 @@
  .v419-bulk-reference .v418-reference-badge{font-size:9px}
  .v37-bulk-modal .v419-bulk-card .v37-bulk-amount{gap:5px}
 }
+
+
+/* V41.11 — samedi partiel + "Pas de repas" sans faux appel aux courses. */
+.day-meals.v411-one-meal{grid-template-columns:minmax(0,1fr)}
+.meal-tile.v411-no-meal,.meal-tile.filled.v411-no-meal{
+ background:linear-gradient(115deg,#f3f6f9,#f8fafb);
+ border-color:#d9e2e8;
+ color:#385263;
+}
+.meal-tile.v411-no-meal strong{color:#385263}
+.meal-tile.v411-no-meal .meal-type{color:#637e91}
+.v411-no-meal-button{
+ display:flex;flex-direction:column;align-items:center;gap:3px;
+ margin:10px 0 14px;min-height:51px;line-height:1.25;
+ border:1px solid #d4e0e6!important;background:#f2f7fa!important;
+ color:#2b5264!important;font-weight:800!important;
+}
+.v411-no-meal-button small{font-size:10px;color:#648096;font-weight:600}

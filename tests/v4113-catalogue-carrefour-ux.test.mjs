@@ -89,7 +89,7 @@ function removalFixture(){
   productById:id=>state.products.find(x=>x.id===id),
   checkpoint:label=>actions.push(['checkpoint',label]),
   persist:()=>actions.push(['persist']),closeModal:()=>actions.push(['close']),
-  render:keep=>actions.push(['render',keep]),toast:msg=>actions.push(['toast',msg])
+  render:keep=>actions.push(['render',keep]),toast:msg=>actions.push(['toast',msg]),confirm:()=>true
  };
  const code=take('carrefourReferenceLinkedV4133','productBadge');
  const fun=runInNewContext(code+';({unlinkIngredientCarrefourV413,clearDailyCarrefourV413})',ctx);
@@ -97,17 +97,18 @@ function removalFixture(){
 }
 
 test('V41.13 : détacher Carrefour d’un ingrédient conserve les deux catalogues et les achats',()=>{
- const f=removalFixture();const initialProducts=JSON.stringify(f.state.products);
+ const f=removalFixture();const initialOther=JSON.stringify(f.p2);
  const initialWeeks=JSON.stringify(f.state.weeks);
  assert.equal(f.unlinkIngredientCarrefourV413('ingredient'),true);
  assert.equal(f.ing.productId,null);
  assert.equal(f.state.recipes[0].ingredients[0].productId,null);
  assert.equal(f.state.recipes[0].ingredients[0].name,'Ma fondue');
  assert.equal(f.state.recipes[0].ingredients[1].productId,'product2');
- assert.equal(f.p1.carrefourReferenceHiddenV4133,true,'la référence technique ne doit pas devenir un achat indépendant');
- assert.equal(JSON.stringify(f.state.products.map(({carrefourReferenceHiddenV4133,...p})=>p)),initialProducts,
-   'seul un indicateur de masquage est ajouté, aucune fiche supprimée');
- assert.equal(JSON.stringify(f.state.weeks),initialWeeks);
+ assert.equal(f.state.products.length,1,'la référence orpheline est réellement supprimée');
+ assert.equal(JSON.stringify(f.state.products[0]),initialOther,'le second produit est conservé');
+ assert.equal(f.state.weeks['2026-11-07'].extras[0].productId,null);
+ assert.equal(f.state.weeks['2026-11-07'].extras[0].name,'Poireaux');
+ assert.notEqual(JSON.stringify(f.state.weeks),initialWeeks,'seul le lien supprimé est nettoyé');
  assert.ok(f.actions.some(x=>x[0]==='persist'));
  assert.ok(f.actions.some(x=>x[0]==='render'&&x[1]===true));
 });

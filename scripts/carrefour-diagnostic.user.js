@@ -615,8 +615,8 @@
     // Transfert direct depuis la PWA iPhone par fragment URL : aucune dépendance
     // aux permissions du presse-papiers et aucune donnée personnelle envoyée.
     function loadDirectTransfer(){
-      const prefix='#md-drive-v1=';
-      if(!location.hash.startsWith(prefix))return false;
+      const prefix=['#md-drive-v2=','#md-drive-v1='].find(p=>location.hash.startsWith(p));
+      if(!prefix)return false;
       const encoded=location.hash.slice(prefix.length);
       let imported=false;
       try{

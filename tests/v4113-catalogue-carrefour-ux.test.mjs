@@ -91,7 +91,7 @@ function removalFixture(){
   persist:()=>actions.push(['persist']),closeModal:()=>actions.push(['close']),
   render:keep=>actions.push(['render',keep]),toast:msg=>actions.push(['toast',msg])
  };
- const code=take('unlinkIngredientCarrefourV413','productBadge');
+ const code=take('carrefourReferenceLinkedV4133','productBadge');
  const fun=runInNewContext(code+';({unlinkIngredientCarrefourV413,clearDailyCarrefourV413})',ctx);
  return {state,ing,p1,p2,actions,...fun};
 }

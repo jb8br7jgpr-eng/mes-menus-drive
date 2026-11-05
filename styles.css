@@ -1217,3 +1217,15 @@
 .v413-carrefour-import-notice{
  margin:2px 0 15px;border-color:#cde5d3;
 }
+
+.v413-reference-paste{
+ display:grid;gap:8px;padding:11px;
+ border:1px solid #dce5df;border-radius:12px;background:#fff;
+}
+.v413-reference-paste[hidden]{display:none!important}
+.v413-reference-paste label{font-size:12px;font-weight:750}
+.v413-reference-paste textarea{
+ width:100%;min-height:65px;resize:vertical;
+ font:inherit;font-size:13px;
+ padding:10px;border:1px solid #dce5df;border-radius:9px;
+}

@@ -47,8 +47,10 @@ test('Le filtre par catégorie fonctionne pour ingrédients ET achats du quotidi
  {id:'p1',name:'Papier toilette',category:'Papier et consommables',store:'carrefour'},
  {id:'p2',name:'Lessive',category:'Entretien et nettoyage',store:'carrefour'}]
  };
- const fn=runInNewContext(between('function unifiedCatalogueItems(){','function unifiedCatalogueRows(){')+';unifiedCatalogueItems',{
-  state,catalogueTypeFilter:'all',catalogueStoreFilter:'all',catalogueCategoryFilter:'Œufs',
+ const fn=runInNewContext(between('function unifiedCatalogueSourceV4114(){','function unifiedCatalogueRows(){')+';unifiedCatalogueItems',{
+  state,catalogueTypeFilter:'all',catalogueStoreFilter:'all',
+  categoryMatchesV4114:(category,selected)=>!selected.size||selected.has(category),
+  categorySelectionV4114:()=>new Set(['Œufs']),
   productSearch:'',norm:v=>String(v||'').toLowerCase(),ingredientStore:x=>x.store,
   catalogueSortV40:'name',catalogueCategoryV40:item=>item.category||'Autres',
   catalogueSortCompareV40:(a,b)=>a.name.localeCompare(b.name,'fr')
@@ -72,11 +74,11 @@ test('Les catégories détaillées conservent les grandes sections de courses sa
   'Produits frais':'Produits frais'
  }))assert.equal(productGrouping({category:cat}),group,cat);
 });
-test('Les fiches affichent la catégorie et le filtre est un select compact',()=>{
+test('Les fiches affichent la catégorie et utilisent le sélecteur par rayons',()=>{
  const editor=between('function catalogueEditor(', 'function previewCarrefourPackV38(');
  assert.match(editor,/productCategoryOptions\(record.category\|\|'Autres'\)/);
  const listing=between('function renderProduits(){','function chooseUnifiedProductType(){');
- assert.match(listing,/categoryId:'catalogueCategoryFilter'/);
+ assert.match(listing,/catalogueRayonMarkupV4114|catalogueFiltersV40/);
  assert.match(listing,/productCategoryChoices\(\)/);
  const row=between('function unifiedCatalogueRows(){','function renderProduits(){');
  assert.match(row,/v39-category-label/);

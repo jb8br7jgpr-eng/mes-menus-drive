@@ -12,7 +12,7 @@ const units=['g','kg','ml','cl','l','pièce','paquet','boîte','rouleau','boutei
 // conversions continuent d'exiger une unité compatible déclarée.
 const contentUnits=units;
 const baseState=()=>({schema:1,recipes:[],products:[],weeks:{},staples:[],storePreferences:{},ingredientCatalog:[],favoritesUnifiedV29:false,coursesExplicitGenerationV1:false,settings:{people:2}});
-let state=baseState(), currentTab='menus', currentWeek='', search='', recipeSort='az', recipeTypeFilter='all', recipeIngredientFilterV416='', productSearch='', productCategory='Toutes', ingredientStoreTab='carrefour', catalogueTypeFilter='all', catalogueStoreFilter='all', catalogueCategoryFilter='all', catalogueSortV40='name', db=null, usingFallback=false;
+let state=baseState(), currentTab='menus', currentWeek='', search='', recipeSort='az', recipeTypeFilter='all', recipeIngredientFilterV416='', productSearch='', productCategory='Toutes', ingredientStoreTab='carrefour', catalogueTypeFilter='all', catalogueStoreFilter='all', catalogueSortV40='name', db=null, usingFallback=false;
 let pendingRecipeDraftImage='',pendingIngredientLinkId=null;
 let recipeImportedSourceIdsV417=new Set();
 let independentProductsOpen=false;const courseOpenSections=new Set();
@@ -171,7 +171,7 @@ function undoWeekAction(){
 }
 
 function render(preserveScroll=false){const scrollY=window.scrollY;document.querySelectorAll('.nav-item').forEach(b=>{const active=b.dataset.tab===currentTab;b.classList.toggle('active',active);if(active)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current')});app.innerHTML=({menus:renderMenus,plats:renderPlats,produits:renderProduits,courses:renderCourses,drive:renderDrive,stock:()=>stockModulesV41?stockModulesV41.ui.renderStockV41({state,week:getWeek(),weekId:currentWeek,view:stockViewV41,recipeById,mealDishes,mealLeftovers,
- mealProductsV412,productById,mealLabel:menuMealLabelV411}):'<div class="loading">Chargement du stock…</div>'}[currentTab])();window.scrollTo({top:preserveScroll?scrollY:0,behavior:'auto'})}
+ mealProductsV412,productById,mealLabel:menuMealLabelV411}):'<div class="loading">Chargement du stock…</div>'}[currentTab])();if(currentTab==='produits')syncCatalogueRayonsV4114('produits');window.scrollTo({top:preserveScroll?scrollY:0,behavior:'auto'})}
 function switchTabV33(destination){
  if(!Object.prototype.hasOwnProperty.call(tabScrollV33,destination))return;
  if(destination===currentTab)return;
@@ -549,15 +549,15 @@ function catalogueSortOptionsV40(chosen='name'){
  return catalogueSortChoicesV40.map(([value,label])=>'<option value="'+value+'" '+(chosen===value?'selected':'')+'>'+label+'</option>').join('')
 }
 function catalogueFiltersV40({prefix,searchId,searchValue='',storeId,storeValue='all',categoryId,
-  categoryValue='all',sortId,sortValue='name',categories=[],extra=''}) {
+  categoryValue='all',sortId,sortValue='name',categories=[],items=[],extra=''}) {
  return '<div class="v40-filter-panel" role="group" aria-label="Rechercher et filtrer les produits">'+
   '<div class="field v40-filter-search"><label for="'+searchId+'">Rechercher un article</label>'+
   '<input id="'+searchId+'" type="search" autocomplete="off" value="'+html(searchValue)+'" placeholder="Ex. lait, pâtes, sopalin…" aria-label="Rechercher un article"></div>'+
   '<div class="v40-filter-controls">'+
   '<div class="field"><label for="'+storeId+'">Magasin</label><select id="'+storeId+'">'+catalogueStoreOptionsV40(storeValue)+'</select></div>'+
-  '<div class="field"><label for="'+categoryId+'">Catégorie</label><select id="'+categoryId+'">'+catalogueCategoryOptionsV40(categories,categoryValue)+'</select></div>'+
+
   '<div class="field v40-filter-sort"><label for="'+sortId+'">Trier par</label><select id="'+sortId+'">'+catalogueSortOptionsV40(sortValue)+'</select></div>'+
-  '</div>'+extra+
+  '</div>'+catalogueRayonMarkupV4114(prefix,categories,items)+extra+
   '<div class="v40-filter-reset"><button type="button" data-action="v40-reset-filters" data-context="'+prefix+'">↺ Effacer les filtres</button></div></div>'
 }
 
@@ -910,7 +910,7 @@ function saveUnifiedCatalogue(e){
  if(catalogueStoreFilter!=='all')catalogueStoreFilter=store;
  if(catalogueTypeFilter!=='all'&&catalogueTypeFilter!==kind)catalogueTypeFilter='all';
  // Un produit modifié doit rester visible, même si le filtre était sur une autre catégorie.
- if(catalogueCategoryFilter!=='all'&&catalogueCategoryFilter!==category)catalogueCategoryFilter='all';
+ if(categorySelectionV4114('produits').size&&!categorySelectionV4114('produits').has(category))categorySelectionV4114('produits').clear();
  persist();closeModal();render(true);toast('Produit enregistré !')
 }
 // V41.13.3 : supprimer réellement la référence, jamais la masquer.
@@ -1000,18 +1000,20 @@ function productRows(){
  '<button class="btn tiny" data-action="add-catalog-product" data-id="'+html(p.id)+'" aria-label="Ajouter '+html(p.name)+' aux courses">＋ Courses</button></div></article>').join('')
 }
 
-function unifiedCatalogueItems(){
+function unifiedCatalogueSourceV4114(){
  const linked=new Set((state.ingredientCatalog||[]).map(i=>i.productId).filter(Boolean));
- const items=[
+ return [
   ...(state.ingredientCatalog||[]).map(i=>({type:'ingredient',id:i.id,name:i.name,store:ingredientStore(i),category:catalogueCategoryV40(i,i.productId),item:i})),
   ...(state.products||[]).filter(p=>!linked.has(p.id)).map(p=>({type:'daily',id:p.id,name:p.name,store:state.storePreferences?.['product:'+p.id]||p.store||'carrefour',category:catalogueCategoryV40(p),item:p}))
- ];
+ ]
+}
+function unifiedCatalogueItems(){
  const needle=norm(productSearch);
- return items.filter(x=>(catalogueTypeFilter==='all'||catalogueTypeFilter===x.type)&&
+ return unifiedCatalogueSourceV4114().filter(x=>(catalogueTypeFilter==='all'||catalogueTypeFilter===x.type)&&
   (catalogueStoreFilter==='all'||catalogueStoreFilter===x.store)&&
-  (catalogueCategoryFilter==='all'||x.category===catalogueCategoryFilter)&&
+  categoryMatchesV4114(x.category,categorySelectionV4114('produits'))&&
   (!needle||[x.name,x.item.brand,x.item.packaging,x.item.category].some(v=>norm(v).includes(needle))))
-  .sort((a,b)=>catalogueSortCompareV40(a,b,catalogueSortV40));
+  .sort((a,b)=>catalogueSortCompareV40(a,b,catalogueSortV40))
 }
 // V41.8 — lecture seule : illustrations choisies par nom puis par rayon.
 // Les fiches historiques classées « Autres » restent intactes.
@@ -1140,8 +1142,8 @@ function renderProduits(){
  out+=catalogueFiltersV40({
   prefix:'produits',searchId:'productSearch',searchValue:productSearch,
   storeId:'catalogueStoreSelectV40',storeValue:catalogueStoreFilter,
-  categoryId:'catalogueCategoryFilter',categoryValue:catalogueCategoryFilter,
-  sortId:'catalogueSortV40',sortValue:catalogueSortV40,categories:productCategoryChoices(),
+  categoryId:'catalogueCategoryFilter',
+  sortId:'catalogueSortV40',sortValue:catalogueSortV40,categories:productCategoryChoices(),items:unifiedCatalogueSourceV4114(),
   extra:'<div class="v40-type-filter"><span>Type</span><div class="catalogue-filter-bar" role="group" aria-label="Type de produit">'+
    [['all','Tous'],['ingredient','Ingrédients'],['daily','Quotidien']].map(([k,label])=>
    '<button class="catalogue-filter '+(catalogueTypeFilter===k?'active':'')+'" data-action="catalogue-type-filter" data-value="'+k+'" aria-pressed="'+(catalogueTypeFilter===k)+'">'+label+'</button>').join('')+'</div></div>'
@@ -1155,6 +1157,7 @@ function refreshCatalogueV40(){
  const result=$('#catalogueResults'),count=$('#catalogueCount');
  if(result)result.innerHTML=unifiedCatalogueRows();
  if(count){const n=unifiedCatalogueItems().length;count.textContent=n+' produit'+(n>1?'s':'')}
+ syncCatalogueRayonsV4114('produits')
 }
 function chooseUnifiedProductType(){
  const suggested=catalogueTypeFilter==='daily'?'daily':'ingredient';
@@ -2341,13 +2344,14 @@ function bulkCatalogueItemV419(x,matched=false){
   '<select data-v37-unit aria-label="Unité de '+html(x.name)+'">'+selectOptions(units,x.unit)+'</select></div></div>';
 }
 function openBulkCatalogueV37(favoritesOnly=false,stockMode=false){
+ categorySelectionV4114('courses').clear();
  const items=bulkCatalogueV37();
  if(!items.length){toast('Ajoute d’abord des produits ou ingrédients dans ton catalogue.');return}
  const categories=productCategoryChoices();
  let out='<p class="helper v40-bulk-help">'+(stockMode?'Choisis les produits déjà présents chez toi. Sélectionne plusieurs articles, ajuste leurs quantités puis valide le stock en une seule fois.':'Les quantités sont de simples propositions : sélectionne tes articles et ajuste-les sans modifier les recettes.')+'</p>'+
  catalogueFiltersV40({
   prefix:'courses',searchId:'v37BulkSearch',storeId:'v40BulkStore',
-  categoryId:'v40BulkCategory',sortId:'v40BulkSort',categories,
+  categoryId:'v40BulkCategory',sortId:'v40BulkSort',categories,items,
   extra:'<label class="v40-frequent-toggle"><input id="v40BulkFrequent" type="checkbox" '+(favoritesOnly?'checked':'')+
    '> ☆ Afficher seulement mes achats fréquents</label>'
  })+
@@ -2367,12 +2371,12 @@ function openBulkCatalogueV37(favoritesOnly=false,stockMode=false){
  (stockMode?'':'<button class="btn ghost wide v37-bulk-exceptional" data-action="extra-one-off">＋ Article ponctuel, hors catalogue</button>')+'</div>';
  showModal(stockMode?'🏠 Ajouter plusieurs produits au stock':'🛒 Ajouter des articles',out);
  modalRoot.querySelector('.modal')?.classList.add('v37-bulk-modal','v414-one-scroll');
+ syncCatalogueRayonsV4114('courses');
  filterBulkV37()
 }
 function filterBulkV37(){
  const query=norm($('#v37BulkSearch')?.value||''),
   store=$('#v40BulkStore')?.value||'all',
-  category=$('#v40BulkCategory')?.value||'all',
   frequent=Boolean($('#v40BulkFrequent')?.checked),
   sort=$('#v40BulkSort')?.value||'name';
  const list=modalRoot.querySelector('.v37-bulk-list');
@@ -2389,7 +2393,7 @@ function filterBulkV37(){
  rows.forEach(row=>{
   const show=(!query||row.dataset.search.includes(query))&&
    (store==='all'||row.dataset.store===store)&&
-   (category==='all'||row.dataset.category===category)&&
+   categoryMatchesV4114(row.dataset.category,categorySelectionV4114('courses'))&&
    (!frequent||row.dataset.frequent==='true');
   row.hidden=!show;if(show)visible++;
   list.appendChild(row)
@@ -3002,17 +3006,15 @@ document.addEventListener('click',e=>{
    }
    else if(mode==='v40-reset-filters'){
     if(a.dataset.context==='courses'){
-     const search=$('#v37BulkSearch'),store=$('#v40BulkStore'),category=$('#v40BulkCategory'),
-      sort=$('#v40BulkSort'),frequent=$('#v40BulkFrequent');
+     const search=$('#v37BulkSearch'),store=$('#v40BulkStore'),sort=$('#v40BulkSort'),frequent=$('#v40BulkFrequent');
      if(search)search.value='';
      if(store)store.value='all';
-     if(category)category.value='all';
      if(sort)sort.value='name';
      if(frequent)frequent.checked=false;
-     filterBulkV37()
+     categorySelectionV4114('courses').clear();syncCatalogueRayonsV4114('courses');filterBulkV37()
     }else{
-     productSearch='';catalogueStoreFilter='all';catalogueCategoryFilter='all';
-     catalogueSortV40='name';catalogueTypeFilter='all';render(true)
+     productSearch='';catalogueStoreFilter='all';catalogueSortV40='name';catalogueTypeFilter='all';
+     categorySelectionV4114('produits').clear();render(true)
     }
    }
    else if(mode==='catalogue-type-filter'){catalogueTypeFilter=['all','ingredient','daily'].includes(a.dataset.value)?a.dataset.value:'all';render(true)}
@@ -3274,7 +3276,7 @@ document.addEventListener('change',e=>{
   if(e.target.id==='catalogueUnit'){previewCourseQuantityV38();previewCarrefourPackV38();return}
   if(e.target.id==='cataloguePackUnit'){previewCarrefourPackV38();return}
   if(e.target.matches('[data-v37-select]')){updateBulkV37();return}
-  if(['v40BulkStore','v40BulkCategory','v40BulkSort','v40BulkFrequent'].includes(e.target.id)){filterBulkV37();return}
+  if(['v40BulkStore','v40BulkSort','v40BulkFrequent'].includes(e.target.id)){filterBulkV37();return}
   if(e.target.matches('[data-v37-unit]')){
    const box=e.target.closest('[data-v37-row]')?.querySelector('[data-v37-select]');
    if(box)box.checked=true;
@@ -3287,10 +3289,7 @@ document.addEventListener('change',e=>{
   catalogueStoreFilter=['all','carrefour','grandfrais'].includes(e.target.value)?e.target.value:'all';
   refreshCatalogueV40();return
  }
- if(e.target.id==='catalogueCategoryFilter'){
-  catalogueCategoryFilter=productCategoryChoices().includes(e.target.value)?e.target.value:'all';
-  refreshCatalogueV40();return
- }
+
  if(e.target.id==='catalogueSortV40'){
   catalogueSortV40=catalogueSortChoicesV40.some(([k])=>k===e.target.value)?e.target.value:'name';
   refreshCatalogueV40();return

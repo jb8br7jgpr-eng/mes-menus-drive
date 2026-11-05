@@ -118,11 +118,14 @@ test('V41.13.3 : les chemins d’édition et de remplacement masquent la référ
 });
 
 test('V41.13.3 : toutes les listes d’achat excluent les anciennes références masquées',()=>{
- assert.match(src,/function frequentCatalogueItems\(\)[\s\S]*?activeIndependentProductsV4133\(\)/);
- assert.match(src,/function mealProductPickerResultsV412[\s\S]*?activeIndependentProductsV4133\(\)/);
- assert.match(src,/function extraSearchItems[\s\S]*?activeIndependentProductsV4133\(\)/);
- assert.match(src,/function bulkCatalogueV37[\s\S]*?activeIndependentProductsV4133\(\)/);
- assert.match(src,/function independentProducts\(store=ingredientStoreTab\)\{\s*return activeIndependentProductsV4133\(\)/);
+ for(const [start,end] of [
+  ['frequentCatalogueItems','canonicalIngredient'],
+  ['mealProductPickerResultsV412','openMealProductPickerV412'],
+  ['extraSearchItems','extraSearchResults'],
+  ['bulkCatalogueV37','bulkPurchaseExtraV37'],
+  ['independentProducts','productRows'],
+  ['unifiedCatalogueItems','catalogueIconV418']
+ ])assert.match(part(start,end),/carrefourReferenceHiddenV4133/,start);
  assert.match(src,/data-action="v4133-hide-duplicate"/);
  assert.match(src,/data-action="v4133-show-hidden"/);
  assert.match(src,/data-action="v4133-restore-reference"/);

@@ -28,14 +28,14 @@ test('V41.12.2 : le bouton Compte et sauvegardes garde un gestionnaire quand le 
  assert.match(ui,/Récupérer la version du serveur sur cet iPhone/);
  assert.match(ui,/loadServerDiscardingLocalDraft\("ABANDONNER_LE_BROUILLON"\)/);
 });
-test('V41.13.1 : ressources actualisées et même session Firebase',()=>{
+test('V41.13.2 : ressources actualisées et même session Firebase',()=>{
  assert.match(index,/styles\.css\?v=20261105-41-13-release/);
- assert.match(index,/app\.js\?v=20261105-41-13-1-release/);
+ assert.match(index,/app\.js\?v=20261105-41-13-2-release/);
  assert.match(index,/firebase\/v34-ui\.js\?v=20261104-41-12-2-release/);
- assert.match(sw,/CACHE='menus-drive-v41-13-1-filtre-ingredients-20261105'/);
+ assert.match(sw,/CACHE='menus-drive-v41-13-2-noms-panier-20261105'/);
  assert.match(sw,/styles\.css\?v=20261105-41-13-release/);
- assert.match(sw,/app\.js\?v=20261105-41-13-1-release/);
- assert.doesNotMatch(index,/app\.js\?v=20261105-41-13-release/);
+ assert.match(sw,/app\.js\?v=20261105-41-13-2-release/);
+ assert.doesNotMatch(index,/app\.js\?v=20261105-41-13-1-release/);
  assert.doesNotMatch(index,/v34-ui\.js\?v=20261104-41-12-1-release/);
 });
 test('V41.12.2 : le compte Firebase et les catalogues ne sont pas modifiés par le correctif',()=>{

@@ -13,14 +13,23 @@ function catalogueRayonGroupsV4114(categories){
   categories:[...remaining].sort((a,b)=>a.localeCompare(b,'fr'))});
  return groups
 }
-function catalogueRayonMarkupV4114(context,categories,items=[]){
- const groups=catalogueRayonGroupsV4114(categories),selected=categorySelectionV4114(context);
- const seen=new Set(),countByCategory=new Map();
+// V41.14.1 : les compteurs ne prennent en compte que le magasin choisi,
+// tout en conservant toutes les catégories (y compris celles à zéro produit).
+function catalogueRayonCountsV4115(items,store='all'){
+ const seen=new Set(),counts=new Map();
  for(const x of items){
+  if(store!=='all'&&x.store!==store)continue;
   const key=String(x.type||x.kind||'produit')+':'+String(x.id||'');
-  if(seen.has(key))continue;seen.add(key);
-  const c=String(x.category||'Autres');countByCategory.set(c,(countByCategory.get(c)||0)+1)
+  if(seen.has(key))continue;
+  seen.add(key);
+  const category=String(x.category||'Autres');
+  counts.set(category,(counts.get(category)||0)+1)
  }
+ return counts
+}
+function catalogueRayonMarkupV4114(context,categories,items=[],store='all'){
+ const groups=catalogueRayonGroupsV4114(categories),selected=categorySelectionV4114(context);
+ const countByCategory=catalogueRayonCountsV4115(items,store);
  const rows=groups.map(g=>{
   const count=g.categories.reduce((n,c)=>n+(countByCategory.get(c)||0),0);
   const children=g.categories.map(c=>
@@ -47,6 +56,46 @@ function catalogueRayonMarkupV4114(context,categories,items=[]){
    '<div class="v4114-groups">'+rows+'</div>'+
    '<div class="v4114-no-result" data-v4114-empty hidden>Aucun rayon ni catégorie trouvé.</div>'+
   '</div></div>'
+}
+// Les compteurs changent sur place, sans recréer le panneau ni perdre
+// les cases cochées ou les rayons déjà dépliés.
+function refreshCatalogueRayonCountsV4115(context,items,store='all'){
+ const root=(context==='courses'?modalRoot:app).querySelector('[data-v4114-selector="'+context+'"]');
+ if(!root)return;
+ const counts=catalogueRayonCountsV4115(items,store);
+ for(const group of root.querySelectorAll('[data-v4114-group]')){
+  let total=0;
+  for(const child of group.querySelectorAll('[data-v4114-child-row]')){
+   const number=counts.get(child.dataset.category)||0;
+   total+=number;
+   const small=child.querySelector('small');if(small)small.textContent=String(number)
+  }
+  const badge=group.querySelector('.v4114-count');if(badge)badge.textContent=String(total)
+ }
+}
+// Restaurer seulement l'état visuel au retour de la fiche produit.
+// Le choix des filtres reste géré par les Set non persistés en mémoire.
+function captureCatalogueRayonUiV4115(context){
+ const root=(context==='courses'?modalRoot:app).querySelector('[data-v4114-selector="'+context+'"]');
+ if(!root)return null;
+ return {open:!root.querySelector('[data-v4114-panel]').hidden,
+  search:root.querySelector('[data-v4114-search]')?.value||'',
+  expanded:[...root.querySelectorAll('[data-v4114-group]')].filter(g=>!g.querySelector('[data-v4114-children]').hidden).map(g=>g.dataset.name)}
+}
+function restoreCatalogueRayonUiV4115(context,snapshot){
+ if(!snapshot)return;
+ const root=(context==='courses'?modalRoot:app).querySelector('[data-v4114-selector="'+context+'"]');
+ if(!root)return;
+ const panel=root.querySelector('[data-v4114-panel]'),openButton=root.querySelector('[data-v4114-open]');
+ panel.hidden=!snapshot.open;openButton.setAttribute('aria-expanded',String(snapshot.open));
+ const expanded=new Set(snapshot.expanded);
+ root.querySelectorAll('[data-v4114-group]').forEach(group=>{
+  const isOpen=expanded.has(group.dataset.name);
+  group.querySelector('[data-v4114-children]').hidden=!isOpen;
+  group.querySelector('[data-v4114-expand]').setAttribute('aria-expanded',String(isOpen))
+ });
+ const search=root.querySelector('[data-v4114-search]');
+ if(search&&snapshot.search){search.value=snapshot.search;catalogueRayonSearchV4114(search)}
 }
 function syncCatalogueRayonsV4114(context){
  const root=(context==='courses'?modalRoot:app).querySelector('[data-v4114-selector="'+context+'"]');

@@ -155,7 +155,7 @@ test('V41.13 : les trois actions sont proposées et la sauvegarde ne remonte plu
  assert.match(src,/data-action="v413-clear-daily-carrefour"/);
  assert.match(src,/data-action="v413-import-daily-carrefour"/);
  assert.match(src,/function carrefourClipboardModal\(ingredientId=null,dailyId=null\)/);
- assert.match(src,/persist\(\);closeModal\(\);render\(true\);toast\('Produit enregistré !'\)/);
+ assert.match(src,/persist\(\);closeModal\(\);render\(true\);\s*restoreCatalogueRayonUiV4115\('produits',rayonUiV4115\);\s*toast\('Produit enregistré !'\)/);
  assert.match(src,/function showModal\(title,body,autoFocus=true\)/);
  assert.match(css,/\.v413-clear-reference/);
 });

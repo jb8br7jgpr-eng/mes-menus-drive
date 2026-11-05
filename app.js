@@ -648,6 +648,45 @@ function importCarrefourProductFromHash(){
   catch(error){toast('Import Carrefour impossible : '+String(error.message||'lien invalide'))}
   return true
 }
+// Importer une référence dans la fiche ouverte sans jamais fermer celle-ci :
+// les modifications non encore enregistrées (notamment le nom) sont conservées.
+function applyCarrefourToOpenProductV413(raw){
+ const text=String(raw||'').trim();
+ if(!text||text.length>5000)throw Error('Colle un lien Carrefour ou un texte « Copier pour mon appli ».');
+ const parsed=text.startsWith(CARREFOUR_CLIP_PREFIX)?
+   JSON.parse(text.slice(CARREFOUR_CLIP_PREFIX.length)):
+   {v:1,url:text};
+ if(parsed?.v!==1||typeof parsed.url!=='string')throw Error('Format Carrefour non reconnu.');
+ const url=validCarrefourLink(parsed.url);
+ if(!new URL(url).pathname.startsWith('/p/'))throw Error('Ce lien ne correspond pas à une fiche produit Carrefour.');
+ const form=$('#catalogueEditorForm'),urlField=$('#catalogueUrl'),eanField=$('#catalogueEan');
+ if(form?.dataset.kind!=='daily'||!urlField||!eanField)throw Error('Ouvre la fiche Produit pour ajouter la référence.');
+ const ean=/^\d{13}$/.test(String(parsed.ean||''))?String(parsed.ean):'';
+ const originalId=form.dataset.id||null;
+ const duplicate=state.products.find(p=>p.id!==originalId&&
+  ((p.url&&p.url.split(/[?#]/)[0]===url.split(/[?#]/)[0])||
+   (ean&&p.ean===ean)));
+ if(duplicate)throw Error('Cette référence est déjà liée à « '+duplicate.name+' ». Aucune fiche modifiée.');
+ // Ne PAS réécrire le champ catalogueName, même en cas de nom commercial différent.
+ urlField.value=url;eanField.value=ean;
+ const status=$('#v413ReferenceStatus');
+ if(status)status.textContent='✓ Référence prête. Le nom du produit est inchangé. Appuie sur « Enregistrer le produit ».';
+ return {url,ean}
+}
+async function importCarrefourIntoOpenProductV413(){
+ const panel=$('#v413ReferencePastePanel');
+ if(panel)panel.hidden=false;
+ if(!navigator.clipboard?.readText){
+  toast('Colle le lien Carrefour dans le champ, puis touche « Utiliser cette référence ».');return
+ }
+ try{
+  const copied=await navigator.clipboard.readText();
+  applyCarrefourToOpenProductV413(copied);
+  toast('Référence Carrefour chargée. Nom du produit conservé.')
+ }catch(err){
+  toast('Colle le lien dans le champ ci-dessous puis valide. Aucun nom modifié.');
+ }
+}
 function carrefourClipboardModal(ingredientId=null,dailyId=null){
  pendingIngredientLinkId=ingredientById(ingredientId)?.id||null;
  pendingCarrefourDailyIdV413=productById(dailyId)?.id||null;
@@ -755,10 +794,16 @@ function catalogueEditor(kind,id=null,draft=null,linkedIngredientId=null){
    '<div id="v38PackPreview" class="v38-pack-preview" aria-live="polite"></div>'+
    '<div class="field"><label for="catalogueEan">Code-barres EAN-13 (facultatif)</label><input id="catalogueEan" inputmode="numeric" maxlength="13" pattern="[0-9]{13}" value="'+html(record.ean||'')+'"></div>'+
    '<div class="field"><label for="catalogueUrl">Lien Carrefour (facultatif)</label><input id="catalogueUrl" type="url" maxlength="2000" value="'+html(record.url||'')+'"></div>'+
-   (id?'<div class="v413-reference-actions">'+
-    '<button type="button" class="btn secondary wide" data-action="v413-import-daily-carrefour" data-id="'+html(id)+'">📋 Charger une référence Carrefour sans renommer le produit</button>'+
-    ((record.url||record.ean)?'<button type="button" class="btn secondary wide v413-clear-reference" data-action="v413-clear-daily-carrefour" data-id="'+html(id)+'">✕ Retirer le lien Carrefour de ce produit</button>':'')+
-    '</div>':'')+
+   '<div class="v413-reference-actions">'+
+    '<button type="button" class="btn secondary wide" data-action="v413-import-daily-carrefour">📋 Coller une référence Carrefour sans changer le nom</button>'+
+    '<div id="v413ReferencePastePanel" class="v413-reference-paste" hidden>'+
+     '<label for="v413ReferencePaste">Lien ou texte copié depuis Carrefour</label>'+
+     '<textarea id="v413ReferencePaste" rows="3" placeholder="Colle ton lien Carrefour ou le texte « Copier pour mon appli »"></textarea>'+
+     '<button type="button" class="btn secondary wide" data-action="v413-use-pasted-reference">✓ Utiliser cette référence</button>'+
+     '<div class="helper" id="v413ReferenceStatus" aria-live="polite"></div>'+
+    '</div>'+
+    ((id&&(record.url||record.ean))?'<button type="button" class="btn secondary wide v413-clear-reference" data-action="v413-clear-daily-carrefour" data-id="'+html(id)+'">✕ Retirer le lien Carrefour de ce produit</button>':'')+
+    '</div>'+
    '</div></details>';
  }
  body+='<button class="btn wide" type="submit">✓ Enregistrer le produit</button></form>';
@@ -2953,7 +2998,13 @@ document.addEventListener('click',e=>{
    productEditor(null,{name:ing.name,brand:'',packaging:'',category:'Autres',store:'carrefour',qty:1,unit:'paquet',url:'',ean:'',packAmount:null,packUnit:null},ing.id)
   }
   else if(mode==='open-carrefour-import')carrefourClipboardModal();
-  else if(mode==='v413-import-daily-carrefour')carrefourClipboardModal(null,id);
+  else if(mode==='v413-import-daily-carrefour')void importCarrefourIntoOpenProductV413();
+  else if(mode==='v413-use-pasted-reference'){
+   try{
+    applyCarrefourToOpenProductV413($('#v413ReferencePaste')?.value);
+    toast('Référence Carrefour prête, nom conservé.')
+   }catch(error){toast(error.message||'Référence Carrefour invalide.')}
+  }
   else if(mode==='v413-unlink-ingredient-carrefour')unlinkIngredientCarrefourV413(id);
   else if(mode==='v413-clear-daily-carrefour')clearDailyCarrefourV413(id);
   else if(mode==='import-linked-product')carrefourClipboardModal(id);

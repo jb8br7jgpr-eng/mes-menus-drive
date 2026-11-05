@@ -52,10 +52,10 @@ test('Crème fraîche : recherche insensible aux accents, anciennes recettes com
  const matchesWithAccents=api.recipesWithIngredientV416(environment.state.recipes,'CRÈME FRAÎCHE');
  assert.deepEqual(Array.from(matchesWithAccents,r=>r.id),['1','3']);
 });
-test('Recherche par nom de produit lié en conservant identifiant et ingrédient',()=>{
+test('La recherche n’utilise plus les titres de références Carrefour invisibles dans la recette',()=>{
  const {api,environment}=context();
- assert.deepEqual(Array.from(api.recipesWithIngredientV416(environment.state.recipes,'entière 30%'),r=>r.id),['1']);
- assert.deepEqual(Array.from(api.recipesWithIngredientV416(environment.state.recipes,'Pâtes 500 g'),r=>r.id),['2']);
+ assert.deepEqual(Array.from(api.recipesWithIngredientV416(environment.state.recipes,'entière 30%'),r=>r.id),[]);
+ assert.deepEqual(Array.from(api.recipesWithIngredientV416(environment.state.recipes,'Pâtes 500 g'),r=>r.id),[]);
  assert.deepEqual(Array.from(api.recipesWithIngredientV416(environment.state.recipes,'crème de coco'),r=>r.id),['4']);
  assert.deepEqual(Array.from(api.recipesWithIngredientV416(environment.state.recipes,'sauce barbecue'),r=>r.id),[]);
 });
@@ -66,9 +66,40 @@ test('Pas de faux positif sur les noms de recettes ni sur les produits non utili
  assert.ok(!Array.from(q,r=>r.id).includes('5'),'Crème brûlée ne contient pas de crème dans sa liste');
  const names=api.recipeIngredientSuggestionsV416();
  assert.ok(names.includes('Crème fraîche épaisse'));
- assert.ok(names.includes('Crème Fraîche entière 30%'));
+ assert.ok(!names.includes('Crème Fraîche entière 30%'),'le titre commercial non affiché ne doit pas être proposé');
  assert.ok(!names.includes('Produit jamais utilisé'));
  assert.deepEqual(Array.from(api.recipesWithIngredientV416(environment.state.recipes,''),r=>r.id),['1','2','3','4','5']);
+});
+test('Régression : « Crudités blanc de poulet » ne ressort pas sur Moutarde si la fiche ne l’affiche pas',()=>{
+ const {api,environment}=context();
+ // Le nom historique et/ou la référence Carrefour sont incohérents :
+ // seule la liste visible Taboulé / Céleri râpé / Blanc de poulet compte.
+ environment.state.ingredientCatalog.push(
+  {id:'taboule',name:'Taboulé',productId:'mustard-product'},
+  {id:'celeri',name:'Céleri râpé'},
+  {id:'poulet',name:'Blanc de poulet'}
+ );
+ environment.state.products.push({id:'mustard-product',name:'Moutarde de Dijon'});
+ const crudites={id:'crudites',name:'Crudités blanc de poulet',ingredients:[
+  {ingredientId:'taboule',name:'Moutarde',productId:'mustard-product',qty:1,unit:'boîte'},
+  {ingredientId:'celeri',name:'Céleri râpé',qty:1,unit:'boîte'},
+  {ingredientId:'poulet',name:'Blanc de poulet',qty:1,unit:'paquet'}
+ ]};
+ environment.state.recipes.push(crudites);
+ assert.deepEqual(Array.from(api.recipeIngredientNamesV416(crudites)),['Taboulé','Céleri râpé','Blanc de poulet']);
+ assert.ok(!Array.from(api.recipesWithIngredientV416(environment.state.recipes,'moutarde'),r=>r.id).includes('crudites'));
+ assert.ok(Array.from(api.recipesWithIngredientV416(environment.state.recipes,'taboulé'),r=>r.id).includes('crudites'));
+ assert.ok(!Array.from(api.recipeIngredientSuggestionsV416()).includes('Moutarde de Dijon'));
+ assert.ok(!Array.from(api.recipeIngredientSuggestionsV416()).includes('Moutarde'));
+});
+test('Une référence Carrefour intitulée Moutarde ne suffit pas pour retrouver une recette',()=>{
+ const {api,environment}=context();
+ environment.state.products.push({id:'mustard-product',name:'Moutarde forte'});
+ environment.state.recipes.push({id:'false-positive',name:'Crudités',ingredients:[
+  {name:'Blanc de poulet',productId:'mustard-product',qty:1,unit:'paquet'}
+ ]});
+ assert.ok(!Array.from(api.recipesWithIngredientV416(environment.state.recipes,'moutarde'),r=>r.id).includes('false-positive'));
+ assert.deepEqual(Array.from(api.recipesWithIngredientV416(environment.state.recipes,'blanc de poulet'),r=>r.id),['false-positive']);
 });
 test('Filtre ingrédient + type + nom compatibles, tri des recettes inchangé',()=>{
  const {api,environment}=context({recipeIngredientFilterV416:'crème fraîche',recipeTypeFilter:'Viande'});

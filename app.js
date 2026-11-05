@@ -597,15 +597,45 @@ function openImportedCarrefourProduct(data){
   const ean=/^\d{13}$/.test(String(data.ean||''))?String(data.ean):'';
   if(!name)throw Error('Nom du produit introuvable');
   const already=state.products.find(p=>(p.url&&p.url.split(/[?#]/)[0]===url.split(/[?#]/)[0])||(ean&&p.ean===ean));
+  // Un retour depuis Carrefour peut changer d'onglet ; on préserve l'ancienne
+  // position du catalogue, jamais le haut de la page par défaut.
+  if(currentTab!=='produits'&&catalogueModalScrollV413===null)
+   catalogueModalScrollV413=Math.max(0,Number(tabScrollV33.produits)||0);
   switchTabV33('produits');
   const linked=ingredientById(pendingIngredientLinkId);
-  pendingIngredientLinkId=null;
+  const original=productById(pendingCarrefourDailyIdV413);
+  pendingIngredientLinkId=null;pendingCarrefourDailyIdV413=null;
+  if(original){
+   // Le nom choisi dans Produits est prioritaire. On ne copie JAMAIS le
+   // titre commercial Carrefour sur une fiche existante.
+   if(already&&already.id!==original.id){
+    showCatalogueModalV413('Référence déjà associée',
+     '<div class="note"><strong>'+html(already.name)+'</strong>'+
+     '<p>Ce lien Carrefour appartient déjà à un autre produit. Aucun nom ni aucune fiche n’a été modifié.</p></div>'+
+     '<button class="btn wide" data-action="edit-product" data-id="'+html(original.id)+'">Retour à mon produit</button>');
+    return
+   }
+   productEditor(original.id);
+   const link=$('#catalogueUrl'),barcode=$('#catalogueEan');
+   if(link)link.value=url;
+   if(barcode&&ean)barcode.value=ean;
+   const form=$('#catalogueEditorForm');
+   if(form){
+    form.insertAdjacentHTML('afterbegin',
+     '<div class="note v413-carrefour-import-notice"><strong>✓ Référence Carrefour chargée</strong>'+
+     '<p>Le nom « '+html(original.name)+' » est conservé. Seuls le lien Carrefour et le code-barres sont préparés. Vérifie puis enregistre.</p></div>');
+    form.querySelector('.v38-pack-details')?.setAttribute('open','');
+   }
+   return
+  }
   if(already){
-    showModal('Produit déjà enregistré','<div class="note"><strong>'+html(already.name)+'</strong><p>Cette référence existe déjà, inutile de la créer deux fois.</p></div>'+
+    showCatalogueModalV413('Produit déjà enregistré','<div class="note"><strong>'+html(already.name)+'</strong><p>Cette référence existe déjà, inutile de la créer deux fois.</p></div>'+
       '<button class="btn wide" data-action="edit-product" data-id="'+html(already.id)+'">Modifier la fiche existante</button>'+
       (linked?'<button class="btn secondary wide" style="margin-top:8px" data-action="link-imported-existing" data-id="'+html(already.id)+'" data-ingredient="'+html(linked.id)+'">✓ Associer à '+html(linked.name)+'</button>':''));
   }else{
-    productEditor(null,{name,brand,packaging,category:'Autres',store:'carrefour',qty:1,unit:'paquet',url,ean,packAmount:null,packUnit:null},linked?.id||null);
+    // En association avec un ingrédient déjà nommé, sa dénomination reste la
+    // source de vérité ; les champs marque/conditionnement restent séparés.
+    productEditor(null,{name:linked?.name||name,brand,packaging,category:'Autres',store:'carrefour',qty:1,unit:'paquet',url,ean,packAmount:null,packUnit:null},linked?.id||null);
   }
 }
 function importCarrefourProductFromHash(){

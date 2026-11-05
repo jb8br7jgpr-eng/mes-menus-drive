@@ -995,6 +995,7 @@ function productBadge(p){
 function independentProducts(store=ingredientStoreTab){
  return activeIndependentProductsV4133().filter(p=>
   (state.storePreferences?.['product:'+p.id]||p.store||'carrefour')===store)
+}
 
 function productRows(){
  const filter=norm(productSearch);

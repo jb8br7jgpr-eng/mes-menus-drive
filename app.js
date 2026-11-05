@@ -899,83 +899,61 @@ function saveUnifiedCatalogue(e){
  if(catalogueCategoryFilter!=='all'&&catalogueCategoryFilter!==category)catalogueCategoryFilter='all';
  persist();closeModal();render(true);toast('Produit enregistré !')
 }
-// V41.13.3 : une fiche référence reste archivée, jamais supprimée.
-// Un détachement ou remplacement n'en fait plus un nouvel achat du quotidien.
+// V41.13.3 : supprimer réellement la référence, jamais la masquer.
 function carrefourReferenceLinkedV4133(id){
  return (state.ingredientCatalog||[]).some(i=>i.productId===id)
 }
-function hideOrphanCarrefourReferenceV4133(id){
- const p=productById(id);
- if(!p||carrefourReferenceLinkedV4133(id))return false;
- p.carrefourReferenceHiddenV4133=true;
+function referenceUsedInMealsV4133(id){
+ return Object.values(state.weeks||{}).some(w=>(w.meals||[]).some(m=>(m?.products||[]).some(x=>x.productId===id)))
+}
+function removeOrphanCarrefourReferenceV4133(id,ingredientId=null){
+ if(!productById(id)||carrefourReferenceLinkedV4133(id)||referenceUsedInMealsV4133(id))return false;
+ state.products=state.products.filter(x=>x.id!==id);
+ if(state.storePreferences)delete state.storePreferences['product:'+id];
+ Object.values(state.weeks||{}).forEach(w=>{
+  for(const x of (w.extras||[]))if(x.productId===id)x.productId=null;
+  for(const x of (w.generatedIngredients||[]))if(x.productId===id)x.productId=null;
+ });
+ (state.recipes||[]).forEach(r=>(r.ingredients||[]).forEach(x=>{if(x.productId===id)x.productId=null}));
+ if(ingredientId&&state.stockV41?.items){
+  const from='product:'+id,to='ingredient:'+ingredientId;
+  for(const [key,item] of Object.entries(state.stockV41.items)){
+   if(item?.identity!==from)continue;
+   const dest=to+'|'+item.unit,existing=state.stockV41.items[dest];
+   if(existing)existing.quantity=Math.round((Number(existing.quantity||0)+Number(item.quantity||0))*1000)/1000;
+   else state.stockV41.items[dest]={...item,identity:to};
+   delete state.stockV41.items[key]
+  }
+ }
  return true
-}
-function activeIndependentProductsV4133(){
- const linked=new Set((state.ingredientCatalog||[]).map(i=>i.productId).filter(Boolean));
- return (state.products||[]).filter(p=>!linked.has(p.id)&&!p.carrefourReferenceHiddenV4133)
-}
-function hiddenOrphanCarrefourReferencesV4133(){
- return (state.products||[]).filter(p=>p.carrefourReferenceHiddenV4133&&!carrefourReferenceLinkedV4133(p.id))
-}
-function potentialExistingDuplicateV4133(product){
- if(!product||carrefourReferenceLinkedV4133(product.id)||product.carrefourReferenceHiddenV4133)return false;
- const name=norm(product.name);
- return Boolean(name&&(state.ingredientCatalog||[]).some(ing=>norm(ing.name)===name))
-}
-function hidePotentialDuplicateV4133(id){
- const p=productById(id);
- if(!potentialExistingDuplicateV4133(p))return false;
- checkpoint('Avant masquage d’un doublon possible');
- if(!hideOrphanCarrefourReferenceV4133(id))return false;
- persist();render(true);
- toast('Doublon masqué sans suppression. Réversible dans Produits.');
- return true
-}
-function restoreHiddenReferenceV4133(id){
- const p=productById(id);
- if(!p||!p.carrefourReferenceHiddenV4133||carrefourReferenceLinkedV4133(id))return false;
- checkpoint('Avant réaffichage d’une référence conservée');
- delete p.carrefourReferenceHiddenV4133;
- persist();closeModal();render(true);
- toast('« '+p.name+' » réaffiché dans Produits.');
- return true
-}
-function showHiddenReferencesV4133(){
- const products=hiddenOrphanCarrefourReferencesV4133();
- if(!products.length){toast('Aucune référence masquée.');return}
- const body='<p class="helper">Ces anciennes références sont conservées avec leurs informations et liens Carrefour. Elles ne s’affichent pas comme des achats du quotidien. Tu peux réafficher une fiche sans rien perdre.</p>'+
-  products.map(p=>'<div class="drive-preflight-item"><div class="grow"><strong>'+html(p.name)+'</strong>'+
-    '<p>'+html(p.ean?'EAN '+p.ean:'Référence conservée')+'</p></div>'+
-    '<button class="btn tiny secondary" data-action="v4133-restore-reference" data-id="'+html(p.id)+'">Réafficher</button></div>').join('');
- showCatalogueModalV413('Références Carrefour conservées',body)
 }
 function unlinkIngredientCarrefourV413(id){
  const ing=ingredientById(id);
  if(!ing||!ing.productId)return false;
- checkpoint('Avant retrait de référence Carrefour');
  const previousProductId=ing.productId;
+ const shared=(state.ingredientCatalog||[]).some(i=>i.id!==id&&i.productId===previousProductId);
+ if(!shared&&referenceUsedInMealsV4133(previousProductId)){
+  toast('Cette référence sert à un repas planifié. Retire-la du repas avant de la supprimer.');return false
+ }
+ if(!confirm('Supprimer définitivement la référence Carrefour de « '+ing.name+' » ? La fiche Speedrive et les courses seront conservées.'))return false;
+ checkpoint('Avant suppression de référence Carrefour');
  ing.productId=null;
- state.recipes.forEach(r=>(r.ingredients||[]).forEach(line=>{
-  // Certaines anciennes recettes n'ont pas d'identifiant d'ingrédient.
-  if(line.ingredientId===ing.id||(!line.ingredientId&&norm(line.name)===norm(ing.name)))
-   line.productId=null;
+ (state.recipes||[]).forEach(r=>(r.ingredients||[]).forEach(x=>{
+  if(x.ingredientId===ing.id||(!x.ingredientId&&norm(x.name)===norm(ing.name)))x.productId=null
  }));
- // La référence technique est conservée dans state.products, sans apparaître
- // comme un nouvel article quotidien. Les usages des autres ingrédients restent.
- hideOrphanCarrefourReferenceV4133(previousProductId);
+ if(!shared)removeOrphanCarrefourReferenceV4133(previousProductId,ing.id);
  persist();closeModal();render(true);
- toast('Référence Carrefour retirée de « '+ing.name+' » sans créer de doublon.');
+ toast('Référence Carrefour supprimée de « '+ing.name+' ».');
  return true
 }
 function clearDailyCarrefourV413(id){
  const p=productById(id);
  if(!p||(!p.url&&!p.ean))return false;
- checkpoint('Avant retrait de lien Carrefour');
- // Seul le lien / EAN est détaché : nom, emballage, catégorie,
- // magasin, quantité, stock et achats déjà enregistrés restent inchangés.
+ if(!confirm('Supprimer définitivement la référence Carrefour de « '+p.name+' » ? Sa fiche Speedrive sera conservée.'))return false;
+ checkpoint('Avant suppression de référence Carrefour');
  p.url='';p.ean='';
  persist();closeModal();render(true);
- toast('Lien Carrefour retiré de « '+p.name+' », fiche conservée.');
+ toast('Référence Carrefour supprimée de « '+p.name+' », fiche conservée.');
  return true
 }
 function productBadge(p){

@@ -566,6 +566,19 @@ function catalogueFiltersV40({prefix,searchId,searchValue='',storeId,storeValue=
   '<div class="v40-filter-reset"><button type="button" data-action="v40-reset-filters" data-context="'+prefix+'">↺ Effacer les filtres</button></div></div>'
 }
 
+// V41.13 — le catalogue reste à la même hauteur lorsque l'on ouvre
+// ou enregistre une fiche, une référence Carrefour ou une association.
+let catalogueModalScrollV413=null,pendingCarrefourDailyIdV413=null;
+function showCatalogueModalV413(title,body){
+ if(catalogueModalScrollV413===null)
+  catalogueModalScrollV413=Math.max(0,Number(window.scrollY)||0);
+ showModal(title,body,false);
+ const y=catalogueModalScrollV413;
+ requestAnimationFrame(()=>{
+  if(currentTab==='produits'&&catalogueModalScrollV413===y)
+   window.scrollTo({top:y,behavior:'auto'});
+ });
+}
 function productById(id){return (state.products||[]).find(p=>p.id===id)}
 function validCarrefourLink(raw){
   const value=String(raw||'').trim();if(!value)return '';
@@ -605,14 +618,15 @@ function importCarrefourProductFromHash(){
   catch(error){toast('Import Carrefour impossible : '+String(error.message||'lien invalide'))}
   return true
 }
-function carrefourClipboardModal(ingredientId=null){
+function carrefourClipboardModal(ingredientId=null,dailyId=null){
  pendingIngredientLinkId=ingredientById(ingredientId)?.id||null;
+ pendingCarrefourDailyIdV413=productById(dailyId)?.id||null;
   const body='<div class="note"><strong>Depuis l’icône sur ton iPhone</strong><p>Sur Carrefour.fr, copie le produit avec notre bouton vert. Reviens ici avec l’icône Menus & Drive, puis appuie sur « Coller et vérifier ».</p></div>'+
     '<button class="btn wide" data-action="read-carrefour-clipboard" style="margin:13px 0">📋 Coller et vérifier le produit</button>'+
     '<div class="field"><label for="carrefourPaste">Si le collage automatique ne marche pas</label><textarea id="carrefourPaste" class="text-input" rows="3" placeholder="Appuie ici longtemps puis choisis Coller"></textarea></div>'+
     '<button class="btn secondary wide" data-action="import-pasted-carrefour">Vérifier le texte collé</button>'+
     '<p class="helper">L’import ne supprime aucune recette et ne modifie pas le panier Carrefour. La fiche doit encore être validée avant d’être enregistrée.</p>';
-  showModal('Importer un produit Carrefour',body)
+  showCatalogueModalV413('Importer un produit Carrefour',body)
 }
 function importCopiedCarrefourProduct(raw){
   try{
@@ -696,7 +710,9 @@ function catalogueEditor(kind,id=null,draft=null,linkedIngredientId=null){
   body+='<div class="catalogue-reference-panel" id="catalogueReferencePanel" '+(store==='grandfrais'?'hidden':'')+'>'+
    '<div class="field"><label for="catalogueLinkedProduct">Référence Carrefour associée (facultatif)</label>'+
    '<select id="catalogueLinkedProduct"><option value="">Aucune référence associée</option>'+referenceOptions+'</select></div>'+
-   '<p class="helper">La même référence sert à toutes les recettes contenant cet ingrédient.</p></div>';
+   '<p class="helper">La même référence sert à toutes les recettes contenant cet ingrédient. Son nom ne remplacera jamais celui de ton ingrédient.</p>'+
+   (linked?'<button type="button" class="btn secondary wide v413-clear-reference" data-action="v413-unlink-ingredient-carrefour" data-id="'+html(id)+'">✕ Retirer la référence Carrefour de cet ingrédient</button>':'')+
+   '</div>';
  }else{
   body+='<details class="daily-optional catalogue-advanced v38-pack-details" '+(store==='carrefour'||id||isImported||record.ean||record.brand?'open':'')+'><summary>📦 Contenu de l’unité achetée et référence Carrefour</summary>'+
    '<p class="helper v38-pack-warning">Un lien Carrefour ne suffit pas à connaître automatiquement le contenu d’un paquet ou d’une boîte. Renseigne le contenu pour convertir les quantités nécessaires aux recettes en nombre de paquets à acheter.</p>'+
@@ -709,6 +725,10 @@ function catalogueEditor(kind,id=null,draft=null,linkedIngredientId=null){
    '<div id="v38PackPreview" class="v38-pack-preview" aria-live="polite"></div>'+
    '<div class="field"><label for="catalogueEan">Code-barres EAN-13 (facultatif)</label><input id="catalogueEan" inputmode="numeric" maxlength="13" pattern="[0-9]{13}" value="'+html(record.ean||'')+'"></div>'+
    '<div class="field"><label for="catalogueUrl">Lien Carrefour (facultatif)</label><input id="catalogueUrl" type="url" maxlength="2000" value="'+html(record.url||'')+'"></div>'+
+   (id?'<div class="v413-reference-actions">'+
+    '<button type="button" class="btn secondary wide" data-action="v413-import-daily-carrefour" data-id="'+html(id)+'">📋 Charger une référence Carrefour sans renommer le produit</button>'+
+    ((record.url||record.ean)?'<button type="button" class="btn secondary wide v413-clear-reference" data-action="v413-clear-daily-carrefour" data-id="'+html(id)+'">✕ Retirer le lien Carrefour de ce produit</button>':'')+
+    '</div>':'')+
    '</div></details>';
  }
  body+='<button class="btn wide" type="submit">✓ Enregistrer le produit</button></form>';
@@ -719,7 +739,7 @@ function catalogueEditor(kind,id=null,draft=null,linkedIngredientId=null){
     '<button class="btn secondary wide" data-action="new-linked-product" data-id="'+html(id)+'">＋ Créer une référence Carrefour</button></div>';
  }
  if(id)body+='<button class="btn danger wide" style="margin-top:12px" data-action="'+(isIngredient?'delete-catalog-ingredient':'delete-product')+'" data-id="'+html(id)+'">Supprimer ce produit</button>';
- showModal(isImported?'Importer depuis Carrefour':id?'Gérer le produit':'Nouveau produit',
+ showCatalogueModalV413(isImported?'Importer depuis Carrefour':id?'Gérer le produit':'Nouveau produit',
   (isImported?'<div class="note">Vérifie les informations importées avant d’enregistrer. Aucun panier Carrefour n’est modifié.</div>':'')+body);
  previewCarrefourPackV38()
 }
@@ -801,7 +821,32 @@ function saveUnifiedCatalogue(e){
  if(catalogueTypeFilter!=='all'&&catalogueTypeFilter!==kind)catalogueTypeFilter='all';
  // Un produit modifié doit rester visible, même si le filtre était sur une autre catégorie.
  if(catalogueCategoryFilter!=='all'&&catalogueCategoryFilter!==category)catalogueCategoryFilter='all';
- persist();closeModal();render();toast('Produit enregistré !')
+ persist();closeModal();render(true);toast('Produit enregistré !')
+}
+function unlinkIngredientCarrefourV413(id){
+ const ing=ingredientById(id);
+ if(!ing||!ing.productId)return false;
+ checkpoint('Avant retrait de référence Carrefour');
+ ing.productId=null;
+ state.recipes.forEach(r=>(r.ingredients||[]).forEach(line=>{
+  if(line.ingredientId===ing.id)line.productId=null;
+ }));
+ // On conserve la référence dans le catalogue si d'autres fiches l'utilisent.
+ // Aucun produit, ingrédient, nom ou achat existant n'est supprimé.
+ persist();closeModal();render(true);
+ toast('Référence Carrefour retirée de « '+ing.name+' ». Le produit est conservé.');
+ return true
+}
+function clearDailyCarrefourV413(id){
+ const p=productById(id);
+ if(!p||(!p.url&&!p.ean))return false;
+ checkpoint('Avant retrait de lien Carrefour');
+ // Seul le lien / EAN est détaché : nom, emballage, catégorie,
+ // magasin, quantité, stock et achats déjà enregistrés restent inchangés.
+ p.url='';p.ean='';
+ persist();closeModal();render(true);
+ toast('Lien Carrefour retiré de « '+p.name+' », fiche conservée.');
+ return true
 }
 function productBadge(p){
  const cat=p?.category||'Autres',group=productGroup(p);
@@ -1712,8 +1757,21 @@ function renderDrive(){
  out+='<p class="helper drive-v29-footer">La liste des courses reste dans Courses. Ici, seules les références Carrefour prêtes sont transmises à Safari via Userscripts. Vérifie le magasin et le panier avant de poursuivre.</p>';
  return out
 }
-function showModal(title,body){modalRoot.innerHTML='<div class="modal-overlay" data-overlay="true"><div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle"><div class="modal-head"><h2 id="modalTitle">'+title+'</h2><button class="close-btn" aria-label="Fermer" data-action="close-modal">×</button></div>'+body+'</div></div>';const first=modalRoot.querySelector('input,button');if(first)first.focus()}
-function closeModal(){modalRoot.innerHTML='';pendingIngredientLinkId=null}
+function showModal(title,body,autoFocus=true){
+ modalRoot.innerHTML='<div class="modal-overlay" data-overlay="true"><div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle"><div class="modal-head"><h2 id="modalTitle">'+title+'</h2><button class="close-btn" aria-label="Fermer" data-action="close-modal">×</button></div>'+body+'</div></div>';
+ // Pas de focus automatique sur les inputs lors de la gestion du catalogue :
+ // iOS déplaçait la page derrière la fenêtre et ouvrait le clavier.
+ const first=modalRoot.querySelector(autoFocus?'input,button':'.close-btn');
+ if(first)first.focus({preventScroll:!autoFocus})
+}
+function closeModal(){
+ const anchored=catalogueModalScrollV413;
+ modalRoot.innerHTML='';pendingIngredientLinkId=null;pendingCarrefourDailyIdV413=null;
+ catalogueModalScrollV413=null;
+ if(anchored!==null&&currentTab==='produits'){
+  requestAnimationFrame(()=>window.scrollTo({top:anchored,behavior:'auto'}));
+ }
+}
 function selectOptions(values,value){return values.map(x=>'<option value="'+html(x)+'" '+(x===value?'selected':'')+'>'+html(x)+'</option>').join('')}
 function ingredientRow(item={name:'',qty:'',unit:'g'}){
  const ing=canonicalIngredient(item);
@@ -2865,12 +2923,15 @@ document.addEventListener('click',e=>{
    productEditor(null,{name:ing.name,brand:'',packaging:'',category:'Autres',store:'carrefour',qty:1,unit:'paquet',url:'',ean:'',packAmount:null,packUnit:null},ing.id)
   }
   else if(mode==='open-carrefour-import')carrefourClipboardModal();
+  else if(mode==='v413-import-daily-carrefour')carrefourClipboardModal(null,id);
+  else if(mode==='v413-unlink-ingredient-carrefour')unlinkIngredientCarrefourV413(id);
+  else if(mode==='v413-clear-daily-carrefour')clearDailyCarrefourV413(id);
   else if(mode==='import-linked-product')carrefourClipboardModal(id);
   else if(mode==='link-imported-existing'){
    const ing=ingredientById(a.dataset.ingredient),p=productById(id);if(!ing||!p)return;
    ing.productId=p.id;ing.store='carrefour';ing.frequent=Boolean(ing.frequent||p.frequent);
    state.recipes.forEach(r=>(r.ingredients||[]).forEach(x=>{if(x.ingredientId===ing.id)x.productId=p.id}));
-   persist();closeModal();render();toast('Référence Carrefour associée à '+ing.name+' !')
+   persist();closeModal();render(true);toast('Référence Carrefour associée à '+ing.name+' !')
   }
   else if(mode==='read-carrefour-clipboard')readCarrefourClipboard();
   else if(mode==='import-pasted-carrefour')importCopiedCarrefourProduct($('#carrefourPaste')?.value);

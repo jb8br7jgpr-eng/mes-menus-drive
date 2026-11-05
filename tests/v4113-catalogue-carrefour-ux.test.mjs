@@ -156,3 +156,73 @@ test('V41.13 : les trois actions sont proposées et la sauvegarde ne remonte plu
  assert.match(src,/function showModal\(title,body,autoFocus=true\)/);
  assert.match(css,/\.v413-clear-reference/);
 });
+
+function inlineCarrefourFixture(id='product1'){
+ const product={id:'product1',name:'Nom enregistré',url:'',ean:'',brand:'Marque actuelle'};
+ const state={products:[product]};
+ const inputs={
+  '#catalogueName':{value:'Nom personnalisé en cours de saisie'},
+  '#catalogueUrl':{value:''},
+  '#catalogueEan':{value:'9999999999999'},
+  '#catalogueEditorForm':{dataset:{kind:'daily',id}},
+  '#v413ReferenceStatus':{textContent:''}
+ };
+ const ctx={
+  CARREFOUR_CLIP_PREFIX:'MD-CARREFOUR-V1:',URL,state,
+  validCarrefourLink:raw=>{
+   const u=new URL(raw);
+   if(u.protocol!=='https:'||!(u.hostname==='carrefour.fr'||u.hostname.endsWith('.carrefour.fr')))
+    throw Error('Lien non Carrefour');
+   return u.href
+  },
+  $:query=>inputs[query]||null
+ };
+ const apply=runInNewContext(take('applyCarrefourToOpenProductV413','carrefourClipboardModal')+
+  ';applyCarrefourToOpenProductV413',ctx);
+ return {apply,inputs,product,state}
+}
+
+test('V41.13 : coller une référence dans une fiche garde le nom tapé même non enregistré',()=>{
+ const f=inlineCarrefourFixture();
+ const parsed='MD-CARREFOUR-V1:'+JSON.stringify(sample);
+ const output=f.apply(parsed);
+ assert.equal(output.url,sample.url);
+ assert.equal(f.inputs['#catalogueName'].value,'Nom personnalisé en cours de saisie');
+ assert.equal(f.product.name,'Nom enregistré');
+ assert.equal(f.inputs['#catalogueUrl'].value,sample.url);
+ assert.equal(f.inputs['#catalogueEan'].value,sample.ean);
+ assert.match(f.inputs['#v413ReferenceStatus'].textContent,/Le nom du produit est inchangé/);
+});
+
+test('V41.13 : une fiche non encore créée peut recevoir un lien sans modifier son nom',()=>{
+ const f=inlineCarrefourFixture('');
+ f.apply(sample.url);
+ assert.equal(f.inputs['#catalogueName'].value,'Nom personnalisé en cours de saisie');
+ assert.equal(f.inputs['#catalogueEan'].value,'','un lien sans EAN efface l’ancien code-barres du formulaire');
+ assert.equal(f.inputs['#catalogueUrl'].value,sample.url);
+});
+
+test('V41.13 : un lien déjà utilisé n’écrase ni la fiche ni le formulaire',()=>{
+ const f=inlineCarrefourFixture();
+ f.state.products.push({id:'other',name:'Déjà associé',url:sample.url,ean:sample.ean});
+ assert.throws(()=>f.apply('MD-CARREFOUR-V1:'+JSON.stringify(sample)),/déjà liée/);
+ assert.equal(f.inputs['#catalogueName'].value,'Nom personnalisé en cours de saisie');
+ assert.equal(f.inputs['#catalogueUrl'].value,'');
+ assert.equal(f.product.url,'');
+});
+
+test('V41.13 : une référence non Carrefour est refusée avant de remplir la fiche',()=>{
+ const f=inlineCarrefourFixture();
+ assert.throws(()=>f.apply('https://example.com/p/123'),/non Carrefour/);
+ assert.equal(f.inputs['#catalogueName'].value,'Nom personnalisé en cours de saisie');
+ assert.equal(f.inputs['#catalogueUrl'].value,'');
+});
+
+test('V41.13 : collage direct, pas de changement de fenêtre ni de réinitialisation de nom',()=>{
+ assert.match(src,/function applyCarrefourToOpenProductV413\(raw\)/);
+ assert.match(src,/function importCarrefourIntoOpenProductV413\(\)/);
+ assert.match(src,/data-action="v413-use-pasted-reference"/);
+ assert.match(src,/else if\(mode==='v413-import-daily-carrefour'\)void importCarrefourIntoOpenProductV413\(\)/);
+ assert.match(src,/data-action="v413-clear-daily-carrefour"/);
+ assert.match(css,/\.v413-reference-paste\[hidden\]/);
+});

@@ -11,7 +11,7 @@ function part(start,end){
 }
 const helpers=part('carrefourReferenceLinkedV4133','productBadge');
 const independent=part('independentProducts','productRows');
-const catalogue=part('unifiedCatalogueItems','catalogueIconV418');
+const catalogue=part('unifiedCatalogueSourceV4114','catalogueIconV418');
 const norm=s=>String(s||'').toLocaleLowerCase('fr').normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim();
 function fixture({ingredients,products,recipes=[],weeks={},stockV41=null,confirmResult=true}={}){
  const ing=ingredients??[{id:'ing1',name:'Moutarde',store:'carrefour',productId:'p1',category:'Sauces'}];
@@ -21,7 +21,9 @@ function fixture({ingredients,products,recipes=[],weeks={},stockV41=null,confirm
   recipes:structuredClone(recipes),weeks:structuredClone(weeks),storePreferences:{},
   ...(stockV41?{stockV41:structuredClone(stockV41)}:{})};
  const calls=[],ctx={state,norm,productSearch:'',catalogueTypeFilter:'all',catalogueStoreFilter:'all',
-  catalogueCategoryFilter:'all',catalogueSortV40:'name',ingredientStoreTab:'carrefour',
+  catalogueSortV40:'name',ingredientStoreTab:'carrefour',
+  categoryMatchesV4114:(category,selected)=>!selected.size||selected.has(category),
+  categorySelectionV4114:()=>new Set(),
   productById:id=>state.products.find(p=>p.id===id),
   ingredientById:id=>state.ingredientCatalog.find(p=>p.id===id),
   ingredientStore:i=>i.store||'carrefour',catalogueCategoryV40:i=>i.category||'Autres',

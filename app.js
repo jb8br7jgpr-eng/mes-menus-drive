@@ -854,8 +854,10 @@ function saveUnifiedCatalogue(e){
   const productId=$('#catalogueLinkedProduct')?.value||null;
   if(productId&&!productById(productId)){toast('Référence Carrefour introuvable.');return}
   const ing=old||makeIngredient(name,store,productId);if(!ing)return;
-  const previous=ing.name;
+  const previous=ing.name,previousProductId=ing.productId;
   Object.assign(ing,{name,store,category,qty,unit,frequent:frequent||(!old&&Boolean(productById(productId)?.frequent)),productId});
+  if(previousProductId&&previousProductId!==productId)
+   hideOrphanCarrefourReferenceV4133(previousProductId);
   if(state.storePreferences)delete state.storePreferences['ingredient:'+ing.id];
   state.recipes.forEach(r=>(r.ingredients||[]).forEach(x=>{
    if(x.ingredientId===ing.id||norm(x.name)===norm(previous)){
@@ -876,14 +878,18 @@ function saveUnifiedCatalogue(e){
      (norm(p.name)===norm(name)&&norm(p.brand)===norm(brand)&&norm(p.packaging)===norm(packaging))));
   if(duplicate){toast('Ce produit existe déjà. Modifie sa fiche plutôt que de créer un doublon.');return}
   const product={id:old?.id||uid(),name,brand,packaging,category,store,qty,unit,url,ean,packAmount,
-    packUnit:packAmount?packUnit:null,frequent};
+    packUnit:packAmount?packUnit:null,frequent,
+    ...(old?.carrefourReferenceHiddenV4133?{carrefourReferenceHiddenV4133:true}:{})};
   if(state.storePreferences)delete state.storePreferences['product:'+product.id];
   if(old)state.products=state.products.map(p=>p.id===old.id?product:p);else state.products.push(product);
   if(product.frequent)state.ingredientCatalog.forEach(x=>{if(x.productId===product.id)x.frequent=true});
   const ing=ingredientById(e.target.dataset.ingredientId);
   if(ing){
+   const previousProductId=ing.productId;
    ing.productId=product.id;ing.store='carrefour';ing.frequent=Boolean(ing.frequent||product.frequent);ingredientStoreTab='carrefour';
-   state.recipes.forEach(r=>(r.ingredients||[]).forEach(x=>{if(x.ingredientId===ing.id)x.productId=product.id}))
+   state.recipes.forEach(r=>(r.ingredients||[]).forEach(x=>{if(x.ingredientId===ing.id)x.productId=product.id}));
+   if(previousProductId&&previousProductId!==product.id)
+    hideOrphanCarrefourReferenceV4133(previousProductId)
   }
  }
  ingredientStoreTab=store;
@@ -1270,7 +1276,10 @@ function normalizeIngredientCatalog(){
     if(ing)changed=true
    }
    if(!ing)continue;
-   if(!ing.productId&&line.productId&&productById(line.productId)){ing.productId=line.productId;changed=true}
+   if(!ing.productId&&line.productId&&productById(line.productId)&&
+      !productById(line.productId).carrefourReferenceHiddenV4133){
+    ing.productId=line.productId;changed=true
+   }
    if(line.ingredientId!==ing.id){line.ingredientId=ing.id;changed=true}
   }
  }
@@ -1352,7 +1361,6 @@ function addBulkFavoritesV36(){
 }
 
 function frequentCatalogueItems(){
- const linked=new Set((state.ingredientCatalog||[]).map(i=>i.productId).filter(Boolean));
  return [
   ...(state.ingredientCatalog||[]).filter(i=>i.frequent).map(i=>({kind:'ingredient',id:i.id,name:i.name})),
   ...activeIndependentProductsV4133().filter(p=>p.frequent).map(p=>({kind:'daily',id:p.id,name:p.name}))
@@ -2261,7 +2269,6 @@ function editMealProductV412(index,productId){
 }
 function extraSearchItems(term=''){
  const needle=norm(term);
- const linked=new Set((state.ingredientCatalog||[]).map(i=>i.productId).filter(Boolean));
  return [
   ...(state.ingredientCatalog||[]).map(i=>({kind:'ingredient',id:i.id,name:i.name,store:ingredientStore(i),frequent:!!i.frequent})),
   ...activeIndependentProductsV4133().map(p=>({kind:'daily',id:p.id,name:p.name,store:p.store||'carrefour',frequent:!!p.frequent}))
@@ -2280,7 +2287,6 @@ function extraSearchResults(term=''){
 /* V37 — sélectionner et quantifier tous les ingrédients et achats du quotidien.
    Les nouvelles lignes utilisent le format extras déjà synchronisé par Firebase. */
 function bulkCatalogueV37(){
- const linked=new Set((state.ingredientCatalog||[]).map(i=>i.productId).filter(Boolean));
  const items=[
   ...(state.ingredientCatalog||[]).map(i=>{
    const unit=units.includes(i.unit)?i.unit:preferredIngredientUnit(i);
@@ -3072,11 +3078,17 @@ document.addEventListener('click',e=>{
   }
   else if(mode==='v413-unlink-ingredient-carrefour')unlinkIngredientCarrefourV413(id);
   else if(mode==='v413-clear-daily-carrefour')clearDailyCarrefourV413(id);
+  else if(mode==='v4133-hide-duplicate')hidePotentialDuplicateV4133(id);
+  else if(mode==='v4133-show-hidden')showHiddenReferencesV4133();
+  else if(mode==='v4133-restore-reference')restoreHiddenReferenceV4133(id);
   else if(mode==='import-linked-product')carrefourClipboardModal(id);
   else if(mode==='link-imported-existing'){
    const ing=ingredientById(a.dataset.ingredient),p=productById(id);if(!ing||!p)return;
+   const previousProductId=ing.productId;
    ing.productId=p.id;ing.store='carrefour';ing.frequent=Boolean(ing.frequent||p.frequent);
    state.recipes.forEach(r=>(r.ingredients||[]).forEach(x=>{if(x.ingredientId===ing.id)x.productId=p.id}));
+   if(previousProductId&&previousProductId!==p.id)
+    hideOrphanCarrefourReferenceV4133(previousProductId);
    persist();closeModal();render(true);toast('Référence Carrefour associée à '+ing.name+' !')
   }
   else if(mode==='read-carrefour-clipboard')readCarrefourClipboard();

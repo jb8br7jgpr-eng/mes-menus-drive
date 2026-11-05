@@ -1,0 +1,31 @@
+name: "Speedrive V41.13.3 — suppression Carrefour et non-régression"
+on:
+  push:
+    branches:
+      - speedrive-v41-13-3-references-sans-doublons
+      - developpement-v1
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Syntaxe JavaScript
+        run: |
+          node --check app.js
+          node --check tests/v41133-references-sans-doublons.test.mjs
+          node --check tests/v4113-catalogue-carrefour-ux.test.mjs
+      - name: Tests Speedrive et références Carrefour
+        run: |
+          node --test tests/*.test.mjs
+      - name: Vérification absence d’archives cachées
+        run: |
+          if grep -Eq 'carrefourReferenceHiddenV4133|Masquer doublon|v4133-show-hidden|v4133-hide-duplicate' app.js; then
+            echo "Mécanisme de masquage Carrefour encore présent"
+            exit 1
+          fi

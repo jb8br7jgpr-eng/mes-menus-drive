@@ -1204,3 +1204,16 @@
  color:#24516b!important;
  font-weight:750!important;
 }
+
+/* V41.13 — une référence Carrefour se détache sans supprimer la fiche produit. */
+.v413-reference-actions{display:grid;gap:8px;margin:8px 0 11px}
+.v413-reference-actions .btn,.v413-clear-reference{
+ min-height:41px;white-space:normal;text-align:center;
+}
+.v413-clear-reference{
+ border:1px solid #efd5cb!important;background:#fff6f2!important;
+ color:#9e4c38!important;
+}
+.v413-carrefour-import-notice{
+ margin:2px 0 15px;border-color:#cde5d3;
+}

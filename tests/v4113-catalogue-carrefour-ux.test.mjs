@@ -104,7 +104,9 @@ test('V41.13 : détacher Carrefour d’un ingrédient conserve les deux catalogu
  assert.equal(f.state.recipes[0].ingredients[0].productId,null);
  assert.equal(f.state.recipes[0].ingredients[0].name,'Ma fondue');
  assert.equal(f.state.recipes[0].ingredients[1].productId,'product2');
- assert.equal(JSON.stringify(f.state.products),initialProducts);
+ assert.equal(f.p1.carrefourReferenceHiddenV4133,true,'la référence technique ne doit pas devenir un achat indépendant');
+ assert.equal(JSON.stringify(f.state.products.map(({carrefourReferenceHiddenV4133,...p})=>p)),initialProducts,
+   'seul un indicateur de masquage est ajouté, aucune fiche supprimée');
  assert.equal(JSON.stringify(f.state.weeks),initialWeeks);
  assert.ok(f.actions.some(x=>x[0]==='persist'));
  assert.ok(f.actions.some(x=>x[0]==='render'&&x[1]===true));

@@ -4,6 +4,8 @@ import {readFileSync} from 'node:fs';
 import {runInNewContext} from 'node:vm';
 const js=readFileSync(new URL('../app.js',import.meta.url),'utf8');
 const css=readFileSync(new URL('../styles.css',import.meta.url),'utf8');
+const rayonSrc=readFileSync(new URL('../rayon-filters-v4114.js',import.meta.url),'utf8');
+const rayonLogic=rayonSrc.slice(0,rayonSrc.indexOf("document.addEventListener('click'"));
 function fragment(start,end){
  const a=js.indexOf(start),b=js.indexOf(end,a);
  assert.ok(a>=0&&b>a,start+' → '+end);return js.slice(a,b)
@@ -17,7 +19,7 @@ const state={
  {id:'p2',name:'Litière',store:'grandfrais',category:'Animaux',qty:1,unit:'paquet'}],
  storePreferences:{},recipes:[]};
 const html=s=>String(s).replaceAll('&','&amp;').replaceAll('"','&quot;');
-const helpers=runInNewContext(fragment('const catalogueSortChoicesV40=', 'function productById(')+
+const helpers=runInNewContext(fragment('const productCategoryGroups=', 'function productById(')+rayonLogic+
  ';({catalogueCategoryV40,catalogueSortCompareV40,catalogueFiltersV40,catalogueStoreLabelV40})',{
  state,html,selectOptions:(values,selected)=>values.map(v=>
  '<option value="'+html(v)+'" '+(v===selected?'selected':'')+'>'+html(v)+'</option>').join(''),
@@ -34,7 +36,10 @@ test('Les mêmes champs apparaissent dans Produits et dans Ajout des courses',()
   assert.ok(modal.includes(name),name);assert.ok(catalogue.includes(name),name);
  }
  assert.ok(modal.indexOf('id="v37BulkSearch"')<modal.indexOf('id="v40BulkStore"'));
- assert.ok(modal.indexOf('id="v40BulkStore"')<modal.indexOf('id="v40BulkCategory"'));
+ assert.ok(modal.indexOf('id="v40BulkStore"')<modal.indexOf('data-v4114-selector="courses"'));
+ assert.match(modal,/data-v4114-rayon/);
+ assert.match(catalogue,/data-v4114-child/);
+ assert.doesNotMatch(modal,/<select id="v40BulkCategory"/);
  assert.ok(!modal.includes('id="v37BulkFilter"'),'ancien filtre mélangeant magasin et favoris supprimé');
  assert.match(modal,/data-action="v40-reset-filters" data-context="courses"/);
  assert.match(catalogue,/data-action="v40-reset-filters" data-context="produits"/);
@@ -60,14 +65,15 @@ test('Un ingrédient lié peut utiliser une catégorie précise de sa référenc
  assert.equal(helpers.catalogueCategoryV40({category:'Épices et assaisonnements'},'boite'),'Épices et assaisonnements');
  assert.equal(JSON.stringify(ingredient),original);
 });
-test('Filtrer par magasin/catégorie/favoris conserve les autres sélections et quantités',()=>{
+test('Filtrer par magasin et catégories multiples conserve sélections et quantités',()=>{
+ const activeCategories=new Set();
  const entries=[
   {dataset:{store:'carrefour',category:'Œufs',name:'Œufs',kind:'ingredient',search:'oeufs',frequent:'false'},hidden:false,qty:4,selected:true},
   {dataset:{store:'grandfrais',category:'Fruits',name:'Bananes',kind:'ingredient',search:'bananes',frequent:'false'},hidden:false,qty:2,selected:false},
   {dataset:{store:'carrefour',category:'Papier et consommables',name:'Papier toilette',kind:'daily',search:'papier toilette',frequent:'true'},hidden:false,qty:3,selected:true}
  ];
  const controls={
-  v37BulkSearch:{value:''},v40BulkStore:{value:'carrefour'},v40BulkCategory:{value:'all'},
+  v37BulkSearch:{value:''},v40BulkStore:{value:'carrefour'},
   v40BulkSort:{value:'category'},v40BulkFrequent:{checked:false},
   v37BulkVisible:{textContent:''},v37BulkSubmit:{disabled:true,textContent:''},
   v37BulkStatus:{textContent:''}
@@ -82,20 +88,22 @@ test('Filtrer par magasin/catégorie/favoris conserve les autres sélections et 
  const code=fragment('function filterBulkV37(){','function stepBulkV37(');
  const filter=runInNewContext(code+';filterBulkV37',{
   modalRoot,norm:v=>String(v||'').toLowerCase(),
-  $:key=>controls[key.slice(1)]||null,catalogueSortCompareV40:helpers.catalogueSortCompareV40
+  $:key=>controls[key.slice(1)]||null,catalogueSortCompareV40:helpers.catalogueSortCompareV40,
+  categorySelectionV4114:()=>activeCategories,
+  categoryMatchesV4114:(category,selection)=>!selection.size||selection.has(category)
  });
  filter();
  assert.deepEqual(entries.map(x=>x.hidden),[false,true,false]);
  assert.equal(controls.v37BulkVisible.textContent,'2 résultats');
  assert.match(controls.v37BulkSubmit.textContent,/Ajouter 2 articles/);
  controls.v40BulkStore.value='grandfrais';
- controls.v40BulkCategory.value='Fruits';
+ activeCategories.add('Fruits');
  filter();
  assert.deepEqual(entries.map(x=>x.hidden),[true,false,true]);
  assert.equal(entries[0].qty,4);assert.equal(entries[2].qty,3);
  assert.equal(entries[0].selected,true);assert.equal(entries[2].selected,true);
  assert.equal(controls.v37BulkStatus.textContent,'2 articles sélectionnés');
- controls.v40BulkStore.value='all';controls.v40BulkCategory.value='all';
+ controls.v40BulkStore.value='all';activeCategories.clear();
  controls.v40BulkFrequent.checked=true;filter();
  assert.deepEqual(entries.map(x=>x.hidden),[true,true,false]);
 });

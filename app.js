@@ -855,6 +855,13 @@ function saveUnifiedCatalogue(e){
   if(productId&&!productById(productId)){toast('Référence Carrefour introuvable.');return}
   const ing=old||makeIngredient(name,store,productId);if(!ing)return;
   const previous=ing.name,previousProductId=ing.productId;
+  if(previousProductId&&previousProductId!==productId){
+   const shared=(state.ingredientCatalog||[]).some(i=>i.id!==ing.id&&i.productId===previousProductId);
+   if(!shared&&referenceUsedInMealsV4133(previousProductId)){
+    toast('Ancienne référence utilisée dans un repas. Retire-la du repas avant son remplacement.');return
+   }
+   if(!confirm('Remplacer la référence Carrefour précédente ? L’ancienne référence inutilisée sera définitivement supprimée.'))return
+  }
   Object.assign(ing,{name,store,category,qty,unit,frequent:frequent||(!old&&Boolean(productById(productId)?.frequent)),productId});
   if(previousProductId&&previousProductId!==productId)
    removeOrphanCarrefourReferenceV4133(previousProductId,ing.id);
@@ -877,6 +884,14 @@ function saveUnifiedCatalogue(e){
     ((ean&&p.ean===ean)||(url&&p.url&&p.url.split(/[?#]/)[0]===url.split(/[?#]/)[0])||
      (norm(p.name)===norm(name)&&norm(p.brand)===norm(brand)&&norm(p.packaging)===norm(packaging))));
   if(duplicate){toast('Ce produit existe déjà. Modifie sa fiche plutôt que de créer un doublon.');return}
+  const targetIngredient=ingredientById(e.target.dataset.ingredientId);
+  if(targetIngredient?.productId&&targetIngredient.productId!==old?.id){
+   const prior=targetIngredient.productId;
+   if(referenceUsedInMealsV4133(prior)&&!(state.ingredientCatalog||[]).some(i=>i.id!==targetIngredient.id&&i.productId===prior)){
+    toast('Ancienne référence utilisée dans un repas. Retire-la du repas avant son remplacement.');return
+   }
+   if(!confirm('Remplacer la référence Carrefour précédente ? L’ancienne référence inutilisée sera définitivement supprimée.'))return
+  }
   const product={id:old?.id||uid(),name,brand,packaging,category,store,qty,unit,url,ean,packAmount,
     packUnit:packAmount?packUnit:null,frequent};
   if(state.storePreferences)delete state.storePreferences['product:'+product.id];
@@ -3065,6 +3080,12 @@ document.addEventListener('click',e=>{
   else if(mode==='link-imported-existing'){
    const ing=ingredientById(a.dataset.ingredient),p=productById(id);if(!ing||!p)return;
    const previousProductId=ing.productId;
+   if(previousProductId&&previousProductId!==p.id){
+    if(referenceUsedInMealsV4133(previousProductId)&&!(state.ingredientCatalog||[]).some(i=>i.id!==ing.id&&i.productId===previousProductId)){
+     toast('Ancienne référence utilisée dans un repas. Retire-la du repas avant son remplacement.');return
+    }
+    if(!confirm('Remplacer la référence Carrefour précédente ? L’ancienne référence inutilisée sera définitivement supprimée.'))return
+   }
    ing.productId=p.id;ing.store='carrefour';ing.frequent=Boolean(ing.frequent||p.frequent);
    state.recipes.forEach(r=>(r.ingredients||[]).forEach(x=>{if(x.ingredientId===ing.id)x.productId=p.id}));
    if(previousProductId&&previousProductId!==p.id)

@@ -372,24 +372,19 @@ function normalRecipeType(value){
  if(recipeTypes.includes(value))return value;
  return legacyRecipeTypeAliases[value]||'legacy'
 }
-// V41.6 — recherche locale d'ingrédients déjà utilisés dans les recettes.
-// Rapproche les lignes historiques par nom, les références d'ingrédient et
-// les produits Carrefour/Grand Frais liés ; ne modifie jamais les données.
+// V41.13.1 — la recherche s'appuie sur le MÊME nom que la fiche du plat.
+// Les anciennes valeurs de recette et les titres commerciaux Carrefour
+// ne doivent pas créer de faux positifs quand ils ne sont pas affichés.
 function recipeIngredientNamesV416(recipe,ingredientCatalog=state.ingredientCatalog,products=state.products){
  const catalogue=Array.isArray(ingredientCatalog)?ingredientCatalog:[],
-  productList=Array.isArray(products)?products:[], names=new Map();
- const catalogueById=new Map(catalogue.map(x=>[x.id,x]));
- const productsById=new Map(productList.map(x=>[x.id,x]));
- const add=name=>{
-  const title=String(name||'').trim(),key=norm(title);
-  if(title&&key&&!names.has(key))names.set(key,title);
- };
+  catalogueById=new Map(catalogue.map(x=>[x.id,x])),names=new Map();
  for(const line of (Array.isArray(recipe?.ingredients)?recipe.ingredients:[])){
   if(!line)continue;
-  const ing=catalogueById.get(line.ingredientId)||
-   catalogue.find(x=>norm(x.name)===norm(line.name));
-  const product=productsById.get(line.productId)||productsById.get(ing?.productId);
-  add(line.name);add(ing?.name);add(product?.name);
+  // viewRecipeV33 affiche également ingredientById(line.ingredientId)?.name
+  // puis line.name. Garder cette priorité identique à l'interface.
+  const title=String((catalogueById.get(line.ingredientId)?.name||line.name)||'').trim();
+  const key=norm(title);
+  if(key&&!names.has(key))names.set(key,title);
  }
  return [...names.values()];
 }

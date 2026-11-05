@@ -91,8 +91,8 @@ test('V41.13.3 : masque et réaffichage sont réversibles, même lorsque la fich
  f.api.unlinkIngredientCarrefourV413('ing1');
  const before=JSON.stringify({...f.state.products[0]});
  assert.equal(f.api.restoreHiddenReferenceV4133('p1'),true);
- assert.deepEqual(visible(f),[{type:'daily',id:'p1',name:'Moutarde'},
-  {type:'ingredient',id:'ing1',name:'Moutarde'}]);
+ assert.deepEqual(visible(f),[{type:'ingredient',id:'ing1',name:'Moutarde'},
+  {type:'daily',id:'p1',name:'Moutarde'}]);
  assert.equal(f.state.products[0].ean,'1234567890123');
  assert.equal(f.state.products[0].carrefourReferenceHiddenV4133,undefined);
  assert.equal(f.api.restoreHiddenReferenceV4133('p1'),false);

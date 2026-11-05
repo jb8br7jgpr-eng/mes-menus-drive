@@ -557,7 +557,7 @@ function catalogueFiltersV40({prefix,searchId,searchValue='',storeId,storeValue=
   '<div class="field"><label for="'+storeId+'">Magasin</label><select id="'+storeId+'">'+catalogueStoreOptionsV40(storeValue)+'</select></div>'+
 
   '<div class="field v40-filter-sort"><label for="'+sortId+'">Trier par</label><select id="'+sortId+'">'+catalogueSortOptionsV40(sortValue)+'</select></div>'+
-  '</div>'+catalogueRayonMarkupV4114(prefix,categories,items)+extra+
+  '</div>'+catalogueRayonMarkupV4114(prefix,categories,items,storeValue)+extra+
   '<div class="v40-filter-reset"><button type="button" data-action="v40-reset-filters" data-context="'+prefix+'">↺ Effacer les filtres</button></div></div>'
 }
 
@@ -907,11 +907,12 @@ function saveUnifiedCatalogue(e){
   }
  }
  ingredientStoreTab=store;
- if(catalogueStoreFilter!=='all')catalogueStoreFilter=store;
- if(catalogueTypeFilter!=='all'&&catalogueTypeFilter!==kind)catalogueTypeFilter='all';
- // Un produit modifié doit rester visible, même si le filtre était sur une autre catégorie.
- if(categorySelectionV4114('produits').size&&!categorySelectionV4114('produits').has(category))categorySelectionV4114('produits').clear();
- persist();closeModal();render(true);toast('Produit enregistré !')
+ // Garder exactement les filtres choisis, même si le produit édité
+ // ne correspond plus au rayon, au type ou au magasin sélectionné.
+ const rayonUiV4115=captureCatalogueRayonUiV4115('produits');
+ persist();closeModal();render(true);
+ restoreCatalogueRayonUiV4115('produits',rayonUiV4115);
+ toast('Produit enregistré !')
 }
 // V41.13.3 : supprimer réellement la référence, jamais la masquer.
 function carrefourReferenceLinkedV4133(id){
@@ -1157,7 +1158,8 @@ function refreshCatalogueV40(){
  const result=$('#catalogueResults'),count=$('#catalogueCount');
  if(result)result.innerHTML=unifiedCatalogueRows();
  if(count){const n=unifiedCatalogueItems().length;count.textContent=n+' produit'+(n>1?'s':'')}
- syncCatalogueRayonsV4114('produits')
+ syncCatalogueRayonsV4114('produits');
+ refreshCatalogueRayonCountsV4115('produits',unifiedCatalogueSourceV4114(),catalogueStoreFilter)
 }
 function chooseUnifiedProductType(){
  const suggested=catalogueTypeFilter==='daily'?'daily':'ingredient';
@@ -2398,6 +2400,10 @@ function filterBulkV37(){
   row.hidden=!show;if(show)visible++;
   list.appendChild(row)
  });
+ // On ne reconstruit ni les lignes, ni les cases cochées lors d'un changement de magasin.
+ if(typeof refreshCatalogueRayonCountsV4115==='function')refreshCatalogueRayonCountsV4115('courses',rows.map(row=>({
+  kind:row.dataset.kind,id:row.dataset.id,category:row.dataset.category,store:row.dataset.store
+ })),store);
  const result=$('#v37BulkVisible');
  if(result)result.textContent=visible+' résultat'+(visible>1?'s':'')+(visible===0?' · aucun article pour ces filtres':'');
  updateBulkV37()

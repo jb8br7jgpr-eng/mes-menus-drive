@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Menus & Drive — Diagnostic Carrefour (lecture seule)
 // @namespace    https://github.com/jb8br7jgpr-eng/mes-menus-drive
-// @version      0.9.0
-// @description  Constitue le panier Drive et présente un bilan clair des articles ajoutés, présents ou manquants. Aucun paiement.
+// @version      0.10.0
+// @description  Constitue le panier Drive et affiche le nom Speedrive des articles ajoutés, présents ou manquants. Aucun paiement.
 // @match        https://www.carrefour.fr/*
 // @match        https://carrefour.fr/*
 // @run-at       document-idle
@@ -225,13 +225,18 @@
       if(sourceLines.length>200)throw Error('Maximum 200 lignes.');
       const totals=new Map();
       for(const line of sourceLines){
-        const match=line.match(/^(\d{13})[\s;,]+([1-9]\d{0,2})$/);
-        if(!match)throw Error('Format attendu : 13 chiffres puis la quantité, par exemple 3270190010000 2.');
-        const ean=match[1],qty=Number(match[2]),total=(totals.get(ean)||0)+qty;
-        if(total>999)throw Error('Quantité trop grande pour '+ean+'.');
-        totals.set(ean,total);
+        // V1 : "EAN quantité". V2 : "EAN quantité | nom Speedrive".
+        // Les noms ne modifient jamais les EAN ou les quantités envoyés au panier.
+        const match=line.match(/^(\d{13})[\s;,]+([1-9]\d{0,2})(?:\s*\|\s*(.{1,100}))?$/);
+        if(!match)throw Error('Format attendu : 13 chiffres, quantité, nom facultatif après |. Ex. 3270190010000 2 | Moutarde.');
+        const ean=match[1],qty=Number(match[2]),name=String(match[3]||'').trim();
+        const record=totals.get(ean)||{ean,qty:0,name:''};
+        record.qty+=qty;
+        if(record.qty>999)throw Error('Quantité trop grande pour '+ean+'.');
+        if(!record.name&&name)record.name=name;
+        totals.set(ean,record);
       }
-      return {rows:[...totals].map(([ean,qty])=>({ean,qty})).sort((a,b)=>a.ean.localeCompare(b.ean))};
+      return {rows:[...totals.values()].sort((a,b)=>a.ean.localeCompare(b.ean))};
     }
     function renderPreview(data){
       previewRows=data.rows;
@@ -252,10 +257,10 @@
       for(const item of data.rows){
         const line=document.createElement('div');line.className='line';
         const headline=document.createElement('strong');
-        headline.textContent=item.ean;
+        headline.textContent=item.name||'Référence '+item.ean;
         headline.className='greenTxt';
         const extra=document.createElement('small');
-        extra.textContent='Quantité : '+item.qty;
+        extra.textContent='EAN : '+item.ean+' · Quantité : '+item.qty;
         line.append(headline,extra);
         listPreview.append(line);
       }
@@ -304,7 +309,7 @@
     }
     function drawVerified(item,qty){
       const el=document.createElement('div');el.className='line';
-      const title=document.createElement('strong');title.textContent=item.name||item.ean;
+      const title=document.createElement('strong');title.textContent=previewRows.find(x=>x.ean===item.ean)?.name||item.name||item.ean;
       const details=document.createElement('small');
       details.textContent='EAN : '+item.ean+' · Quantité : '+qty+
         (item.brand?' · '+item.brand:'')+(item.price?' · Prix indicatif : '+item.price:'');
@@ -471,7 +476,7 @@
         for(const item of group.rows){
           const expected=previewRows.find(x=>x.ean===item.ean);
           const row=create('div','summary-product '+group.klass);
-          row.append(create('div','product-name',item.name||'Référence '+item.ean));
+          row.append(create('div','product-name',expected?.name||item.name||'Référence '+item.ean));
           const quantities='Demandé : '+(expected?.qty??'?')+
             (Number.isInteger(item.finalQty)?' · Dans le panier : '+item.finalQty:'');
           row.append(create('div','product-meta','EAN '+item.ean+' · '+quantities));

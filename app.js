@@ -1727,24 +1727,38 @@ function driveTransferRows(){
  });
 }
 function driveTransferLines(){
- // Seules les références complètes avec un nombre entier de colis sont exportées.
- // Les occurrences d’un même EAN sont regroupées pour ne pas multiplier les lignes.
+ // Les occurrences d'un même EAN sont regroupées. Le nom envoyé est celui
+ // enregistré dans Speedrive, jamais un intitulé fourni par Carrefour.
  const grouped=new Map();
  for(const item of driveTransferRows().filter(x=>x.ready)){
-  grouped.set(item.ean,(grouped.get(item.ean)||0)+item.qty);
+  const label=String(item.name||'').trim().replace(/[\r\n|]+/g,' ').replace(/\s+/g,' ').slice(0,100);
+  const existing=grouped.get(item.ean);
+  if(existing){
+   existing.qty+=item.qty;
+   if(!existing.name&&label)existing.name=label;
+  }else grouped.set(item.ean,{ean:item.ean,qty:item.qty,name:label});
  }
- return [...grouped.entries()].sort((a,b)=>a[0].localeCompare(b[0])).map(([ean,qty])=>({ean,qty}));
+ return [...grouped.values()].sort((a,b)=>a.ean.localeCompare(b.ean));
 }
-function driveTransferText(){
+function driveTransferLegacyText(){
  return driveTransferLines().map(x=>x.ean+' '+x.qty).join('\n');
 }
-// Un lien extérieur transmet seulement les EAN et quantités via le fragment d'URL.
+function driveTransferText(){
+ // Format V2 lisible ET compatible avec le collage manuel :
+ // EAN quantité | nom Speedrive. Aucun nom n'influence l'EAN envoyé au panier.
+ return driveTransferLines().map(x=>x.ean+' '+x.qty+(x.name?' | '+x.name:'')).join('\n');
+}
+// Le transfert V2 donne au script Safari les noms à afficher dans son bilan.
+// Si le lien devient trop long pour l'iPhone, le format historique V1 est
+// conservé comme secours pour ne pas casser l'ajout au panier.
 function driveDirectUrl(){
- const lines=driveTransferLines(),text=driveTransferText();
+ const lines=driveTransferLines();
  if(!lines.length||lines.length>120)return '';
- const encoded=encodeURIComponent(text);
- if(encoded.length>2900)return ''; // Garde une URL courte pour Safari iPhone.
- return 'https://www.carrefour.fr/#md-drive-v1='+encoded;
+ const labeled=encodeURIComponent(driveTransferText());
+ if(labeled.length<=2900)return 'https://www.carrefour.fr/#md-drive-v2='+labeled;
+ const legacy=encodeURIComponent(driveTransferLegacyText());
+ if(legacy.length<=2900)return 'https://www.carrefour.fr/#md-drive-v1='+legacy;
+ return '';
 }
 // Sur l'iPhone, les liens HTTPS externes d'une PWA peuvent s'ouvrir dans un
 // navigateur intégré sans extension Safari. On utilise alors l'URL scheme Safari.
@@ -1778,8 +1792,8 @@ function driveListModal(){
  body+='<div class="row between" style="margin:12px 0"><span class="pill">'+lines.length+' code'+(lines.length>1?'s':'')+' à copier</span><span class="pill">'+missing.length+' produit'+(missing.length>1?'s':'')+' à préciser</span></div>';
  body+=driveDirectUrl()?'<button class="btn wide" data-action="open-drive-in-safari">🛒 Constituer mon panier Carrefour</button>':'<div class="note">La liste est trop longue pour un lien direct ou aucun produit n’est prêt. Utilise la copie de secours.</div>';
  body+='<button class="btn secondary wide" style="margin-top:10px" data-action="copy-drive-url" '+(!driveDirectUrl()?'disabled':'')+'>🔗 Copier le lien pour Safari (secours)</button>';
- body+='<button class="btn secondary wide" style="margin-top:9px" data-action="copy-drive-transfer" '+(!lines.length?'disabled':'')+'>📋 Copier les codes-barres (autre secours)</button>';
- body+='<div class="field" style="margin-top:12px"><label for="driveTransferFallback">Aperçu du texte à copier</label><textarea class="text-input" id="driveTransferFallback" rows="5" readonly>'+html(driveTransferText())+'</textarea><div class="helper">Si la copie automatique est bloquée : appui long → Tout sélectionner → Copier.</div></div>';
+ body+='<button class="btn secondary wide" style="margin-top:9px" data-action="copy-drive-transfer" '+(!lines.length?'disabled':'')+'>📋 Copier la liste avec les noms (secours)</button>';
+ body+='<div class="field" style="margin-top:12px"><label for="driveTransferFallback">Liste des références, quantités et noms à copier</label><textarea class="text-input" id="driveTransferFallback" rows="5" readonly>'+html(driveTransferText())+'</textarea><div class="helper">Si la copie automatique est bloquée : appui long → Tout sélectionner → Copier.</div></div>';
  body+='<div class="note"><strong>Sur iPhone</strong>, le bouton tente d’ouvrir directement Safari (pas la fenêtre intégrée). Si Safari ne s’ouvre pas, copie le lien de secours et colle-le dans sa barre d’adresse. Aucun paiement automatique.</div>';
  if(!lines.length)body+='<p class="helper">Aucune référence exploitable : associe des produits Carrefour aux ingrédients et indique leur conditionnement avant de transférer.</p>';
  if(missing.length)body+='<div class="section-head"><h3>Non transférés — à compléter</h3></div>'+missing.slice(0,25).map(x=>'<div class="shopping-row"><div class="grow"><strong>'+html(x.name)+'</strong><div class="shopping-meta">'+html(x.reason)+'</div></div><span class="pill gray">'+html(quantity(x.qty,x.unit))+'</span></div>').join('')+(missing.length>25?'<p class="helper">Et '+(missing.length-25)+' autres lignes.</p>':'');
@@ -1789,7 +1803,7 @@ async function copyDriveTransfer(){
  const text=driveTransferText();
  if(!text){toast('Aucun code-barres transférable : complète les références manquantes.');return}
  if(text.length>60000){toast('Liste trop volumineuse.');return}
- try{await navigator.clipboard.writeText(text);toast('Codes et quantités copiés ! Ouvre Carrefour dans Safari.')}
+ try{await navigator.clipboard.writeText(text);toast('Références, quantités et noms copiés ! Ouvre Carrefour dans Safari.')}
  catch(e){toast('Utilise le champ de copie manuelle.');$('#driveTransferFallback')?.focus()}
 }
 function renderDrive(){

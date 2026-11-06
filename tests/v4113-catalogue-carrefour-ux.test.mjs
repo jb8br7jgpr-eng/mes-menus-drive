@@ -134,7 +134,7 @@ test('V41.13 : détacher deux fois n’écrase aucune donnée et ne génère pas
 
 test('V41.13 : ouvrir et fermer une fiche préserve la hauteur du catalogue',()=>{
  const target={innerHTML:''},calls=[],ctx={
-  catalogueModalScrollV413:null,pendingCarrefourDailyIdV413:null,pendingIngredientLinkId:null,
+  catalogueModalScrollV413:null,uxModalPositionV4115:null,pendingCarrefourDailyIdV413:null,pendingIngredientLinkId:null,
   currentTab:'produits',window:{scrollY:730,scrollTo:args=>calls.push(args)},
   modalRoot:target,showModal:(title,body,focus)=>calls.push({title,focus}),
   requestAnimationFrame:callback=>callback()

@@ -28,14 +28,16 @@ test('V41.12.2 : le bouton Compte et sauvegardes garde un gestionnaire quand le 
  assert.match(ui,/Récupérer la version du serveur sur cet iPhone/);
  assert.match(ui,/loadServerDiscardingLocalDraft\("ABANDONNER_LE_BROUILLON"\)/);
 });
-test('V41.14.1 : ressources préparées et même session Firebase',()=>{
+test('V41.15 : ressources préparées et même session Firebase',()=>{
  assert.match(index,/styles\.css\?v=20261106-41-14-stage/);
- assert.match(index,/app\.js\?v=20261106-41-14-1-stage/);
+ assert.match(index,/app\.js\?v=20261106-41-15-ux-stage/);
  assert.match(index,/firebase\/v34-ui\.js\?v=20261104-41-12-2-release/);
- assert.match(sw,/CACHE='menus-drive-v41-14-1-magasin-compteurs-20261106'/);
+ assert.match(sw,/CACHE='menus-drive-v41-15-ux-20261106'/);
  assert.match(sw,/styles\.css\?v=20261106-41-14-stage/);
- assert.match(sw,/app\.js\?v=20261106-41-14-1-stage/);
+ assert.match(sw,/app\.js\?v=20261106-41-15-ux-stage/);
  assert.match(index,/rayon-filters-v4114\.js\?v=20261106-41-14-1-stage/);
+ assert.match(index,/ux-v4115\.js\?v=20261106-41-15-ux-stage/);
+ assert.match(sw,/ux-v4115\.js\?v=20261106-41-15-ux-stage/);
  assert.match(sw,/rayon-filters-v4114\.js\?v=20261106-41-14-1-stage/);
  assert.doesNotMatch(index,/app\.js\?v=20261105-41-13-2-release/);
  assert.doesNotMatch(index,/v34-ui\.js\?v=20261104-41-12-1-release/);

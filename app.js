@@ -1893,7 +1893,7 @@ function renderDrive(){
   (items.length&&!url?'<p class="helper">Le transfert direct nécessite au moins une référence prête et une liste compatible avec Safari.</p>':'')+
   '</div>';
  if(missing.length){
-  out+='<details class="drive-v29-details drive-v29-warnings" open><summary>⚠️ '+missing.length+' référence'+(missing.length>1?'s':'')+' à compléter</summary>'+
+  out+='<details class="drive-v29-details drive-v29-warnings" data-ux-key="warnings" open><summary>⚠️ '+missing.length+' référence'+(missing.length>1?'s':'')+' à compléter</summary>'+
   '<div class="drive-v29-details-body"><p class="helper">Ces produits ne seront pas ajoutés automatiquement au panier.</p>'+
   missing.map(x=>'<div class="drive-preflight-item"><div class="grow"><strong>'+html(x.name)+'</strong><p>'+html(x.reason)+'</p></div>'+
     '<button class="btn tiny secondary" data-action="fix-drive-item" data-id="'+html(x.id)+'">Compléter</button></div>').join('')+
@@ -1901,12 +1901,12 @@ function renderDrive(){
  }else if(transfers.length){
   out+='<p class="drive-v29-complete">✓ Toutes les références sélectionnées sont prêtes pour la vérification Carrefour.</p>'
  }
- out+='<details class="drive-v29-details"><summary>Voir mes '+items.length+' article'+(items.length!==1?'s':'')+' Carrefour</summary>'+
+ out+='<details class="drive-v29-details" data-ux-key="articles"><summary>Voir mes '+items.length+' article'+(items.length!==1?'s':'')+' Carrefour</summary>'+
   '<div class="drive-v29-details-body">'+
   (items.length?items.map(x=>'<div class="drive-v29-item"><span>'+html(x.name)+'</span><strong>'+html(quantity(x.qty,x.unit))+'</strong></div>').join(''):
    '<p class="helper">Aucun article prévu chez Carrefour pour cette semaine.</p>')+
   '</div></details>';
- out+='<details class="drive-v29-details"><summary>Options de secours et vérification</summary>'+
+ out+='<details class="drive-v29-details" data-ux-key="options"><summary>Options de secours et vérification</summary>'+
   '<div class="drive-v29-details-body"><p class="helper">Si Safari ne s’ouvre pas ou qu’un produit est indisponible, retrouve ici les codes-barres, la copie manuelle et les informations nécessaires.</p>'+
   '<button class="btn secondary wide" data-action="prepare-drive-transfer" '+(!items.length?'disabled':'')+'>📋 Détails et copie de secours</button>'+
   '<a class="btn secondary wide" style="margin-top:9px" href="https://www.carrefour.fr/" target="_blank" rel="noopener noreferrer">Ouvrir Carrefour ↗</a>'+

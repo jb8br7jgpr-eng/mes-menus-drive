@@ -122,7 +122,7 @@ test('V41.15.3 : le blocage affiche l’action depuis une fiche nouvelle ou déj
 });
 
 test('V41.15.3 : supprimer l’ingrédient informe explicitement que la référence reste',()=>{
- assert.match(src,/La référence Carrefour/); // le parseur existant reste compatible
+ assert.match(src,/Sa référence Carrefour/);
  assert.match(src,/RESTERA dans Produits comme fiche distincte/);
  assert.match(src,/state\.ingredientCatalog=state\.ingredientCatalog\.filter/);
  assert.match(src,/function removeOrphanCarrefourReferenceV4133/);

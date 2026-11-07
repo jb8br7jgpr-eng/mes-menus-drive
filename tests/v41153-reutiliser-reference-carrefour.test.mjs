@@ -12,13 +12,13 @@ function take(start,end){
 }
 const makeNode=(tag='div')=>({
  tag,type:'',className:'',textContent:'',hidden:false,dataset:{},
- children:[],replaceChildren(...nodes){this.children=nodes},
+ children:[],replaceChildren(...nodes){this.children=nodes},append(node){this.children.push(node)},
  insertAdjacentElement(pos,node){this.inserted={pos,node}}
 });
 function fixture({accepted=true,missing=false}={}){
  const product={id:'p1',name:'Beurre salé',url:'https://www.carrefour.fr/p/beurre-tendre-3451790988813',
   ean:'3451790988813',brand:'ELLE & VIRE',packaging:'250 g'};
- const state={products:missing?[]:[product]};
+ const state={products:missing?[]:[product],ingredientCatalog:[],weeks:{},recipes:[],storePreferences:{}};
  let editorId='',writes=0,confirmText='',persistCalls=0;
  const box=makeNode(),panel={hidden:true};
  const input=(value)=>({value});
@@ -34,7 +34,7 @@ function fixture({accepted=true,missing=false}={}){
  };
  const toasts=[];
  const ctx={
-  $:k=>nodes[k]||null,document:{createElement:makeNode},
+  state,$:k=>nodes[k]||null,document:{createElement:makeNode},
   productById:id=>state.products.find(p=>p.id===id),
   confirm:message=>{confirmText=message;return accepted},
   toast:x=>toasts.push(x),
@@ -121,10 +121,11 @@ test('V41.15.3 : le blocage affiche l’action depuis une fiche nouvelle ou déj
  assert.match(css,/\.v41153-conflict\[hidden\]\{display:none!important\}/);
 });
 
-test('V41.15.3 : supprimer l’ingrédient informe explicitement que la référence reste',()=>{
+test('V41.15.3 : supprimer une fiche supprime aussi sa référence non partagée',()=>{
  assert.match(src,/Sa référence Carrefour/);
- assert.match(src,/RESTERA dans Produits comme fiche distincte/);
- assert.match(src,/state\.ingredientCatalog=state\.ingredientCatalog\.filter/);
+ assert.match(src,/son lien et son EAN seront aussi supprimés/);
+ assert.match(src,/function deleteCatalogIngredientV41153\(id\)/);
+ assert.match(src,/deleteCarrefourProductFromStateV41153\(pid\)/);
  assert.match(src,/function removeOrphanCarrefourReferenceV4133/);
 });
 

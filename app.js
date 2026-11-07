@@ -687,6 +687,111 @@ function importCarrefourProductFromHash(){
 // V41.15.3 — un EAN n'appartient qu'à une seule fiche produit dans Speedrive.
 // Une référence reste parfois enregistrée après suppression de son ingrédient.
 // Proposer une action concrète et sans écriture plutôt qu'un blocage obscur.
+
+// V41.15.3 — Suppression réelle dans le catalogue actif, jamais une archive cachée.
+// Les références partagées restent attachées aux AUTRES fiches encore présentes.
+// Les achats saisis sont préservés avec leur nom/quantité, mais sans ancien EAN.
+function deleteCarrefourProductFromStateV41153(id){
+ const product=productById(id);
+ if(!product)return false;
+ state.products=state.products.filter(p=>p.id!==id);
+ if(state.storePreferences)delete state.storePreferences['product:'+id];
+ (state.ingredientCatalog||[]).forEach(ing=>{if(ing.productId===id)ing.productId=null});
+ (state.recipes||[]).forEach(r=>(r.ingredients||[]).forEach(x=>{
+  if(x.productId===id)x.productId=null
+ }));
+ Object.values(state.weeks||{}).forEach(w=>{
+  (w.extras||[]).forEach(x=>{
+   if(x.productId!==id)return;
+   if(!x.name)x.name=product.name;
+   x.productId=null;
+   x.fromCatalogue=false
+  });
+  (w.generatedIngredients||[]).forEach(x=>{if(x.productId===id)x.productId=null});
+  (w.meals||[]).forEach((meal,index)=>{
+   if(!Array.isArray(meal?.products))return;
+   const remaining=meal.products.filter(x=>x.productId!==id);
+   if(remaining.length===meal.products.length)return;
+   if(!remaining.length&&meal.type==='products')w.meals[index]=null;
+   else if(remaining.length)meal.products=remaining;
+   else delete meal.products
+  })
+ });
+ if(state.stockV41?.items){
+  for(const [key,item] of Object.entries(state.stockV41.items))
+   if(item?.identity==='product:'+id)delete state.stockV41.items[key]
+ }
+ return true
+}
+function deleteCatalogIngredientV41153(id){
+ const ing=ingredientById(id);
+ if(!ing)return false;
+ if((state.recipes||[]).some(r=>(r.ingredients||[]).some(x=>
+  x.ingredientId===id||norm(x.name)===norm(ing.name)))){
+  toast('Cet ingrédient est utilisé dans des recettes. Retire-le d’abord des plats concernés.');
+  return false
+ }
+ const pid=ing.productId,product=productById(pid);
+ const others=pid?(state.ingredientCatalog||[]).filter(x=>x.id!==id&&x.productId===pid):[];
+ const planned=product&&!others.length?Object.values(state.weeks||{}).reduce((n,w)=>
+  n+(w.meals||[]).reduce((m,meal)=>m+(meal?.products||[]).filter(x=>x.productId===pid).length,0),0):0;
+ const stocked=Object.values(state.stockV41?.items||{}).some(x=>
+  x?.identity==='ingredient:'+id||(product&&!others.length&&x?.identity==='product:'+pid));
+ const message='Supprimer définitivement « '+ing.name+' » ? '+
+  (product?(others.length
+   ?'La référence Carrefour est aussi utilisée par '+others.map(x=>'« '+x.name+' »').join(', ')+
+     ' : elle restera UNIQUEMENT pour ces autres fiches.'
+   :'Sa référence Carrefour « '+product.name+' », son lien et son EAN seront aussi supprimés.')
+   :'')+
+  (planned?' '+planned+' article(s) directement planifié(s) avec cette référence seront retirés des menus.':'')+
+  (stocked?' Le stock lié à cette fiche sera également supprimé.':'')+
+  ' Les achats déjà ajoutés resteront avec leur nom et leur quantité, sans lien vers cette fiche.';
+ if(!confirm(message))return false;
+ checkpoint('Avant suppression définitive d’un ingrédient et sa référence');
+ // Détacher toute trace de l’ingrédient supprimé des achats historiques/actuels.
+ Object.values(state.weeks||{}).forEach(w=>{
+  (w.extras||[]).forEach(x=>{
+   if(x.ingredientId!==id)return;
+   if(!x.name)x.name=ing.name;
+   x.ingredientId=null;
+   x.productId=null;
+   x.fromCatalogue=false
+  });
+  (w.generatedIngredients||[]).forEach(x=>{
+   if(x.ingredientId===id){x.ingredientId=null;x.productId=null}
+  })
+ });
+ state.ingredientCatalog=state.ingredientCatalog.filter(x=>x.id!==id);
+ if(state.storePreferences)delete state.storePreferences['ingredient:'+id];
+ if(state.stockV41?.items){
+  for(const [key,item]of Object.entries(state.stockV41.items))
+   if(item?.identity==='ingredient:'+id)delete state.stockV41.items[key]
+ }
+ // Plus aucun ingrédient n’utilise cette référence : retirer aussi sa fiche
+ // Carrefour, ses identifiants dans les achats et ses usages dans les menus.
+ if(product&&!others.length)deleteCarrefourProductFromStateV41153(pid);
+ persist();closeModal();render(true);
+ toast('Fiche supprimée. '+(product&&!others.length?'Référence Carrefour et EAN retirés du catalogue actif.':'Référence partagée conservée seulement pour les autres fiches.'));
+ return true
+}
+function deleteCatalogProductV41153(id){
+ const p=productById(id);
+ if(!p)return false;
+ const linked=(state.ingredientCatalog||[]).filter(x=>x.productId===id);
+ const planned=Object.values(state.weeks||{}).reduce((n,w)=>
+  n+(w.meals||[]).reduce((m,meal)=>m+(meal?.products||[]).filter(x=>x.productId===id).length,0),0);
+ const stocked=Object.values(state.stockV41?.items||{}).some(x=>x?.identity==='product:'+id);
+ if(!confirm('Supprimer définitivement la fiche « '+p.name+' », son EAN et son lien Carrefour ?'+
+  (linked.length?' La référence sera détachée de '+linked.map(x=>'« '+x.name+' »').join(', ')+'.':'')+
+  (planned?' '+planned+' article(s) directement planifié(s) seront retirés des menus.':'')+
+  (stocked?' Le stock lié à ce produit sera supprimé.':'')+
+  ' Les achats saisis resteront avec leur nom et leur quantité.'))return false;
+ checkpoint('Avant suppression définitive d’un produit Carrefour');
+ deleteCarrefourProductFromStateV41153(id);
+ persist();closeModal();render(true);
+ toast('Produit, lien Carrefour et EAN supprimés du catalogue actif.');
+ return true
+}
 function showCarrefourExistingReferenceV41153(duplicate){
  const box=$('#v41153ReferenceConflict');
  if(!box||!duplicate)return false;
@@ -3227,20 +3332,7 @@ document.addEventListener('click',e=>{
    w.extras.push({id:uid(),ingredientId:ing.id,productId:ing.productId||null,name:ing.name,qty,unit});
    persist();closeModal();tabScrollV33.courses=0;switchTabV33('courses');toast(ing.name+' ajouté aux courses !')
   }
-  else if(mode==='delete-catalog-ingredient'){
-   const ing=ingredientById(id);if(!ing)return;
-   if(state.recipes.some(r=>(r.ingredients||[]).some(x=>x.ingredientId===id||norm(x.name)===norm(ing.name)))){
-    toast('Cet ingrédient est utilisé dans des recettes. Retire-le d’abord des plats concernés.');return
-   }
-   const linkedCarrefour=productById(ing?.productId);
-   const deletionNotice=linkedCarrefour
-    ?' Sa référence Carrefour « '+linkedCarrefour.name+' » RESTERA dans Produits comme fiche distincte, pour préserver tes données et tes courses.'
-    :' Ses achats déjà ajoutés resteront dans les courses.';
-   if(!confirm('Supprimer cet ingrédient ?'+deletionNotice))return;
-   checkpoint('Avant suppression d’un ingrédient');
-   state.ingredientCatalog=state.ingredientCatalog.filter(x=>x.id!==id);
-   persist();closeModal();render(true);toast('Ingrédient supprimé du catalogue.')
-  }
+  else if(mode==='delete-catalog-ingredient')deleteCatalogIngredientV41153(id);
   else if(mode==='edit-ingredient')ingredientEditor(id);
   else if(mode==='new-linked-product'){
    const ing=ingredientById(id);if(!ing)return;
@@ -3284,7 +3376,7 @@ document.addEventListener('click',e=>{
   else if(mode==='edit-product')productEditor(id);
   else if(mode==='add-catalog-product')addCatalogProduct(id);
   else if(mode==='filter-products'){productCategory=a.dataset.category;render(true)}
-  else if(mode==='delete-product'){if(confirm('Supprimer ce produit du catalogue ? Les courses déjà saisies resteront.')){checkpoint('Avant suppression de produit');state.products=state.products.filter(x=>x.id!==id);state.recipes.forEach(r=>r.ingredients.forEach(i=>{if(i.productId===id)i.productId=null}));state.ingredientCatalog.forEach(i=>{if(i.productId===id)i.productId=null});persist();closeModal();render(true);toast('Produit supprimé du catalogue.')}}
+  else if(mode==='delete-product')deleteCatalogProductV41153(id);
   else if(mode==='add-ingredient'){
    const rows=$('#ingredientRows');if(!rows)return;
    rows.insertAdjacentHTML('beforeend',ingredientRow());

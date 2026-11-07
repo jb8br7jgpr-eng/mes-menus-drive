@@ -678,48 +678,92 @@ function applyCarrefourToOpenProductV413(raw){
  if(status)status.textContent='✓ Référence prête. Le nom du produit est inchangé. Appuie sur « Enregistrer le produit ».';
  return {url,ean}
 }
-async function importCarrefourIntoOpenProductV413(){
- const panel=$('#v413ReferencePastePanel');
- if(panel)panel.hidden=false;
- if(!navigator.clipboard?.readText){
-  toast('Colle le lien Carrefour dans le champ, puis touche « Utiliser cette référence ».');return
- }
- try{
-  const copied=await navigator.clipboard.readText();
-  applyCarrefourToOpenProductV413(copied);
-  toast('Référence Carrefour chargée. Nom du produit conservé.')
- }catch(err){
-  toast('Colle le lien dans le champ ci-dessous puis valide. Aucun nom modifié.');
- }
-}
 function carrefourClipboardModal(ingredientId=null,dailyId=null){
  pendingIngredientLinkId=ingredientById(ingredientId)?.id||null;
  pendingCarrefourDailyIdV413=productById(dailyId)?.id||null;
-  const body='<div class="note"><strong>Depuis l’icône sur ton iPhone</strong><p>Sur Carrefour.fr, copie le produit avec notre bouton vert. Reviens ici avec l’icône Menus & Drive, puis appuie sur « Coller et vérifier ».</p></div>'+
-    '<button class="btn wide" data-action="read-carrefour-clipboard" style="margin:13px 0">📋 Coller et vérifier le produit</button>'+
-    '<div class="field"><label for="carrefourPaste">Si le collage automatique ne marche pas</label><textarea id="carrefourPaste" class="text-input" rows="3" placeholder="Appuie ici longtemps puis choisis Coller"></textarea></div>'+
-    '<button class="btn secondary wide" data-action="import-pasted-carrefour">Vérifier le texte collé</button>'+
-    '<p class="helper">L’import ne supprime aucune recette et ne modifie pas le panier Carrefour. La fiche doit encore être validée avant d’être enregistrée.</p>';
-  showCatalogueModalV413('Importer un produit Carrefour',body)
+ const body='<div class="note"><strong>Depuis Carrefour sur Safari</strong><p>Appuie sur le bouton vert « Copier pour mon appli » de notre Userscript. Reviens ici, puis colle le texte ci-dessous.</p></div>'+
+  '<div class="field"><label for="carrefourPaste">Produit Carrefour copié</label>'+
+  '<textarea id="carrefourPaste" class="text-input" rows="3" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Appui long ici → Coller"></textarea></div>'+
+  '<button type="button" class="btn wide" data-action="import-pasted-carrefour">✓ Vérifier le produit collé</button>'+
+  '<button type="button" class="btn secondary wide" data-action="read-carrefour-clipboard" style="margin-top:10px">📋 Essayer le collage automatique</button>'+
+  '<div class="helper v41151-paste-feedback" id="carrefourPasteStatus" role="status" aria-live="polite">Le collage manuel ne dépend pas de l’autorisation automatique du presse-papiers iPhone.</div>'+
+  '<p class="helper">L’import ne supprime aucune recette, ne modifie pas le panier et doit être validé avant d’être enregistré.</p>';
+ showCatalogueModalV413('Importer un produit Carrefour',body)
+}
+// V41.15.1 : les échecs du presse-papiers restent visibles, sans effacer les champs.
+function carrefourPasteFeedbackV41151(target,message,isError=false){
+ const node=$(target);
+ if(node){node.textContent=message;node.dataset.state=isError?'error':'info'}
+ if(isError)toast(message)
 }
 function importCopiedCarrefourProduct(raw){
-  try{
-    const text=String(raw||'').trim();
-    if(text.length>5000)throw Error('Texte trop long');
-    if(!text.startsWith(CARREFOUR_CLIP_PREFIX))throw Error('Ce texte ne vient pas du bouton Carrefour « Copier pour mon appli ».');
-    const parsed=JSON.parse(text.slice(CARREFOUR_CLIP_PREFIX.length));
-    openImportedCarrefourProduct(parsed);
-  }catch(e){toast('Import impossible : '+String(e.message||'texte invalide'))}
+ try{
+  const value=String(raw||'').trim();
+  if(!value)throw Error('Aucun texte collé. Appuie longtemps dans le champ puis choisis « Coller ».');
+  if(value.length>5000)throw Error('Texte trop long pour un produit Carrefour.');
+  if(!value.startsWith(CARREFOUR_CLIP_PREFIX))
+   throw Error('Utilise « Copier pour mon appli » dans notre Userscript Carrefour, puis colle le texte complet ici.');
+  let data;
+  try{data=JSON.parse(value.slice(CARREFOUR_CLIP_PREFIX.length))}
+  catch(e){throw Error('Le texte copié est incomplet : recopie le produit depuis Carrefour.')}
+  openImportedCarrefourProduct(data);
+  toast('✓ Produit Carrefour récupéré. Vérifie sa fiche, puis enregistre.');
+  return true
+ }catch(e){
+  carrefourPasteFeedbackV41151('#carrefourPasteStatus','⚠️ '+String(e.message||'Collage impossible.'),true);
+  return false
+ }
 }
 async function readCarrefourClipboard(){
-  if(!navigator.clipboard?.readText){toast('Appuie longtemps sur le champ ci-dessous puis choisis « Coller ».');$('#carrefourPaste')?.focus();return}
-  try{
-    const content=await navigator.clipboard.readText();
-    importCopiedCarrefourProduct(content);
-  }catch(e){
-    toast('Accès au presse-papiers refusé. Utilise le champ et « Coller ».');
-    $('#carrefourPaste')?.focus();
-  }
+ const button=modalRoot.querySelector('[data-action="read-carrefour-clipboard"]');
+ if(button?.disabled)return false;
+ if(!navigator.clipboard?.readText){
+  carrefourPasteFeedbackV41151('#carrefourPasteStatus','Le collage automatique est indisponible. Appuie longtemps dans le champ, puis choisis « Coller ».',true);
+  return false
+ }
+ if(button)button.disabled=true;
+ carrefourPasteFeedbackV41151('#carrefourPasteStatus','Lecture en cours… Si iOS ne répond pas, le collage manuel reste disponible.');
+ try{
+  const content=await navigator.clipboard.readText();
+  return importCopiedCarrefourProduct(content)
+ }catch(e){
+  carrefourPasteFeedbackV41151('#carrefourPasteStatus','Accès automatique au presse-papiers refusé ou interrompu. Colle le texte manuellement dans le champ ci-dessus.',true);
+  return false
+ }finally{if(button?.isConnected)button.disabled=false}
+}
+// Le bouton principal de la fiche ouvre d'abord le champ natif :
+// le collage automatique, souvent instable sur Safari iOS, reste facultatif.
+async function importCarrefourIntoOpenProductV413(){
+ const panel=$('#v413ReferencePastePanel');
+ if(panel)panel.hidden=false;
+ const input=$('#v413ReferencePaste');
+ if(input?.value?.trim()){
+  carrefourPasteFeedbackV41151('#v413ReferenceStatus','Texte déjà saisi : utilise « Utiliser cette référence ».')
+ }else{
+  carrefourPasteFeedbackV41151('#v413ReferenceStatus','Appuie longtemps dans le champ puis choisis « Coller ». Tu peux aussi essayer le collage automatique.')
+ }
+}
+async function readCarrefourReferenceClipboardV41151(){
+ const panel=$('#v413ReferencePastePanel');
+ if(panel)panel.hidden=false;
+ const button=modalRoot.querySelector('[data-action="v41151-read-daily-carrefour"]');
+ if(button?.disabled)return false;
+ if(!navigator.clipboard?.readText){
+  carrefourPasteFeedbackV41151('#v413ReferenceStatus','Collage automatique indisponible : appuie longtemps dans le champ puis choisis « Coller ».',true);
+  return false
+ }
+ if(button)button.disabled=true;
+ carrefourPasteFeedbackV41151('#v413ReferenceStatus','Lecture en cours… Le collage manuel reste disponible.');
+ try{
+  const copied=await navigator.clipboard.readText();
+  applyCarrefourToOpenProductV413(copied);
+  toast('✓ Référence Carrefour récupérée. Nom conservé, fiche à enregistrer.');
+  return true
+ }catch(e){
+  const name=e?.name==='NotAllowedError'?'Accès au presse-papiers refusé.':String(e?.message||'Référence non reconnue.');
+  carrefourPasteFeedbackV41151('#v413ReferenceStatus','⚠️ '+name+' Tu peux coller manuellement sans perdre les champs saisis.',true);
+  return false
+ }finally{if(button?.isConnected)button.disabled=false}
 }
 function ingredientRowsCatalogue(){
  const filter=norm(productSearch);
@@ -802,10 +846,11 @@ function catalogueEditor(kind,id=null,draft=null,linkedIngredientId=null){
    '<div class="v413-reference-actions">'+
     '<button type="button" class="btn secondary wide" data-action="v413-import-daily-carrefour">📋 Coller une référence Carrefour sans changer le nom</button>'+
     '<div id="v413ReferencePastePanel" class="v413-reference-paste" hidden>'+
-     '<label for="v413ReferencePaste">Lien ou texte copié depuis Carrefour</label>'+
-     '<textarea id="v413ReferencePaste" rows="3" placeholder="Colle ton lien Carrefour ou le texte « Copier pour mon appli »"></textarea>'+
-     '<button type="button" class="btn secondary wide" data-action="v413-use-pasted-reference">✓ Utiliser cette référence</button>'+
-     '<div class="helper" id="v413ReferenceStatus" aria-live="polite"></div>'+
+     '<label for="v413ReferencePaste">Lien ou produit copié avec Userscripts</label>'+
+     '<textarea id="v413ReferencePaste" rows="3" placeholder="Appui long ici → Coller (lien ou « Copier pour mon appli »)" autocapitalize="off" spellcheck="false"></textarea>'+
+     '<button type="button" class="btn wide" data-action="v413-use-pasted-reference">✓ Utiliser cette référence</button>'+
+     '<button type="button" class="btn secondary wide" data-action="v41151-read-daily-carrefour">📋 Essayer le collage automatique</button>'+
+     '<div class="helper v41151-paste-feedback" id="v413ReferenceStatus" role="status" aria-live="polite">Colle le lien dans le champ, puis appuie sur « Utiliser cette référence ». Le nom déjà saisi sera conservé.</div>'+
     '</div>'+
     ((id&&(record.url||record.ean))?'<button type="button" class="btn secondary wide v413-clear-reference" data-action="v413-clear-daily-carrefour" data-id="'+html(id)+'">✕ Retirer le lien Carrefour de ce produit</button>':'')+
     '</div>'+
@@ -3087,11 +3132,14 @@ document.addEventListener('click',e=>{
   }
   else if(mode==='open-carrefour-import')carrefourClipboardModal();
   else if(mode==='v413-import-daily-carrefour')void importCarrefourIntoOpenProductV413();
+  else if(mode==='v41151-read-daily-carrefour')void readCarrefourReferenceClipboardV41151();
   else if(mode==='v413-use-pasted-reference'){
    try{
     applyCarrefourToOpenProductV413($('#v413ReferencePaste')?.value);
-    toast('Référence Carrefour prête, nom conservé.')
-   }catch(error){toast(error.message||'Référence Carrefour invalide.')}
+    toast('✓ Référence Carrefour prête, nom conservé. Enregistre la fiche pour confirmer.')
+   }catch(error){
+    carrefourPasteFeedbackV41151('#v413ReferenceStatus','⚠️ '+String(error.message||'Référence Carrefour invalide.'),true)
+   }
   }
   else if(mode==='v413-unlink-ingredient-carrefour')unlinkIngredientCarrefourV413(id);
   else if(mode==='v413-clear-daily-carrefour')clearDailyCarrefourV413(id);

@@ -181,7 +181,8 @@ function inlineCarrefourFixture(id='product1'){
   $:query=>inputs[query]||null
  };
  const parser=take('parseCarrefourClipboardV41152','openImportedCarrefourProduct');
- const apply=runInNewContext(parser+take('applyCarrefourToOpenProductV413','carrefourClipboardModal')+
+ const apply=runInNewContext(parser+take('showCarrefourExistingReferenceV41153','continueCarrefourExistingReferenceV41153')+
+  take('applyCarrefourToOpenProductV413','carrefourClipboardModal')+
   ';applyCarrefourToOpenProductV413',ctx);
  return {apply,inputs,product,state}
 }

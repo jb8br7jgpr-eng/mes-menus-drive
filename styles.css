@@ -1289,3 +1289,7 @@
 .v41153-conflict p{margin:0;font-size:12px;line-height:1.5}
 .v41153-conflict button{min-height:46px;white-space:normal}
 .v41153-reuse-note{margin:0 0 12px}
+
+/* V41.15.4 — la confirmation de fusion ne doit pas être visible avant accord. */
+.v41154-merge-notice[hidden]{display:none!important}
+.v41154-merge-notice{margin:12px 0;font-weight:600;line-height:1.5}

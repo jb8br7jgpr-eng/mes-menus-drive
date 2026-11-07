@@ -755,6 +755,10 @@ function applyCarrefourToOpenProductV413(raw){
   throw Error('Cette référence est déjà liée à « '+duplicate.name+' ». Réutilise la fiche proposée ci-dessous, sans rien supprimer.');
  }
  // Ne PAS réécrire le champ catalogueName, même en cas de nom commercial différent.
+ // Si une nouvelle référence est valide, cacher l'ancien conflit pour éviter
+ // qu'un bouton « réutiliser » ne pointe vers une ancienne copie.
+ const conflictBox=$('#v41153ReferenceConflict');
+ if(conflictBox){conflictBox.hidden=true;conflictBox.replaceChildren()}
  urlField.value=url;eanField.value=ean;
  const status=$('#v413ReferenceStatus');
  if(status)status.textContent='✓ Référence prête. Le nom du produit est inchangé. Appuie sur « Enregistrer le produit ».';

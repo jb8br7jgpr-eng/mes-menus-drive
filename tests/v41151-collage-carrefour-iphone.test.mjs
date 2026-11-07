@@ -18,6 +18,7 @@ const take=(start,end)=>{
 function fixture(options={}){
  const toastMessages=[],imported=[],references=[],data={
   '#carrefourPasteStatus':{textContent:'',dataset:{}},
+  '#carrefourPaste':{value:''},
   '#v413ReferenceStatus':{textContent:'',dataset:{}},
   '#v413ReferencePastePanel':{hidden:true},
   '#v413ReferencePaste':{value:'mon texte et mon produit ne sont pas effacés'}
@@ -114,6 +115,48 @@ test('V41.15.1 : collage automatique de la référence charge seulement les cham
  assert.equal(f.references.length,1);
  assert.equal(f.references[0],sampleText);
  assert.match(f.toastMessages.at(-1),/Nom conservé/)
+});
+
+test('V41.15.1 : une permission iOS tardive ne remplace pas un collage manuel',async()=>{
+ let done;const pending=new Promise(resolve=>{done=resolve});
+ const f=fixture({readText:()=>pending});
+ const running=f.api.readCarrefourClipboard();
+ f.data['#carrefourPaste'].value=sampleText;
+ done(sampleText);
+ assert.equal(await running,false);
+ assert.equal(f.imported.length,0);
+ assert.match(f.data['#carrefourPasteStatus'].textContent,/Texte collé manuellement/);
+});
+
+test('V41.15.1 : une réponse iOS tardive n’ouvre pas une fiche après fermeture',async()=>{
+ let done;const pending=new Promise(resolve=>{done=resolve});
+ const f=fixture({readText:()=>pending});
+ const running=f.api.readCarrefourClipboard();
+ f.buttons['[data-action="read-carrefour-clipboard"]'].isConnected=false;
+ done(sampleText);
+ assert.equal(await running,false);
+ assert.equal(f.imported.length,0)
+});
+
+test('V41.15.1 : la réponse automatique n’écrase jamais la saisie manuelle en édition',async()=>{
+ let done;const pending=new Promise(resolve=>{done=resolve});
+ const f=fixture({readText:()=>pending});
+ const running=f.api.readCarrefourReferenceClipboardV41151();
+ f.data['#v413ReferencePaste'].value='https://www.carrefour.fr/p/autre-3270190010000';
+ done(sampleText);
+ assert.equal(await running,false);
+ assert.equal(f.references.length,0);
+ assert.match(f.data['#v413ReferenceStatus'].textContent,/Texte collé manuellement/)
+});
+
+test('V41.15.1 : une fiche refermée ignore les anciennes autorisations iOS',async()=>{
+ let done;const pending=new Promise(resolve=>{done=resolve});
+ const f=fixture({readText:()=>pending});
+ const running=f.api.readCarrefourReferenceClipboardV41151();
+ f.buttons['[data-action="v41151-read-daily-carrefour"]'].isConnected=false;
+ done(sampleText);
+ assert.equal(await running,false);
+ assert.equal(f.references.length,0)
 });
 
 test('V41.15.1 : l’import complet présente le champ natif avant le bouton automatique',()=>{

@@ -1281,3 +1281,11 @@
 .v41151-paste-feedback[data-state="info"]{
  border-color:#cfe3d5;background:#eef6ef;color:#315942
 }
+
+/* V41.15.3 — une référence persistante peut être réutilisée plutôt que recréée. */
+.v41153-conflict{display:flex;flex-direction:column;gap:10px;margin-top:10px;padding:13px;
+ border:1px solid #e6c6a8;border-radius:12px;background:#fff7ec;color:#6b482e}
+.v41153-conflict[hidden]{display:none!important}
+.v41153-conflict p{margin:0;font-size:12px;line-height:1.5}
+.v41153-conflict button{min-height:46px;white-space:normal}
+.v41153-reuse-note{margin:0 0 12px}

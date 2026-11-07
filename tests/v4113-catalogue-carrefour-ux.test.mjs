@@ -181,7 +181,8 @@ function inlineCarrefourFixture(id='product1'){
   $:query=>inputs[query]||null
  };
  const parser=take('parseCarrefourClipboardV41152','openImportedCarrefourProduct');
- const apply=runInNewContext(parser+take('applyCarrefourToOpenProductV413','carrefourClipboardModal')+
+ const apply=runInNewContext(parser+take('showCarrefourExistingReferenceV41153','continueCarrefourExistingReferenceV41153')+
+  take('applyCarrefourToOpenProductV413','carrefourClipboardModal')+
   ';applyCarrefourToOpenProductV413',ctx);
  return {apply,inputs,product,state}
 }
@@ -196,6 +197,17 @@ test('V41.13 : coller une référence dans une fiche garde le nom tapé même no
  assert.equal(f.inputs['#catalogueUrl'].value,sample.url);
  assert.equal(f.inputs['#catalogueEan'].value,sample.ean);
  assert.match(f.inputs['#v413ReferenceStatus'].textContent,/Le nom du produit est inchangé/);
+});
+
+test('V41.15.3 : coller une référence valide fait disparaître un ancien conflit',()=>{
+ const f=inlineCarrefourFixture();
+ let cleared=false;
+ f.inputs['#v41153ReferenceConflict']={hidden:false,replaceChildren(){cleared=true}};
+ const result=f.apply('MD-CARREFOUR-V1:'+JSON.stringify(sample));
+ assert.equal(result.ean,sample.ean);
+ assert.equal(f.inputs['#v41153ReferenceConflict'].hidden,true);
+ assert.equal(cleared,true);
+ assert.equal(f.inputs['#catalogueName'].value,'Nom personnalisé en cours de saisie');
 });
 
 test('V41.15.2 : une copie encodée iPhone conserve le nom et récupère le bon EAN',()=>{

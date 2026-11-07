@@ -902,6 +902,11 @@ function continueCarrefourExistingReferenceV41153(id){
    /^\d{13}$/.test($('#catalogueEan')?.value?.trim()||'')?$('#catalogueEan').value.trim():'';
  const sameEan=Boolean(copiedEan&&p.ean&&copiedEan===p.ean);
  const sameUrl=Boolean(p.url&&p.url.split(/[?#]/)[0]===url.split(/[?#]/)[0]);
+ if(copiedEan&&p.ean&&copiedEan!==p.ean){
+  carrefourPasteFeedbackV41151('#v413ReferenceStatus',
+   'Cet EAN ne correspond pas à celui de la référence existante. Aucun produit fusionné.',true);
+  return false
+ }
  if(!sameEan&&!sameUrl){
   carrefourPasteFeedbackV41151('#v413ReferenceStatus',
    'La copie ne correspond plus à la référence sélectionnée. Recolle le bon produit avant de fusionner.',true);
@@ -1278,7 +1283,7 @@ function saveUnifiedCatalogue(e){
    }
   }
   const product={id:old?.id||uid(),name,brand,packaging,category,store,qty,unit,url,ean,packAmount,
-    packUnit:packAmount?packUnit:null,frequent,
+    packUnit:packAmount?packUnit:null,frequent:Boolean(frequent||(mergedInDraft&&old?.frequent)),
     showInCatalogue:Boolean(old?.showInCatalogue||mergedInDraft)};
   if(state.storePreferences)delete state.storePreferences['product:'+product.id];
   if(old)state.products=state.products.map(p=>p.id===old.id?product:p);else state.products.push(product);

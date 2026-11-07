@@ -683,6 +683,59 @@ function importCarrefourProductFromHash(){
 }
 // Importer une référence dans la fiche ouverte sans jamais fermer celle-ci :
 // les modifications non encore enregistrées (notamment le nom) sont conservées.
+
+// V41.15.3 — un EAN n'appartient qu'à une seule fiche produit dans Speedrive.
+// Une référence reste parfois enregistrée après suppression de son ingrédient.
+// Proposer une action concrète et sans écriture plutôt qu'un blocage obscur.
+function showCarrefourExistingReferenceV41153(duplicate){
+ const box=$('#v41153ReferenceConflict');
+ if(!box||!duplicate)return false;
+ const panel=$('#v413ReferencePastePanel');
+ if(panel)panel.hidden=false;
+ const label=document.createElement('p');
+ label.textContent='Cette référence Carrefour appartient déjà à « '+duplicate.name+' ». Cette fiche peut rester enregistrée après la suppression d’un ingrédient.';
+ const button=document.createElement('button');
+ button.type='button';button.className='btn wide secondary';
+ button.dataset.action='v41153-reuse-carrefour';
+ button.dataset.id=duplicate.id;
+ button.textContent='↪ Réutiliser la fiche existante (garder mon nom)';
+ const note=document.createElement('p');
+ note.className='helper';
+ note.textContent='Aucune fiche ne sera supprimée. Tu pourras vérifier les champs avant d’enregistrer.';
+ box.replaceChildren(label,button,note);
+ box.hidden=false;
+ return true
+}
+function continueCarrefourExistingReferenceV41153(id){
+ const p=productById(id),form=$('#catalogueEditorForm');
+ if(!p||!form||form.dataset.kind!=='daily'){
+  toast('La fiche Carrefour n’est plus disponible. Recharge le catalogue avant de réessayer.');return false
+ }
+ const name=$('#catalogueName')?.value?.trim()||'';
+ const brand=$('#catalogueBrand')?.value?.trim()||'';
+ const packaging=$('#cataloguePackaging')?.value?.trim()||'';
+ const amount=$('#cataloguePackAmount')?.value?.trim()||'';
+ const packUnit=$('#cataloguePackUnit')?.value||'';
+ const originalId=form.dataset.id||null;
+ if(!confirm('Cette référence est déjà enregistrée dans « '+p.name+' ». Ouvrir cette fiche pour continuer, en reprenant le nom et les informations saisis ici ? Aucune modification ne sera enregistrée avant ta validation.'))return false;
+ // Navigation seulement : aucun changement au state ou à Firebase.
+ productEditor(p.id);
+ const write=(id,value)=>{if(value){const node=$('#'+id);if(node)node.value=value}};
+ write('catalogueName',name);
+ write('catalogueBrand',brand);
+ write('cataloguePackaging',packaging);
+ if(amount&&Number(amount)>0){write('cataloguePackAmount',amount);write('cataloguePackUnit',packUnit)}
+ const formNow=$('#catalogueEditorForm');
+ if(formNow){
+  const message=document.createElement('div');
+  message.className='note v41153-reuse-note';
+  message.textContent='✓ Tu modifies maintenant la fiche Carrefour existante « '+p.name+' » : le lien et l’EAN sont conservés. Vérifie les autres champs, puis appuie sur « Enregistrer le produit ».';
+  formNow.insertAdjacentElement('afterbegin',message)
+ }
+ if(originalId&&originalId!==p.id)toast('Édition de la fiche Carrefour existante. L’ancienne fiche n’a pas été modifiée.');
+ else toast('Référence retrouvée : vérifie puis enregistre la fiche existante.');
+ return true
+}
 function applyCarrefourToOpenProductV413(raw){
  const text=String(raw||'').trim();
  if(!text||text.length>5000)throw Error('Colle un lien Carrefour ou un texte « Copier pour mon appli ».');
@@ -697,7 +750,10 @@ function applyCarrefourToOpenProductV413(raw){
  const duplicate=state.products.find(p=>p.id!==originalId&&
   ((p.url&&p.url.split(/[?#]/)[0]===url.split(/[?#]/)[0])||
    (ean&&p.ean===ean)));
- if(duplicate)throw Error('Cette référence est déjà liée à « '+duplicate.name+' ». Aucune fiche modifiée.');
+ if(duplicate){
+  showCarrefourExistingReferenceV41153(duplicate);
+  throw Error('Cette référence est déjà liée à « '+duplicate.name+' ». Réutilise la fiche proposée ci-dessous, sans rien supprimer.');
+ }
  // Ne PAS réécrire le champ catalogueName, même en cas de nom commercial différent.
  urlField.value=url;eanField.value=ean;
  const status=$('#v413ReferenceStatus');
@@ -896,6 +952,7 @@ function catalogueEditor(kind,id=null,draft=null,linkedIngredientId=null){
      '<button type="button" class="btn wide" data-action="v413-use-pasted-reference">✓ Utiliser cette référence</button>'+
      '<button type="button" class="btn secondary wide" data-action="v41151-read-daily-carrefour">📋 Essayer le collage automatique</button>'+
      '<div class="helper v41151-paste-feedback" id="v413ReferenceStatus" role="status" aria-live="polite">Colle le lien dans le champ, puis appuie sur « Utiliser cette référence ». Le nom déjà saisi sera conservé.</div>'+
+     '<div id="v41153ReferenceConflict" class="v41153-conflict" hidden></div>'+
     '</div>'+
     ((id&&(record.url||record.ean))?'<button type="button" class="btn secondary wide v413-clear-reference" data-action="v413-clear-daily-carrefour" data-id="'+html(id)+'">✕ Retirer le lien Carrefour de ce produit</button>':'')+
     '</div>'+
@@ -983,7 +1040,13 @@ function saveUnifiedCatalogue(e){
   const duplicate=state.products.find(p=>p.id!==old?.id&&
     ((ean&&p.ean===ean)||(url&&p.url&&p.url.split(/[?#]/)[0]===url.split(/[?#]/)[0])||
      (norm(p.name)===norm(name)&&norm(p.brand)===norm(brand)&&norm(p.packaging)===norm(packaging))));
-  if(duplicate){toast('Ce produit existe déjà. Modifie sa fiche plutôt que de créer un doublon.');return}
+  if(duplicate){
+   if((ean&&duplicate.ean===ean)||(url&&duplicate.url&&duplicate.url.split(/[?#]/)[0]===url.split(/[?#]/)[0])){
+    showCarrefourExistingReferenceV41153(duplicate);
+    carrefourPasteFeedbackV41151('#v413ReferenceStatus','⚠️ Référence déjà associée à « '+duplicate.name+' ». Utilise la fiche proposée ci-dessous.',true);
+   }else toast('Ce produit existe déjà. Modifie sa fiche plutôt que de créer un doublon.');
+   return
+  }
   const targetIngredient=ingredientById(e.target.dataset.ingredientId);
   if(targetIngredient?.productId&&targetIngredient.productId!==old?.id){
    const prior=targetIngredient.productId;
@@ -3165,7 +3228,11 @@ document.addEventListener('click',e=>{
    if(state.recipes.some(r=>(r.ingredients||[]).some(x=>x.ingredientId===id||norm(x.name)===norm(ing.name)))){
     toast('Cet ingrédient est utilisé dans des recettes. Retire-le d’abord des plats concernés.');return
    }
-   if(!confirm('Supprimer cet ingrédient ? Ses achats déjà ajoutés resteront dans les courses. Sa référence Carrefour, si présente, sera conservée.'))return;
+   const linkedCarrefour=productById(ing?.productId);
+   const deletionNotice=linkedCarrefour
+    ?' Sa référence Carrefour « '+linkedCarrefour.name+' » RESTERA dans Produits comme fiche distincte, pour préserver tes données et tes courses.'
+    :' Ses achats déjà ajoutés resteront dans les courses.';
+   if(!confirm('Supprimer cet ingrédient ?'+deletionNotice))return;
    checkpoint('Avant suppression d’un ingrédient');
    state.ingredientCatalog=state.ingredientCatalog.filter(x=>x.id!==id);
    persist();closeModal();render(true);toast('Ingrédient supprimé du catalogue.')
@@ -3186,6 +3253,7 @@ document.addEventListener('click',e=>{
     carrefourPasteFeedbackV41151('#v413ReferenceStatus','⚠️ '+String(error.message||'Référence Carrefour invalide.'),true)
    }
   }
+  else if(mode==='v41153-reuse-carrefour')continueCarrefourExistingReferenceV41153(id);
   else if(mode==='v413-unlink-ingredient-carrefour')unlinkIngredientCarrefourV413(id);
   else if(mode==='v413-clear-daily-carrefour')clearDailyCarrefourV413(id);
 

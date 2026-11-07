@@ -911,6 +911,8 @@ function continueCarrefourExistingReferenceV41153(id){
  // Aucun changement de fiche/modal : tous les champs du brouillon sont conservés.
  form.dataset.id=p.id;
  form.dataset.v41154MergedDraft='1';
+ form.dataset.v41154MergeEan=copiedEan||p.ean||'';
+ form.dataset.v41154MergeUrl=url;
  const link=$('#catalogueUrl'),ean=$('#catalogueEan');
  if(link)link.value=url;
  if(ean)ean.value=copiedEan||p.ean||'';
@@ -920,10 +922,11 @@ function continueCarrefourExistingReferenceV41153(id){
  };
  fillEmpty('#catalogueBrand',p.brand);
  fillEmpty('#cataloguePackaging',p.packaging);
+ const previousPackAmount=$('#cataloguePackAmount')?.value?.trim()||'';
  fillEmpty('#cataloguePackAmount',Number(p.packAmount)>0?p.packAmount:null);
- if($('#cataloguePackAmount')?.value&&p.packUnit){
+ if(!previousPackAmount&&Number(p.packAmount)>0&&p.packUnit){
   const packUnit=$('#cataloguePackUnit');
-  if(packUnit&&Number(p.packAmount)>0&&Number(packUnit.value||0)===0)packUnit.value=p.packUnit
+  if(packUnit)packUnit.value=p.packUnit
  }
  const box=$('#v41153ReferenceConflict');
  if(box){box.hidden=true;box.replaceChildren()}
@@ -1264,6 +1267,15 @@ function saveUnifiedCatalogue(e){
   if(mergedInDraft&&!old){
    toast('La référence à fusionner n’existe plus. Rien n’a été enregistré. Recolle le produit pour recommencer.');
    return
+  }
+  if(mergedInDraft){
+   const expectedEan=e.target.dataset.v41154MergeEan||'',
+     expectedUrl=e.target.dataset.v41154MergeUrl||'';
+   if((expectedEan&&ean!==expectedEan)||
+      (expectedUrl&&url.split(/[?#]/)[0]!==expectedUrl.split(/[?#]/)[0])){
+    toast('Le lien ou l’EAN a changé après la préparation de la fusion. Recolle le produit avant de confirmer, sans perdre tes autres champs.');
+    return
+   }
   }
   const product={id:old?.id||uid(),name,brand,packaging,category,store,qty,unit,url,ean,packAmount,
     packUnit:packAmount?packUnit:null,frequent,

@@ -199,6 +199,17 @@ test('V41.13 : coller une référence dans une fiche garde le nom tapé même no
  assert.match(f.inputs['#v413ReferenceStatus'].textContent,/Le nom du produit est inchangé/);
 });
 
+test('V41.15.3 : coller une référence valide fait disparaître un ancien conflit',()=>{
+ const f=inlineCarrefourFixture();
+ let cleared=false;
+ f.inputs['#v41153ReferenceConflict']={hidden:false,replaceChildren(){cleared=true}};
+ const result=f.apply('MD-CARREFOUR-V1:'+JSON.stringify(sample));
+ assert.equal(result.ean,sample.ean);
+ assert.equal(f.inputs['#v41153ReferenceConflict'].hidden,true);
+ assert.equal(cleared,true);
+ assert.equal(f.inputs['#catalogueName'].value,'Nom personnalisé en cours de saisie');
+});
+
 test('V41.15.2 : une copie encodée iPhone conserve le nom et récupère le bon EAN',()=>{
  const f=inlineCarrefourFixture();
  const encoded='md-carrefour-v1:'+encodeURIComponent(JSON.stringify(sample))

@@ -803,10 +803,10 @@ function showCarrefourExistingReferenceV41153(duplicate){
  button.type='button';button.className='btn wide secondary';
  button.dataset.action='v41153-reuse-carrefour';
  button.dataset.id=duplicate.id;
- button.textContent='↪ Réutiliser la fiche existante (garder mon nom)';
+ button.textContent='✓ Fusionner dans la fiche que je crée';
  const note=document.createElement('p');
  note.className='helper';
- note.textContent='Tu peux ouvrir la fiche conservée pour la réutiliser. Aucune modification ne sera faite avant validation.';
+ note.textContent='Ta fiche actuelle reste ouverte et garde son nom, ses quantités et son rayon. Le lien et l’EAN sont récupérés sans créer de doublon. La fusion sera enregistrée uniquement quand tu appuieras sur « Enregistrer le produit ».';
  box.replaceChildren(label,button,note);
  // La fiche ancienne n'est liée à AUCUN ingrédient actif :
  // proposer sa suppression réelle, et libérer le lien/EAN pour ce formulaire.
@@ -871,34 +871,69 @@ function removeOrphanCarrefourReferenceOnImportV41153(id){
  }
  return true
 }
+// V41.15.4 — la fiche SAISIE est maîtresse. L'ID technique de la référence
+// enregistrée est conservé pour préserver toutes les liaisons recettes/stock.
+// On ne navigue vers aucune autre fiche et on ne modifie pas le state ici.
 function continueCarrefourExistingReferenceV41153(id){
  const p=productById(id),form=$('#catalogueEditorForm');
  if(!p||!form||form.dataset.kind!=='daily'){
-  toast('La fiche Carrefour n’est plus disponible. Recharge le catalogue avant de réessayer.');return false
+  toast('Référence introuvable. Le formulaire actuel n’a pas été modifié.');
+  return false
  }
- const name=$('#catalogueName')?.value?.trim()||'';
- const brand=$('#catalogueBrand')?.value?.trim()||'';
- const packaging=$('#cataloguePackaging')?.value?.trim()||'';
- const amount=$('#cataloguePackAmount')?.value?.trim()||'';
- const packUnit=$('#cataloguePackUnit')?.value||'';
  const originalId=form.dataset.id||null;
- if(!confirm('Cette référence est déjà enregistrée dans « '+p.name+' ». Ouvrir cette fiche pour continuer, en reprenant le nom et les informations saisis ici ? Aucune modification ne sera enregistrée avant ta validation.'))return false;
- // Navigation seulement : aucun changement au state ou à Firebase.
- productEditor(p.id);
- const write=(id,value)=>{if(value){const node=$('#'+id);if(node)node.value=value}};
- write('catalogueName',name);
- write('catalogueBrand',brand);
- write('cataloguePackaging',packaging);
- if(amount&&Number(amount)>0){write('cataloguePackAmount',amount);write('cataloguePackUnit',packUnit)}
- const formNow=$('#catalogueEditorForm');
- if(formNow){
-  const message=document.createElement('div');
-  message.className='note v41153-reuse-note';
-  message.textContent='✓ Tu modifies maintenant la fiche Carrefour existante « '+p.name+' » : le lien et l’EAN sont conservés. Vérifie les autres champs, puis appuie sur « Enregistrer le produit ».';
-  formNow.insertAdjacentElement('afterbegin',message)
+ // Une autre fiche déjà enregistrée ne doit pas être remplacée silencieusement.
+ if(originalId&&originalId!==id){
+  carrefourPasteFeedbackV41151('#v413ReferenceStatus',
+   'Cette fiche est déjà enregistrée. Pour éviter d’en remplacer une autre, crée une nouvelle fiche avant de fusionner ces références.',true);
+  return false
  }
- if(originalId&&originalId!==p.id)toast('Édition de la fiche Carrefour existante. L’ancienne fiche n’a pas été modifiée.');
- else toast('Référence retrouvée : vérifie puis enregistre la fiche existante.');
+ let parsed,url;
+ try{
+  const raw=$('#v413ReferencePaste')?.value?.trim()||$('#catalogueUrl')?.value?.trim()||'';
+  parsed=parseCarrefourClipboardV41152(raw,true);
+  url=validCarrefourLink(parsed.url);
+  if(!new URL(url).pathname.startsWith('/p/'))throw Error('Cette URL n’est pas une fiche produit Carrefour.');
+ }catch(error){
+  carrefourPasteFeedbackV41151('#v413ReferenceStatus',
+   '⚠️ Copie Carrefour invalide. Recolle le produit sans perdre ton formulaire : '+String(error.message||'format incorrect'),true);
+  return false
+ }
+ const copiedEan=/^\d{13}$/.test(String(parsed.ean||''))?String(parsed.ean):
+   /^\d{13}$/.test($('#catalogueEan')?.value?.trim()||'')?$('#catalogueEan').value.trim():'';
+ const sameEan=Boolean(copiedEan&&p.ean&&copiedEan===p.ean);
+ const sameUrl=Boolean(p.url&&p.url.split(/[?#]/)[0]===url.split(/[?#]/)[0]);
+ if(!sameEan&&!sameUrl){
+  carrefourPasteFeedbackV41151('#v413ReferenceStatus',
+   'La copie ne correspond plus à la référence sélectionnée. Recolle le bon produit avant de fusionner.',true);
+  return false
+ }
+ if(!confirm('Fusionner la référence « '+p.name+' » DANS la fiche que tu remplis ? Le formulaire et le nom actuel seront conservés. Les recettes, achats et stocks liés à cette référence resteront associés. Il restera à appuyer sur « Enregistrer le produit » pour valider.'))return false;
+ // Aucun changement de fiche/modal : tous les champs du brouillon sont conservés.
+ form.dataset.id=p.id;
+ form.dataset.v41154MergedDraft='1';
+ const link=$('#catalogueUrl'),ean=$('#catalogueEan');
+ if(link)link.value=url;
+ if(ean)ean.value=copiedEan||p.ean||'';
+ const fillEmpty=(selector,value)=>{
+  const node=$(selector);
+  if(node&&!node.value?.trim()&&value)node.value=String(value)
+ };
+ fillEmpty('#catalogueBrand',p.brand);
+ fillEmpty('#cataloguePackaging',p.packaging);
+ fillEmpty('#cataloguePackAmount',Number(p.packAmount)>0?p.packAmount:null);
+ if($('#cataloguePackAmount')?.value&&p.packUnit){
+  const packUnit=$('#cataloguePackUnit');
+  if(packUnit&&Number(p.packAmount)>0&&Number(packUnit.value||0)===0)packUnit.value=p.packUnit
+ }
+ const box=$('#v41153ReferenceConflict');
+ if(box){box.hidden=true;box.replaceChildren()}
+ const notice=$('#v41154MergedNotice');
+ if(notice){
+  notice.hidden=false;
+  notice.textContent='✓ Fusion préparée dans TA fiche : le nom et les champs saisis sont conservés. Lien et EAN chargés. Appuie sur « Enregistrer le produit » pour finaliser.'
+ }
+ carrefourPasteFeedbackV41151('#v413ReferenceStatus',
+  '✓ Fusion préparée dans le formulaire actuel. Ton produit n’a pas changé de fiche. Enregistre-le pour confirmer.');
  return true
 }
 function applyCarrefourToOpenProductV413(raw){
@@ -1127,6 +1162,7 @@ function catalogueEditor(kind,id=null,draft=null,linkedIngredientId=null){
     '</div>'+
    '</div></details>';
  }
+ if(!isIngredient)body+='<div class="note v41154-merge-notice" id="v41154MergedNotice" hidden></div>';
  body+='<button class="btn wide" type="submit">✓ Enregistrer le produit</button></form>';
  if(isIngredient&&id){
   body+='<div class="catalogue-linked-actions">'+
@@ -1224,8 +1260,14 @@ function saveUnifiedCatalogue(e){
    }
    if(!confirm('Remplacer la référence Carrefour précédente ? L’ancienne référence inutilisée sera définitivement supprimée.'))return
   }
+  const mergedInDraft=e.target.dataset.v41154MergedDraft==='1';
+  if(mergedInDraft&&!old){
+   toast('La référence à fusionner n’existe plus. Rien n’a été enregistré. Recolle le produit pour recommencer.');
+   return
+  }
   const product={id:old?.id||uid(),name,brand,packaging,category,store,qty,unit,url,ean,packAmount,
-    packUnit:packAmount?packUnit:null,frequent};
+    packUnit:packAmount?packUnit:null,frequent,
+    showInCatalogue:Boolean(old?.showInCatalogue||mergedInDraft)};
   if(state.storePreferences)delete state.storePreferences['product:'+product.id];
   if(old)state.products=state.products.map(p=>p.id===old.id?product:p);else state.products.push(product);
   if(product.frequent)state.ingredientCatalog.forEach(x=>{if(x.productId===product.id)x.frequent=true});
@@ -1239,12 +1281,20 @@ function saveUnifiedCatalogue(e){
   }
  }
  ingredientStoreTab=store;
+ const mergedSaved=!isIngredient&&e.target.dataset.v41154MergedDraft==='1';
+ const mergedSavedProduct=mergedSaved?productById(e.target.dataset.id):null;
  // Garder exactement les filtres choisis, même si le produit édité
  // ne correspond plus au rayon, au type ou au magasin sélectionné.
  const rayonUiV4115=captureCatalogueRayonUiV4115('produits');
  persist();closeModal();render(true);
  restoreCatalogueRayonUiV4115('produits',rayonUiV4115);
- toast('Produit enregistré !')
+ if(mergedSaved&&mergedSavedProduct){
+  const saved=mergedSavedProduct;
+  showCatalogueModalV413('✓ Fusion enregistrée',
+   '<div class="note"><strong>'+html(saved.name)+'</strong>'+
+   '<p>Ta fiche a bien été enregistrée avec le lien Carrefour et l’EAN '+html(saved.ean||'non renseigné')+'. Le formulaire que tu avais créé est devenu la fiche principale. Toutes les associations existantes ont été conservées.</p></div>'+
+   '<button type="button" class="btn wide" data-action="edit-product" data-id="'+html(saved.id)+'">Voir ma fiche enregistrée</button>');
+ }else toast('Produit enregistré !')
 }
 // V41.13.3 : supprimer réellement la référence, jamais la masquer.
 function carrefourReferenceLinkedV4133(id){
@@ -1337,7 +1387,7 @@ function unifiedCatalogueSourceV4114(){
  const linked=new Set((state.ingredientCatalog||[]).map(i=>i.productId).filter(Boolean));
  return [
   ...(state.ingredientCatalog||[]).map(i=>({type:'ingredient',id:i.id,name:i.name,store:ingredientStore(i),category:catalogueCategoryV40(i,i.productId),item:i})),
-  ...(state.products||[]).filter(p=>!linked.has(p.id)).map(p=>({type:'daily',id:p.id,name:p.name,store:state.storePreferences?.['product:'+p.id]||p.store||'carrefour',category:catalogueCategoryV40(p),item:p}))
+  ...(state.products||[]).filter(p=>!linked.has(p.id)||p.showInCatalogue).map(p=>({type:'daily',id:p.id,name:p.name,store:state.storePreferences?.['product:'+p.id]||p.store||'carrefour',category:catalogueCategoryV40(p),item:p}))
  ]
 }
 function unifiedCatalogueItems(){

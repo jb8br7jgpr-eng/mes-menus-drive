@@ -717,6 +717,10 @@ function importCopiedCarrefourProduct(raw){
 async function readCarrefourClipboard(){
  const button=modalRoot.querySelector('[data-action="read-carrefour-clipboard"]');
  if(button?.disabled)return false;
+ const startingText=$('#carrefourPaste')?.value||'';
+ const stillCurrent=()=>Boolean(button?.isConnected&&
+  modalRoot.querySelector('[data-action="read-carrefour-clipboard"]')===button);
+ const manualChanged=()=>String($('#carrefourPaste')?.value||'')!==startingText;
  if(!navigator.clipboard?.readText){
   carrefourPasteFeedbackV41151('#carrefourPasteStatus','Le collage automatique est indisponible. Appuie longtemps dans le champ, puis choisis « Coller ».',true);
   return false
@@ -725,8 +729,17 @@ async function readCarrefourClipboard(){
  carrefourPasteFeedbackV41151('#carrefourPasteStatus','Lecture en cours… Si iOS ne répond pas, le collage manuel reste disponible.');
  try{
   const content=await navigator.clipboard.readText();
+  // Une réponse tardive d'iOS ne doit jamais remplacer un collage manuel
+  // ni ouvrir une fiche après la fermeture de la fenêtre initiale.
+  if(!stillCurrent())return false;
+  if(manualChanged()){
+   carrefourPasteFeedbackV41151('#carrefourPasteStatus','Texte collé manuellement : utilise « Vérifier le produit collé ».');
+   return false
+  }
   return importCopiedCarrefourProduct(content)
  }catch(e){
+  if(!stillCurrent())return false;
+  if(manualChanged())return false;
   carrefourPasteFeedbackV41151('#carrefourPasteStatus','Accès automatique au presse-papiers refusé ou interrompu. Colle le texte manuellement dans le champ ci-dessus.',true);
   return false
  }finally{if(button?.isConnected)button.disabled=false}
@@ -748,6 +761,10 @@ async function readCarrefourReferenceClipboardV41151(){
  if(panel)panel.hidden=false;
  const button=modalRoot.querySelector('[data-action="v41151-read-daily-carrefour"]');
  if(button?.disabled)return false;
+ const startingText=$('#v413ReferencePaste')?.value||'';
+ const stillCurrent=()=>Boolean(button?.isConnected&&
+  modalRoot.querySelector('[data-action="v41151-read-daily-carrefour"]')===button);
+ const manualChanged=()=>String($('#v413ReferencePaste')?.value||'')!==startingText;
  if(!navigator.clipboard?.readText){
   carrefourPasteFeedbackV41151('#v413ReferenceStatus','Collage automatique indisponible : appuie longtemps dans le champ puis choisis « Coller ».',true);
   return false
@@ -756,10 +773,16 @@ async function readCarrefourReferenceClipboardV41151(){
  carrefourPasteFeedbackV41151('#v413ReferenceStatus','Lecture en cours… Le collage manuel reste disponible.');
  try{
   const copied=await navigator.clipboard.readText();
+  if(!stillCurrent())return false;
+  if(manualChanged()){
+   carrefourPasteFeedbackV41151('#v413ReferenceStatus','Texte collé manuellement : appuie sur « Utiliser cette référence ».');
+   return false
+  }
   applyCarrefourToOpenProductV413(copied);
   toast('✓ Référence Carrefour récupérée. Nom conservé, fiche à enregistrer.');
   return true
  }catch(e){
+  if(!stillCurrent()||manualChanged())return false;
   const name=e?.name==='NotAllowedError'?'Accès au presse-papiers refusé.':String(e?.message||'Référence non reconnue.');
   carrefourPasteFeedbackV41151('#v413ReferenceStatus','⚠️ '+name+' Tu peux coller manuellement sans perdre les champs saisis.',true);
   return false

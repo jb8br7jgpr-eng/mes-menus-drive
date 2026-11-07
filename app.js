@@ -806,9 +806,69 @@ function showCarrefourExistingReferenceV41153(duplicate){
  button.textContent='↪ Réutiliser la fiche existante (garder mon nom)';
  const note=document.createElement('p');
  note.className='helper';
- note.textContent='Aucune fiche ne sera supprimée. Tu pourras vérifier les champs avant d’enregistrer.';
+ note.textContent='Tu peux ouvrir la fiche conservée pour la réutiliser. Aucune modification ne sera faite avant validation.';
  box.replaceChildren(label,button,note);
+ // La fiche ancienne n'est liée à AUCUN ingrédient actif :
+ // proposer sa suppression réelle, et libérer le lien/EAN pour ce formulaire.
+ if(!(state.ingredientCatalog||[]).some(x=>x.productId===duplicate.id)){
+  const remove=document.createElement('button');
+  remove.type='button';remove.className='btn secondary wide';
+  remove.dataset.action='v41153-remove-orphan-carrefour';
+  remove.dataset.id=duplicate.id;
+  remove.textContent='Supprimer l’ancienne référence et libérer cet EAN';
+  box.append(remove);
+ }
  box.hidden=false;
+ return true
+}
+
+// Une ancienne fiche « fantôme » peut déjà exister dans les données actives,
+// même si l'ingrédient correspondant a été supprimé avant ce correctif.
+// Action explicite : supprimer l'ancien produit, puis préremplir le formulaire.
+function removeOrphanCarrefourReferenceOnImportV41153(id){
+ const p=productById(id),form=$('#catalogueEditorForm');
+ if(!p||!form||form.dataset.kind!=='daily'){
+  toast('Référence introuvable. Recharge le catalogue puis réessaie.');return false
+ }
+ const users=(state.ingredientCatalog||[]).filter(x=>x.productId===id);
+ if(users.length){
+  toast('Cette référence est utilisée par « '+users.map(x=>x.name).join(' », « ')+
+   ' ». Elle ne peut pas être supprimée depuis une autre fiche.');
+  return false
+ }
+ // Vérifier d'abord que la copie est complète et correspond réellement à l'EAN
+ // proposé, sinon ne rien effacer.
+ const raw=$('#v413ReferencePaste')?.value?.trim()||'';
+ let parsed,url;
+ try{
+  parsed=parseCarrefourClipboardV41152(raw,true);
+  url=validCarrefourLink(parsed.url);
+  if(!new URL(url).pathname.startsWith('/p/'))throw Error('Lien Carrefour non reconnu.');
+ }catch(e){toast('Copie Carrefour invalide : '+String(e.message||'recopie le produit.'));return false}
+ const ean=/^\d{13}$/.test(String(parsed.ean||''))?String(parsed.ean):'';
+ const matches=(ean&&ean===p.ean)||
+  (p.url&&p.url.split(/[?#]/)[0]===url.split(/[?#]/)[0]);
+ if(!matches){toast('La copie ne correspond pas à cette ancienne référence. Aucun élément supprimé.');return false}
+ const planned=Object.values(state.weeks||{}).reduce((n,w)=>n+
+  (w.meals||[]).reduce((m,meal)=>m+(meal?.products||[]).filter(x=>x.productId===id).length,0),0);
+ const stock=Object.values(state.stockV41?.items||{}).some(x=>x?.identity==='product:'+id);
+ if(!confirm('Supprimer définitivement l’ancienne fiche Carrefour « '+p.name+
+  ' » et son EAN ?'+
+  (planned?' '+planned+' article(s) directement planifié(s) seront retirés des menus.':'')+
+  (stock?' Le stock directement lié à cette ancienne fiche sera également supprimé.':'')+
+  ' Tu conserveras le formulaire ouvert pour enregistrer la nouvelle fiche.'))return false;
+ checkpoint('Avant suppression d’une ancienne référence Carrefour');
+ deleteCarrefourProductFromStateV41153(id);
+ persist(); // le cloud conserve cet état seulement après confirmation de synchronisation
+ // Ne jamais fermer le formulaire : ses champs encore non enregistrés sont conservés.
+ try{
+  applyCarrefourToOpenProductV413(raw);
+  carrefourPasteFeedbackV41151('#v413ReferenceStatus',
+   '✓ Ancienne fiche retirée du catalogue actif. Référence prête : vérifie puis enregistre ton produit.');
+ }catch(e){
+  carrefourPasteFeedbackV41151('#v413ReferenceStatus',
+   'Ancienne fiche retirée. Vérifie le lien et l’EAN avant d’enregistrer : '+String(e.message||'Import à refaire.'),true)
+ }
  return true
 }
 function continueCarrefourExistingReferenceV41153(id){
@@ -3350,6 +3410,7 @@ document.addEventListener('click',e=>{
    }
   }
   else if(mode==='v41153-reuse-carrefour')continueCarrefourExistingReferenceV41153(id);
+  else if(mode==='v41153-remove-orphan-carrefour')removeOrphanCarrefourReferenceOnImportV41153(id);
   else if(mode==='v413-unlink-ingredient-carrefour')unlinkIngredientCarrefourV413(id);
   else if(mode==='v413-clear-daily-carrefour')clearDailyCarrefourV413(id);
 

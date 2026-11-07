@@ -115,6 +115,14 @@ test('V41.15.4 : même si la référence est liée à un ingrédient, la fiche f
  assert.equal(items.find(x=>x.type==='daily').name,'Beurre tendre demi-sel');
 });
 
+test('V41.15.4 : les achats fréquents associés à la référence ne sont pas perdus',()=>{
+ const p=product();p.frequent=true;
+ const f=fixture({products:[p]});
+ f.submit();
+ assert.equal(f.state.products[0].frequent,true);
+ assert.equal(f.saved[0].products[0].frequent,true)
+});
+
 test('V41.15.4 : changer l’EAN après la fusion bloque la sauvegarde sans écraser la référence',()=>{
  const f=fixture();f.data['#catalogueEan'].value='3270190010000';
  const before=JSON.stringify(f.state);f.submit();

@@ -1265,3 +1265,19 @@
 .v4114-no-result{padding:13px 8px;text-align:center;color:#6a8171;font-size:12px}
 @media(min-width:660px){.v40-filter-controls{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:370px){.v4114-children{padding-left:10px}.v4114-group-name{font-size:11px}.v4114-panel{padding:8px}}
+
+/* V41.15.1 — collage natif Carrefour sur Safari iPhone.
+   Taille >= 16px pour ne pas déclencher le zoom automatique à la saisie. */
+#carrefourPaste,#v413ReferencePaste{font-size:16px;line-height:1.4}
+.v41151-paste-feedback{
+ margin:8px 0 0;padding:10px 12px;
+ border:1px solid #cfe3d5;border-radius:11px;
+ background:#eef6ef;color:#315942;
+ font-size:12px;line-height:1.45;overflow-wrap:anywhere
+}
+.v41151-paste-feedback[data-state="error"]{
+ border-color:#efd1ba;background:#fff4e9;color:#934b2d
+}
+.v41151-paste-feedback[data-state="info"]{
+ border-color:#cfe3d5;background:#eef6ef;color:#315942
+}

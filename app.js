@@ -592,6 +592,34 @@ function validCarrefourLink(raw){
 }
 // Échange volontaire depuis Safari Carrefour : fragment d’URL, jamais d'accès au stockage d'un autre site.
 const CARREFOUR_CLIP_PREFIX='MD-CARREFOUR-V1:';
+// V41.15.2 : Safari/iOS peut coller un texte sous la forme
+// md-carrefour-v1:%7B%22v%22:1... au lieu de MD-CARREFOUR-V1:{"v":1,...}.
+// Ne décoder QUE le contenu déjà reconnu comme copie de notre Userscript.
+// Les URLs seules restent autorisées dans la fiche Produit, avec le même
+// contrôle strict de domaine HTTPS lors de applyCarrefourToOpenProductV413.
+function parseCarrefourClipboardV41152(raw,allowDirectUrl=false){
+ const value=String(raw||'').trim();
+ if(!value)throw Error('Aucun produit collé. Appuie longtemps sur le champ puis choisis « Coller ».');
+ if(value.length>5000)throw Error('Texte Carrefour trop long.');
+ const prefix=value.match(/^MD-CARREFOUR-V1:/i);
+ if(!prefix){
+  if(allowDirectUrl)return {v:1,url:value};
+  throw Error('Copie le produit avec « Copier pour mon appli » dans notre Userscript Carrefour.');
+ }
+ let body=value.slice(prefix[0].length).trim();
+ if(!body)throw Error('Copie Carrefour vide : recommence avec « Copier pour mon appli ».');
+ if(!body.startsWith('{')){
+  // Les séquences %7B/%22 sont un encodage d'URL, pas un produit invalide.
+  try{body=decodeURIComponent(body)}
+  catch(error){throw Error('Texte Carrefour tronqué ou encodage incomplet. Recopie le produit depuis Carrefour.')}
+ }
+ let data;
+ try{data=JSON.parse(body)}
+ catch(error){throw Error('Texte Carrefour incomplet. Recopie le produit avec le bouton Userscript.')}
+ if(!data||data.v!==1||typeof data.url!=='string')
+  throw Error('Copie Carrefour non reconnue : recommence depuis le bouton Userscript.');
+ return data
+}
 function openImportedCarrefourProduct(data){
   if(!data||data.v!==1||typeof data.url!=='string')throw Error('Format non reconnu');
   const url=validCarrefourLink(data.url);
@@ -658,9 +686,7 @@ function importCarrefourProductFromHash(){
 function applyCarrefourToOpenProductV413(raw){
  const text=String(raw||'').trim();
  if(!text||text.length>5000)throw Error('Colle un lien Carrefour ou un texte « Copier pour mon appli ».');
- const parsed=text.startsWith(CARREFOUR_CLIP_PREFIX)?
-   JSON.parse(text.slice(CARREFOUR_CLIP_PREFIX.length)):
-   {v:1,url:text};
+ const parsed=parseCarrefourClipboardV41152(text,true);
  if(parsed?.v!==1||typeof parsed.url!=='string')throw Error('Format Carrefour non reconnu.');
  const url=validCarrefourLink(parsed.url);
  if(!new URL(url).pathname.startsWith('/p/'))throw Error('Ce lien ne correspond pas à une fiche produit Carrefour.');
@@ -701,11 +727,7 @@ function importCopiedCarrefourProduct(raw){
   const value=String(raw||'').trim();
   if(!value)throw Error('Aucun texte collé. Appuie longtemps dans le champ puis choisis « Coller ».');
   if(value.length>5000)throw Error('Texte trop long pour un produit Carrefour.');
-  if(!value.startsWith(CARREFOUR_CLIP_PREFIX))
-   throw Error('Utilise « Copier pour mon appli » dans notre Userscript Carrefour, puis colle le texte complet ici.');
-  let data;
-  try{data=JSON.parse(value.slice(CARREFOUR_CLIP_PREFIX.length))}
-  catch(e){throw Error('Le texte copié est incomplet : recopie le produit depuis Carrefour.')}
+  const data=parseCarrefourClipboardV41152(value);
   openImportedCarrefourProduct(data);
   toast('✓ Produit Carrefour récupéré. Vérifie sa fiche, puis enregistre.');
   return true

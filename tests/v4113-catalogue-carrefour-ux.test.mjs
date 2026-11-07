@@ -198,6 +198,26 @@ test('V41.13 : coller une référence dans une fiche garde le nom tapé même no
  assert.match(f.inputs['#v413ReferenceStatus'].textContent,/Le nom du produit est inchangé/);
 });
 
+test('V41.15.2 : une copie encodée iPhone conserve le nom et récupère le bon EAN',()=>{
+ const f=inlineCarrefourFixture();
+ const encoded='md-carrefour-v1:'+encodeURIComponent(JSON.stringify(sample))
+  .replaceAll('%3A',':').replaceAll('%2C',',');
+ const result=f.apply(encoded);
+ assert.equal(result.url,sample.url);
+ assert.equal(result.ean,sample.ean);
+ assert.equal(f.inputs['#catalogueName'].value,'Nom personnalisé en cours de saisie');
+ assert.equal(f.inputs['#catalogueUrl'].value,sample.url);
+ assert.equal(f.inputs['#catalogueEan'].value,sample.ean)
+});
+
+test('V41.15.2 : copie incomplète n’altère ni le nom ni la référence en cours',()=>{
+ const f=inlineCarrefourFixture();
+ assert.throws(()=>f.apply('md-carrefour-v1:%7B%22v%22:1%'),/tronqué|incomplet/i);
+ assert.equal(f.inputs['#catalogueName'].value,'Nom personnalisé en cours de saisie');
+ assert.equal(f.inputs['#catalogueUrl'].value,'');
+ assert.equal(f.inputs['#catalogueEan'].value,'9999999999999')
+});
+
 test('V41.13 : une fiche non encore créée peut recevoir un lien sans modifier son nom',()=>{
  const f=inlineCarrefourFixture('');
  f.apply(sample.url);

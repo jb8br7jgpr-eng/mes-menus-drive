@@ -91,6 +91,7 @@ test('V41.15.1 : collage automatique reste possible lorsque Safari donne accès'
 test('V41.15.1 : ouvrir les zones de collage ne déclenche pas de demande iOS',async()=>{
  let calls=0;
  const f=fixture({readText:async()=>{calls++;return sampleText}});
+ f.data['#v413ReferencePaste'].value='';
  await f.api.importCarrefourIntoOpenProductV413();
  assert.equal(calls,0);
  assert.equal(f.data['#v413ReferencePastePanel'].hidden,false);

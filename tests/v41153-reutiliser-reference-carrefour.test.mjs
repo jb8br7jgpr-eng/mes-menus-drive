@@ -113,6 +113,18 @@ test('V41.15.3 : refuser la confirmation conserve le formulaire et la fiche',()=
  assert.equal(f.persistCalls,0);
 });
 
+test('V41.15.4 : une copie avec EAN contradictoire ne fusionne pas même si l’URL est identique',()=>{
+ const f=fixture();
+ f.getNodes()['#v413ReferencePaste'].value='MD-CARREFOUR-V1:'+JSON.stringify({
+  v:1,ean:'3270190010000',url:f.product.url,name:'Autre produit'
+ });
+ assert.equal(f.api.continueCarrefourExistingReferenceV41153('p1'),false);
+ assert.equal(f.getNodes()['#catalogueEditorForm'].dataset.id,'');
+ assert.equal(f.getNodes()['#catalogueName'].value,'Beurre demi-sel');
+ assert.match(f.getNodes()['#v413ReferenceStatus'].textContent,/EAN/);
+ assert.equal(f.persistCalls,0)
+});
+
 test('V41.15.3 : ancienne référence disparue entre-temps ne crée aucun doublon',()=>{
  const f=fixture({missing:true});
  assert.equal(f.api.continueCarrefourExistingReferenceV41153('p1'),false);

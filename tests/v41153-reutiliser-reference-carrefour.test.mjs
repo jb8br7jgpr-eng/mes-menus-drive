@@ -31,10 +31,20 @@ function fixture({accepted=true,missing=false}={}){
   '#cataloguePackaging':input(''),
   '#cataloguePackAmount':input('250'),
   '#cataloguePackUnit':input('g'),
+  '#catalogueUrl':input(''),
+  '#catalogueEan':input(''),
+  '#v413ReferencePaste':input('MD-CARREFOUR-V1:'+JSON.stringify({
+   v:1,name:'Beurre demi-sel',ean:product.ean,url:product.url
+  })),
+  '#v413ReferenceStatus':{textContent:'',dataset:{}},
+  '#v41154MergedNotice':{hidden:true,textContent:''},
  };
  const toasts=[];
  const ctx={
-  state,$:k=>nodes[k]||null,document:{createElement:makeNode},
+  state,$:k=>nodes[k]||null,document:{createElement:makeNode},URL,
+  parseCarrefourClipboardV41152:raw=>raw.startsWith('MD-CARREFOUR-V1:')?JSON.parse(raw.slice('MD-CARREFOUR-V1:'.length)):{v:1,url:raw},
+  validCarrefourLink:raw=>{const u=new URL(raw);if(u.protocol!=='https:'||!u.hostname.endsWith('carrefour.fr'))throw Error('Domaine invalide');return u.href},
+  carrefourPasteFeedbackV41151:(target,message)=>{if(nodes[target])nodes[target].textContent=message},
   productById:id=>state.products.find(p=>p.id===id),
   confirm:message=>{confirmText=message;return accepted},
   toast:x=>toasts.push(x),
@@ -68,21 +78,28 @@ test('V41.15.3 : une référence conservée après suppression de l’ingrédien
  const button=f.box.children[1];
  assert.equal(button.dataset.action,'v41153-reuse-carrefour');
  assert.equal(button.dataset.id,'p1');
- assert.match(button.textContent,/Réutiliser/);
+ assert.match(button.textContent,/Fusionner dans la fiche/);
  assert.equal(f.persistCalls,0);
 });
 
-test('V41.15.3 : réutiliser l’ID existant reprend le nom et le conditionnement sans enregistrer',()=>{
+test('V41.15.4 : fusionner garde exactement le même formulaire, sans enregistrer avant validation',()=>{
  const f=fixture();
+ const beforeForm=f.getNodes()['#catalogueEditorForm'];
  assert.equal(f.api.continueCarrefourExistingReferenceV41153('p1'),true);
- assert.equal(f.editorId,'p1');
+ assert.equal(f.editorId,'','ne doit jamais ouvrir une autre fiche');
+ assert.equal(f.getNodes()['#catalogueEditorForm'],beforeForm,'le formulaire reste physiquement le même');
+ assert.equal(beforeForm.dataset.id,'p1','ID de référence conservé pour les recettes et stocks');
+ assert.equal(beforeForm.dataset.v41154MergedDraft,'1');
  assert.equal(f.getNodes()['#catalogueName'].value,'Beurre demi-sel');
  assert.equal(f.getNodes()['#catalogueBrand'].value,'ELLE & VIRE');
  assert.equal(f.getNodes()['#cataloguePackAmount'].value,'250');
  assert.equal(f.getNodes()['#cataloguePackUnit'].value,'g');
- assert.match(f.getNodes()['#catalogueEditorForm'].inserted.node.textContent,/l’EAN sont conservés/);
+ assert.equal(f.getNodes()['#catalogueEan'].value,'3451790988813');
+ assert.equal(f.getNodes()['#catalogueUrl'].value,f.product.url);
+ assert.match(f.getNodes()['#v41154MergedNotice'].textContent,/Enregistrer le produit/);
+ assert.equal(f.getNodes()['#v41154MergedNotice'].hidden,false);
  assert.equal(f.state.products.length,1);
- assert.equal(f.state.products[0].name,'Beurre salé','l’ancien nom enregistré n’est pas modifié avant validation');
+ assert.equal(f.state.products[0].name,'Beurre salé','ancienne fiche non modifiée avant Enregistrer');
  assert.equal(f.persistCalls,0);
 });
 
@@ -90,9 +107,22 @@ test('V41.15.3 : refuser la confirmation conserve le formulaire et la fiche',()=
  const f=fixture({accepted:false});
  assert.equal(f.api.continueCarrefourExistingReferenceV41153('p1'),false);
  assert.equal(f.editorId,'');
+ assert.equal(f.getNodes()['#catalogueEditorForm'].dataset.id,'');
  assert.equal(f.getNodes()['#catalogueName'].value,'Beurre demi-sel');
  assert.equal(f.state.products[0].name,'Beurre salé');
  assert.equal(f.persistCalls,0);
+});
+
+test('V41.15.4 : une copie avec EAN contradictoire ne fusionne pas même si l’URL est identique',()=>{
+ const f=fixture();
+ f.getNodes()['#v413ReferencePaste'].value='MD-CARREFOUR-V1:'+JSON.stringify({
+  v:1,ean:'3270190010000',url:f.product.url,name:'Autre produit'
+ });
+ assert.equal(f.api.continueCarrefourExistingReferenceV41153('p1'),false);
+ assert.equal(f.getNodes()['#catalogueEditorForm'].dataset.id,'');
+ assert.equal(f.getNodes()['#catalogueName'].value,'Beurre demi-sel');
+ assert.match(f.getNodes()['#v413ReferenceStatus'].textContent,/EAN/);
+ assert.equal(f.persistCalls,0)
 });
 
 test('V41.15.3 : ancienne référence disparue entre-temps ne crée aucun doublon',()=>{
@@ -100,7 +130,7 @@ test('V41.15.3 : ancienne référence disparue entre-temps ne crée aucun doublo
  assert.equal(f.api.continueCarrefourExistingReferenceV41153('p1'),false);
  assert.equal(f.editorId,'');
  assert.equal(f.state.products.length,0);
- assert.match(f.toasts[0],/plus disponible/);
+ assert.match(f.toasts[0],/introuvable/);
 });
 
 test('V41.15.3 : champ EAN et lien ne sont jamais écrasés par une réutilisation pré-confirmation',()=>{
@@ -118,6 +148,8 @@ test('V41.15.3 : le blocage affiche l’action depuis une fiche nouvelle ou déj
  assert.match(src,/else if\(mode==='v41153-reuse-carrefour'\)continueCarrefourExistingReferenceV41153\(id\)/);
  assert.match(src,/id="v41153ReferenceConflict"/);
  assert.match(src,/function continueCarrefourExistingReferenceV41153\(id\)/);
+ assert.match(src,/id="v41154MergedNotice"/);
+ assert.match(src,/showInCatalogue:Boolean\(old\?\.showInCatalogue\|\|mergedInDraft\)/);
  assert.match(css,/\.v41153-conflict\[hidden\]\{display:none!important\}/);
 });
 

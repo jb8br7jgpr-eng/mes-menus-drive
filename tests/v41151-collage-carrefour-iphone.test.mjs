@@ -46,10 +46,54 @@ function fixture(options={}){
   }},
   modalRoot:{querySelector:key=>buttons[key]||null}
  };
- const code=take('function carrefourPasteFeedbackV41151(target,message,isError=false){','function ingredientRowsCatalogue(){');
+ const code=take('function parseCarrefourClipboardV41152(raw,allowDirectUrl=false){','function openImportedCarrefourProduct(data){')+
+  take('function carrefourPasteFeedbackV41151(target,message,isError=false){','function ingredientRowsCatalogue(){');
  const api=runInNewContext(code+';({importCopiedCarrefourProduct,readCarrefourClipboard,importCarrefourIntoOpenProductV413,readCarrefourReferenceClipboardV41151})',context);
  return {api,data,toastMessages,imported,references,buttons}
 }
+
+test('V41.15.2 : le texte de la capture en variante iPhone encodée est reconnu',()=>{
+ const f=fixture();
+ const product={v:1,name:'Beurre   tendre demi-sel ELLE & VIRE',brand:'ELLE & VIRE',
+  packaging:'',ean:'3451790988813',
+  url:'https://www.carrefour.fr/p/beurre-tendre-demi-sel-elle-vire-3451790988813'};
+ const json=JSON.stringify(product);
+ // Variante URL/clipboard iOS : %7B et %22, mais virgules, deux-points et & bruts.
+ const encoded='md-carrefour-v1:'+encodeURIComponent(json)
+  .replaceAll('%3A',':').replaceAll('%2C',',').replaceAll('%26','&');
+ assert.equal(f.api.importCopiedCarrefourProduct(encoded),true);
+ assert.equal(f.imported.length,1);
+ assert.equal(f.imported[0].ean,product.ean);
+ assert.equal(f.imported[0].name,product.name);
+ assert.equal(f.imported[0].url,product.url);
+});
+
+test('V41.15.2 : les copies originales Userscripts continuent de fonctionner',()=>{
+ const f=fixture();
+ assert.equal(f.api.importCopiedCarrefourProduct(sampleText),true);
+ assert.equal(f.imported[0].ean,sample.ean);
+});
+
+test('V41.15.2 : copie encodée tronquée ou pourcentage final inachevé refusé clairement',()=>{
+ const f=fixture();
+ for(const incomplete of ['md-carrefour-v1:%7B%22v%22:1%','md-carrefour-v1:%7B%22v%22:1']){
+  assert.equal(f.api.importCopiedCarrefourProduct(incomplete),false);
+  assert.equal(f.imported.length,0);
+  assert.match(f.data['#carrefourPasteStatus'].textContent,/incomplet|tronqué/i);
+ }
+});
+
+test('V41.15.2 : les URLs non Carrefour restent strictement rejetées dans les fiches',()=>{
+ const f=fixture();
+ const parser=runInNewContext(
+  take('function parseCarrefourClipboardV41152(raw,allowDirectUrl=false){','function openImportedCarrefourProduct(data){')+
+  ';parseCarrefourClipboardV41152',{});
+ assert.equal(parser('https://www.carrefour.fr/p/beurre-3451790988813',true).v,1);
+ assert.throws(()=>parser('https://example.com/p/3451790988813'),/Copie le produit/);
+ // Une URL externe est acceptée uniquement comme texte brut en amont de validCarrefourLink.
+ assert.equal(parser('https://example.com/p/3451790988813',true).url,'https://example.com/p/3451790988813');
+ assert.equal(f.api.importCopiedCarrefourProduct('md-carrefour-v1:%7B%22v%22:1'),false);
+});
 
 test('V41.15.1 : importer le texte Userscripts par collage natif prépare la fiche sans nouvelle permission',()=>{
  const f=fixture({readText:async()=>{throw Error('Accès impossible')}});

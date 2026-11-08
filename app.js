@@ -1386,7 +1386,7 @@ function productBadge(p){
 // sur sa fiche, jamais une seconde fois dans les articles indépendants.
 function independentProducts(store=ingredientStoreTab){
  const linked=new Set((state.ingredientCatalog||[]).map(i=>i.productId).filter(Boolean));
- return (state.products||[]).filter(p=>!linked.has(p.id)&&
+ return (state.products||[]).filter(p=>(!linked.has(p.id)||p.showInCatalogue)&&
   (state.storePreferences?.['product:'+p.id]||p.store||'carrefour')===store)
 }
 
@@ -1761,7 +1761,7 @@ function frequentCatalogueItems(){
  const linked=new Set((state.ingredientCatalog||[]).map(i=>i.productId).filter(Boolean));
  return [
   ...(state.ingredientCatalog||[]).filter(i=>i.frequent).map(i=>({kind:'ingredient',id:i.id,name:i.name})),
-  ...(state.products||[]).filter(p=>p.frequent&&!linked.has(p.id)).map(p=>({kind:'daily',id:p.id,name:p.name}))
+  ...(state.products||[]).filter(p=>p.frequent&&(!linked.has(p.id)||p.showInCatalogue)).map(p=>({kind:'daily',id:p.id,name:p.name}))
  ].sort((a,b)=>a.name.localeCompare(b.name,'fr',{sensitivity:'base'}));
 }
 
@@ -2673,7 +2673,7 @@ function extraSearchItems(term=''){
  const needle=norm(term),linked=new Set((state.ingredientCatalog||[]).map(i=>i.productId).filter(Boolean));
  return [
   ...(state.ingredientCatalog||[]).map(i=>({kind:'ingredient',id:i.id,name:i.name,store:ingredientStore(i),frequent:!!i.frequent})),
-  ...(state.products||[]).filter(p=>!linked.has(p.id)).map(p=>({kind:'daily',id:p.id,name:p.name,store:p.store||'carrefour',frequent:!!p.frequent}))
+  ...(state.products||[]).filter(p=>!linked.has(p.id)||p.showInCatalogue).map(p=>({kind:'daily',id:p.id,name:p.name,store:p.store||'carrefour',frequent:!!p.frequent}))
  ].filter(x=>!needle||norm(x.name).includes(needle))
   .sort((a,b)=>Number(b.frequent)-Number(a.frequent)||a.name.localeCompare(b.name,'fr',{sensitivity:'base'}))
   .slice(0,25);
@@ -2698,7 +2698,7 @@ function bulkCatalogueV37(){
    return {kind:'ingredient',id:i.id,name:i.name,store:ingredientStore(i),category:catalogueCategoryV40(i,i.productId),frequent:!!i.frequent,
     qty:Number(i.qty)>0?Number(i.qty):Number(matching?.qty)>0?Number(matching.qty):1,unit}
   }),
-  ...(state.products||[]).filter(p=>!linked.has(p.id)).map(p=>({
+  ...(state.products||[]).filter(p=>!linked.has(p.id)||p.showInCatalogue).map(p=>({
    kind:'daily',id:p.id,name:p.name,category:catalogueCategoryV40(p),
    store:state.storePreferences?.['product:'+p.id]||p.store||'carrefour',
    frequent:!!p.frequent,qty:Number(p.qty)>0?Number(p.qty):1,unit:units.includes(p.unit)?p.unit:'pièce'

@@ -176,6 +176,6 @@ test('V41.15.4 : conserve le modèle complet de sauvegarde Firebase sans modifie
  assert.doesNotMatch(readFn('continueCarrefourExistingReferenceV41153','applyCarrefourToOpenProductV413'),/productEditor\(/,'aucun basculement dans une autre fiche');
  assert.match(src,/showInCatalogue:Boolean\(old\?\.showInCatalogue\|\|mergedInDraft\)/);
  assert.match(src,/v34CloudRuntime\.commitLocalModification\(snapshot\)/);
- assert.match(index,/app\.js\?v=20261107-41-15-4-merge/);
- assert.match(sw,/menus-drive-v41-15-4-merge-20261107/);
+ assert.match(index,/app\.js\?v=20261108-41-15-5-bulk/);
+ assert.match(sw,/menus-drive-v41-15-5-bulk-20261108/);
 });

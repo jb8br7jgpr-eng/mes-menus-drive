@@ -76,14 +76,17 @@ export function renderStockV41({state,week,weekId,view='home',recipeById,mealDis
       '<button class="btn tiny secondary" data-action="v41-freeze-recipe" data-index="'+i+'" data-id="'+escape(dish.recipeId)+'">❄️ Au congélateur</button></div>'));
    }
    for(const product of mealProductsV412(meal)){
-    const p=productById(product.productId),key=i+':product:'+product.productId,status=actions[key];
-    entries.push(row('🛒 '+(p?.name||'Produit supprimé'),
-     mealLabelFor(i)+' · '+product.qty+' '+product.unit+' · produit du catalogue',
+    const ingredient=(state.ingredientCatalog||[]).find(x=>x.id===product.ingredientId);
+    const p=productById(product.productId||ingredient?.productId);
+    const ref=product.ingredientId?'ingredient:'+product.ingredientId:product.productId;
+    const key=i+':product:'+ref,status=actions[key];
+    entries.push(row('🛒 '+(ingredient?.name||p?.name||'Produit supprimé'),
+     mealLabelFor(i)+' · '+product.qty+' '+product.unit+' · '+(ingredient?.store==='grandfrais'||p?.store==='grandfrais'?'Grand Frais':'Carrefour'),
      status?'<div class="v41-stock-actions"><span class="v41-stock-done">✓ Mangé</span>'+
        '<button class="btn tiny secondary" data-action="v41-undo-validation" data-kind="product" data-index="'+i+
-       '" data-id="'+escape(product.productId)+'">Annuler la validation</button></div>':
+       '" data-id="'+escape(ref)+'">Annuler la validation</button></div>':
        '<button class="btn tiny" data-action="v41-eat-product" data-index="'+i+
-       '" data-id="'+escape(product.productId)+'">C’est mangé</button>'));
+       '" data-id="'+escape(ref)+'">C’est mangé</button>'));
    }
    for(const leftover of (typeof mealLeftovers==='function'?mealLeftovers(meal):[])){
     const source=recipeById(leftover.recipeId),prepared=actions[leftover.fromIndex+':'+leftover.recipeId];

@@ -48,7 +48,7 @@ test('Le choix de catégorie modifie le panneau en place, jamais le serveur',()=
  assert.equal(panel.innerHTML,'<div>1:side</div>');
  assert.equal(buttons[1].aria,'true');
  assert.equal(buttons[0].aria,'false');
- assert.ok(modal.scrollTop<300);
+ assert.equal(modal.scrollTop,304,'la barre est positionnée sous l’entête, sans saut en bas de liste');
  api(1,'frozen');
  assert.equal(panel.innerHTML,'<div>1:frozen</div>');
  assert.equal(buttons[3].aria,'true');

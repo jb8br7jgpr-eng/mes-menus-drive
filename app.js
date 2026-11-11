@@ -3572,7 +3572,7 @@ document.addEventListener('click',e=>{
    const before=weekBeforeUndo();
    try{
     state.weeks=stockModulesV41.week.addFrozenToMealV4117(state.weeks,state.stockV41,currentWeek,index,id,qty);
-    persist();render(true);pickMeal(index);
+    persist();render(true);openMealPickerV4116(index,'frozen');
     toastWeekUndo('Portions congelées ajoutées au repas.',before,index)
    }catch(error){toast(error.message||'Impossible d’ajouter ces portions.')}
   }
@@ -3766,7 +3766,7 @@ document.addEventListener('click',e=>{
    row.querySelector('.ingredient-unit').value=preferredIngredientUnit(ing);
    refreshIngredientEntry(row);row.querySelector('.ingredient-qty')?.focus()
   }
-  else if(mode==='choose-recipe'){if(isMealDoneV41(w,index)){toast('Ce repas a déjà été validé.');return}const portions=peopleInput(id);if(portions===null){toast('Choisis entre 1 et 30 portions.');return}if(!addRecipeToMeal(w,index,id,portions)){toast('Ce plat est déjà présent dans ce repas. Modifie plutôt ses portions.');return}persist();render(true);pickMeal(index)}
+  else if(mode==='choose-recipe'){if(isMealDoneV41(w,index)){toast('Ce repas a déjà été validé.');return}const portions=peopleInput(id);if(portions===null){toast('Choisis entre 1 et 30 portions.');return}if(!addRecipeToMeal(w,index,id,portions)){toast('Ce plat est déjà présent dans ce repas. Modifie plutôt ses portions.');return}persist();render(true);openMealPickerV4116(index,'recipes')}
   else if(mode==='v412-pick-product')openMealProductPickerV412(index);
   else if(mode==='v412-select-product'||mode==='v412-edit-meal-product')editMealProductV412(index,id);
   else if(mode==='v412-save-meal-product'){
@@ -3779,7 +3779,7 @@ document.addEventListener('click',e=>{
    next.push({productId:id,qty,unit});
    const before=weekBeforeUndo();
    if(!setMealProductsV412(w,index,next)){toast('Impossible d’ajouter ce produit à ce repas.');return}
-   persist();render(true);pickMeal(index);
+   persist();render(true);openMealPickerV4116(index,'products');
    toastWeekUndo('Produit enregistré pour le repas.',before,index)
   }
   else if(mode==='v412-remove-meal-product'){
@@ -3801,7 +3801,7 @@ document.addEventListener('click',e=>{
    const source=Number(a.dataset.source),qty=Number($('#leftoverPeople')?.value);
    if(!Number.isInteger(qty)||qty<1||qty>30){toast('Choisis entre 1 et 30 portions de restes.');return}
    if(!addLeftoversToMeal(w,index,source,id,qty)){toast('Cette quantité de restes n’est plus disponible.');pickLeftoverSource(index);return}
-   persist();render(true);pickMeal(index);toast('Restes placés au repas choisi !')
+   persist();render(true);openMealPickerV4116(index,'leftovers');toast('Restes placés au repas choisi !')
   }
   else if(mode==='remove-leftover'){
    const li=Number(a.dataset.leftover),parts=mealParts(w.meals[index]),left=mealLeftovers(w.meals[index]);

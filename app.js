@@ -2588,6 +2588,10 @@ function undoMealValidationControlsV41(index,meal){
   recognizedKeys.add(index+':frozen');
   make('frozen',null,null,'Congélateur')
  }
+ if(meal?.type!=='frozen')for(const item of mealFrozenV4117(meal)){
+  const key=index+':frozen:'+item.lotId;
+  if(actions[key]){recognizedKeys.add(key);make('frozen-part',item.lotId,null,state.stockV41?.freezer?.[item.lotId]?.name||'Congélateur')}
+ }
  for(const item of mealProductsV412(meal)){
   const key=index+':product:'+item.productId;
   if(actions[key]){
@@ -2624,6 +2628,11 @@ function quickMealActionsV413(index,meal){
  const button=(action,label,attrs='',secondary=false)=>'<button class="btn '+(secondary?'secondary ':'')+'v413-meal-action" data-action="'+action+'" data-index="'+index+'"'+attrs+'>'+label+'</button>';
  if(meal?.type==='frozen'&&!done[index+':frozen'])
   out.push(button('v41-eat-frozen','✓ C’est mangé'));
+ if(meal?.type!=='frozen')for(const part of mealFrozenV4117(meal)){
+  if(part.consumed||done[index+':frozen:'+part.lotId])continue;
+  const label=state.stockV41?.freezer?.[part.lotId]?.name||'Plat congelé';
+  out.push(button('v41-eat-frozen-part','✓ C’est mangé · '+html(label),' data-id="'+html(part.lotId)+'"'));
+ }
  for(const dish of mealDishes(meal)){
   if(done[index+':'+dish.recipeId])continue;
   const id=' data-id="'+html(dish.recipeId)+'"';

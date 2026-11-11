@@ -2800,13 +2800,22 @@ function pickMeal(index){
 }
 function mealProductPickerResultsV412(index,term=''){
  const already=new Set(mealProductsV412(getWeek().meals[index]).map(x=>x.productId));
- const products=(state.products||[]).filter(p=>!already.has(p.id)&&
-  (!norm(term)||norm(p.name).includes(norm(term)))).sort((a,b)=>a.name.localeCompare(b.name,'fr',{sensitivity:'base'}));
+ const seenIds=new Set(),seenNames=new Set();
+ const products=unifiedCatalogueSourceV4114().map(x=>{
+  const p=x.type==='daily'?x.item:productById(x.item.productId);
+  return p?{...p,displayName:x.name}:null
+ }).filter(p=>{
+  if(!p||already.has(p.id)||seenIds.has(p.id))return false;
+  const key=recipeMatchKeyV4116(p.displayName);
+  if(!key||seenNames.has(key))return false;
+  seenIds.add(p.id);seenNames.add(key);return true;
+ }).filter(p=>!norm(term)||norm(p.displayName).includes(norm(term))||norm(p.name).includes(norm(term)))
+  .sort((a,b)=>a.displayName.localeCompare(b.displayName,'fr',{sensitivity:'base'}));
  return products.length?products.map(p=>'<button class="picker-item" data-action="v412-select-product" data-index="'+index+
-  '" data-id="'+html(p.id)+'"><span class="emoji">🛒</span><span class="grow"><strong>'+html(p.name)+
+  '" data-id="'+html(p.id)+'"><span class="emoji">🛒</span><span class="grow"><strong>'+html(p.displayName)+
   '</strong><small>'+html(p.store==='grandfrais'?'Grand Frais':'Carrefour')+
   ' · '+html(p.unit||'pièce')+'</small></span><span class="end">＋</span></button>').join(''):
-  '<div class="meal-picker-empty">Aucun produit disponible avec cette recherche.</div>';
+  '<div class="meal-picker-empty">Aucun produit actuel disponible avec cette recherche.</div>';
 }
 function openMealProductPickerV412(index){
  if(!Number.isInteger(index)||index<0||index>13||isMealDoneV41(getWeek(),index))return;

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {runInNewContext} from 'node:vm';
 import {stockIdentityV41,stockMeasureV41} from '../stock-engine-v41.mjs';
-import {repeatWeekMealsV41} from '../stock-week-v41.mjs';
+import {repeatWeekMealsV41,resolveStockArticleV41} from '../stock-week-v41.mjs';
 
 const src=readFileSync(new URL('../app.js',import.meta.url),'utf8');
 const stockActions=readFileSync(new URL('../stock-actions-v41.mjs',import.meta.url),'utf8');
@@ -26,12 +26,13 @@ const recipes=[
 const recipeById=id=>recipes.find(x=>x.id===id);
 const productById=id=>catalog.products.find(x=>x.id===id);
 const code=take('mealProductsV412','mealCard')+
- ';({mealProductsV412,mealGuestsV412})';
-const helpers=runInNewContext(code,{units,state:catalog});
+ ';({mealProductsV412,mealGuestsV412,mealProductRefV4118,mealProductInfoV4118})';
+const helpers=runInNewContext(code,{units,state:catalog,productById,ingredientById:()=>null,ingredientStore:()=> 'carrefour'});
 const mealDishes=runInNewContext(take('mealDishes','mealProductsV412')+';mealDishes',{});
 const portionsEatenHere=runInNewContext(take('portionsEatenHere','isMealDoneV41')+';portionsEatenHere',{});
 const products=helpers.mealProductsV412;
-const context={units,mealDishes,mealProductsV412:products,recipeById,productById,state:catalog};
+const context={units,mealDishes,mealProductsV412:products,recipeById,productById,state:catalog,
+ mealProductRefV4118:helpers.mealProductRefV4118,mealProductInfoV4118:helpers.mealProductInfoV4118};
 const storeCode=take('mealLeftovers','portionsEatenHere')+
  ';({mealLeftovers,storeMealParts,setMealProductsV412,setMealGuestsV412})';
 const store=runInNewContext(storeCode,{...context,isMealDoneV41:()=>false,reconcileLeftovers:()=>{}});
@@ -101,7 +102,7 @@ test('V41.12 : 2 pièces correspondent à 1 boîte de 2 sans déduire 2 boîtes'
  const movementSource=stockActions.slice(stockActions.indexOf('function mealProductMovementV412('),
   stockActions.indexOf('function replaceModal(',stockActions.indexOf('function mealProductMovementV412(')));
  const movement=runInNewContext(movementSource+';mealProductMovementV412',{
-  stockIdentityV41,stockMeasureV41});
+  stockIdentityV41,stockMeasureV41,resolveStockArticleV41});
  const m2=movement({state:catalog,units},{productId:'cordons',qty:2,unit:'pièce'});
  assert.equal(m2.amount,2);assert.equal(m2.unit,'pièce');assert.equal(m2.direction,'consume');
 });

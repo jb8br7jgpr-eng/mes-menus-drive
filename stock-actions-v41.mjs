@@ -1,7 +1,7 @@
 // Speedrive V41 — actions du stock en mode brouillon. Aucune migration automatique.
 import {emptyStockV41,applyStockTransactionV41,availableStockV41,
  stockIdentityV41,stockMeasureV41,previewLegacyPantryV41} from './stock-engine-v41.mjs';
-import {kitchenMovementsV41,purchasedMovementsV41,planFrozenMealV41,
+import {resolveStockArticleV41,kitchenMovementsV41,purchasedMovementsV41,planFrozenMealV41,
  remainingFreezerPortionsV41} from './stock-week-v41.mjs';
 import {stockConfirmationTextV413} from './stock-preview-v413.mjs';
 const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -104,7 +104,8 @@ function orphanValidationKeys(ctx,week,index) {
  if(meal?.type==='frozen')known.add(index+':frozen');
  for(const part of (Array.isArray(meal?.frozen)?meal.frozen:[]))known.add(index+':frozen:'+part.lotId);
  for(const d of ctx.mealDishes(meal))known.add(index+':'+d.recipeId);
- for(const product of (ctx.mealProductsV412?.(meal)||[]))known.add(index+':product:'+product.productId);
+ for(const product of (ctx.mealProductsV412?.(meal)||[]))
+   known.add(index+':product:'+(product.ingredientId?'ingredient:'+product.ingredientId:product.productId));
  for(const d of ctx.mealLeftovers(meal))
   known.add(index+':leftovers:'+d.fromIndex+':'+d.recipeId);
  return Object.keys(week.v41MealActions||{}).filter(k=>
@@ -113,14 +114,14 @@ function orphanValidationKeys(ctx,week,index) {
 // V41.12 — consommer une référence du catalogue directement prévue dans Menus.
 // Les conditionnements connus sont convertis par le moteur de stock existant.
 function mealProductMovementV412(ctx,item){
- const p=ctx.state.products.find(x=>x.id===item?.productId);
- if(!p||!ctx.units.includes(item.unit)||!(Number(item.qty)>0))
-  throw Error('Produit du repas introuvable ou quantité invalide.');
- const identity=stockIdentityV41({productId:p.id},ctx.state.ingredientCatalog);
- const measured=stockMeasureV41(Number(item.qty),item.unit,p);
- return {type:'inventory',direction:'consume',identity,
-  name:p.name,amount:measured.amount,unit:measured.unit,
-  category:p.category||'Autres',store:p.store||'carrefour'};
+ if(!ctx.units.includes(item?.unit)||!(Number(item?.qty)>0))
+  throw Error('Quantité du repas invalide.');
+ const article=resolveStockArticleV41(item,ctx.state.ingredientCatalog,ctx.state.products);
+ if(!article)throw Error('Fiche du produit du repas introuvable : corrige-la dans Produits.');
+ const measured=stockMeasureV41(Number(item.qty),item.unit,article.product);
+ return {type:'inventory',direction:'consume',identity:article.identity,
+  name:article.name,amount:measured.amount,unit:measured.unit,
+  category:article.category,store:article.store};
 }
 function replaceModal(ctx,index) {
  const meal=ctx.getWeek().meals[index],actions=ctx.getWeek().v41MealActions||{};
@@ -129,7 +130,7 @@ function replaceModal(ctx,index) {
  const frozen=Object.values(stockOf(ctx.state).freezer||{}).filter(l=>remainingFreezerPortionsV41(
   stockOf(ctx.state),ctx.state.weeks,l.lotId,{weekId:ctx.currentWeek,index})>0);
  let body='<p class="helper">Remplace uniquement ce repas. L’ancien plat ne déduit aucun ingrédient du stock.</p>'+
-  '<button class="btn secondary wide" data-action="v41-replace-ordered" data-index="'+index+'">🍕 Repas commandé / libre</button>'+
+  '<button class="btn secondary wide" data-action="v41-replace-ordered" data-index="'+index+'">🍕 Repas commandé</button>'+
   '<div class="section-head"><h3>Un plat de mes recettes</h3></div>'+
   input('v41RecipePortions','Portions à préparer',2,1,30)+
   '<div class="v41-select-list">'+
@@ -280,7 +281,7 @@ export function handleStockActionV41(ctx) {
  }
  if(mode==='v41-eat-product'){
   if(!Number.isInteger(index)||index<0||index>13||!id)return true;
-  const item=ctx.mealProductsV412(w.meals[index]).find(x=>x.productId===id),key=index+':product:'+id;
+  const item=ctx.mealProductsV412(w.meals[index]).find(x=>(x.ingredientId?'ingredient:'+x.ingredientId:x.productId)===id),key=index+':product:'+id;
   if(!item){ctx.toast('Ce produit n’est pas prévu dans le repas.');return true}
   if(w.v41MealActions?.[key]){ctx.toast('Ce produit a déjà été consommé.');return true}
   try{
@@ -490,7 +491,7 @@ export function handleStockActionV41(ctx) {
    return true
   }
   if(kind==='product'){
-   const item=ctx.mealProductsV412(w.meals[index]).find(x=>x.productId===id);
+   const item=ctx.mealProductsV412(w.meals[index]).find(x=>(x.ingredientId?'ingredient:'+x.ingredientId:x.productId)===id);
    if(!item){ctx.toast('Ce produit n’est plus présent dans le repas.');return true}
    const original=action.movements;
    if(!Array.isArray(original)||original.length!==1||
@@ -498,9 +499,10 @@ export function handleStockActionV41(ctx) {
     ctx.toast('Consommation d’origine introuvable : le stock n’a pas été modifié.');return true
    }
    const inverse=original.map(x=>({...x,direction:'add'}));
-   if(!confirm('Annuler la consommation du produit « '+(productOf(ctx,id)?.name||id)+
+   const name=id.startsWith('ingredient:')?ingredientOf(ctx,id.slice('ingredient:'.length))?.name:productOf(ctx,id)?.name;
+   if(!confirm('Annuler la consommation du produit « '+(name||id)+
     ' » ? Sa quantité sera rétablie dans le Stock maison.'))return true;
-   commit(ctx,tx('Annulation du produit consommé · '+(productOf(ctx,id)?.name||id),inverse),()=>{
+   commit(ctx,tx('Annulation du produit consommé · '+(name||id),inverse),()=>{
     delete w.v41MealActions[key];
     if(Array.isArray(w.generatedIngredients))ctx.generateWeekCourses(w);
    });

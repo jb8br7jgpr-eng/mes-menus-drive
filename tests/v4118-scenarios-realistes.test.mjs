@@ -129,8 +129,8 @@ test('V41.18 : les quatre sources, quantites et nouveau flux achats restent pres
  assert.match(app,/x\.sourceKind==='meal-product'\?'Repas':'Recettes'/);
  assert.doesNotMatch(app,/Enregistrer uniquement les articles cochés/);
  assert.match(ui,/ingredient\.ingredientId|product\.ingredientId/);
- assert.match(index,/41-21-unified/);
- assert.match(sw,/41-21-unified/);
+ assert.match(index,/41-22-four-sources/);
+ assert.match(sw,/41-22-four-sources/);
  assert.doesNotThrow(()=>new Function(app));
 });
 

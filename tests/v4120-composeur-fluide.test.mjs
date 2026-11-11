@@ -88,7 +88,7 @@ test('le catalogue utilise les fiches existantes sans raccourcis dupliqués',()=
  assert.doesNotMatch(app,/data-action="v4120-open-main"/);
  assert.match(app,/function mealProductPickerResultsV412\(/);
  assert.match(app,/unifiedCatalogueSourceV4114\(\)/);
- assert.match(app,/v4121SideProductResults/);
+ assert.match(app,/mealSidePickerResultsV4121/);
 });
 test('recettes directement proposées pour les convives, sans seconde saisie',()=>{
  const picker=segment('function mealPickerBodyV4121(', 'function pickMeal(index){');

@@ -1907,7 +1907,7 @@ function collectRecipeIngredients(w){
   if(!ing&&!p)return;
   const linked=!ing&&p?(state.ingredientCatalog||[]).filter(i=>i.productId===p.id):[];
   lines.push({name:info.name,qty:x.qty,unit:x.unit,productId:p?.id||null,
-   ingredientId:ing?.id||(linked.length===1?linked[0].id:null)});
+   ingredientId:ing?.id||(linked.length===1?linked[0].id:null),sourceKind:'meal-product'});
  }));
  return lines
 }
@@ -2045,7 +2045,7 @@ function shopping(){
   plain(ing?.name||name,qty,unit,source,(store==='grandfrais')?null:p?.id,ing?.id||null,store,extraId,generatedIndex)
  }
  (Array.isArray(w.generatedIngredients)?w.generatedIngredients:[]).forEach((x,index)=>
-  add(x.name,Number(x.qty),x.unit,'Recettes',x.productId,false,x.ingredientId,null,index)
+  add(x.name,Number(x.qty),x.unit,x.sourceKind==='meal-product'?'Repas':'Recettes',x.productId,false,x.ingredientId,null,index)
  );
  w.extras.forEach(x=>add(x.name,x.qty,x.unit,'Ajout manuel',x.productId,Boolean(x.fromCatalogue),x.ingredientId,x.id));
  for(const [productId,item] of packs){

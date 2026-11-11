@@ -2672,7 +2672,8 @@ function pickMeal(index){
  }
  let out='<div class="v413-meal-top">'+
   '<button class="btn secondary" data-action="v4116-open-picker" data-kind="recipes" data-index="'+index+'">＋ Choisir un plat</button>'+ 
- '<button class="btn secondary" data-action="v4116-open-picker" data-kind="frozen" data-index="'+index+'">❄️ Congélateur</button>'
+ '<button class="btn secondary" data-action="v4116-open-picker" data-kind="frozen" data-index="'+index+'">❄️ Congélateur</button>'+
+  '<button class="btn secondary" data-action="v41-replace-meal" data-index="'+index+'">↔ Autres possibilités</button>'+
   (meal?'<button class="btn secondary" data-action="remove-meal" data-index="'+index+'">Vider le repas</button>':'')+'</div>'+quick+
   (meal?.type==='no-meal'?'':'<button type="button" class="btn secondary wide v411-no-meal-button" data-action="mark-no-meal" data-index="'+index+'">🍽️ Pas de repas <small>Restaurant, invitation, sortie…</small></button>');
  if(meal?.type==='frozen'||meal?.type==='ordered'||meal?.type==='no-meal'){

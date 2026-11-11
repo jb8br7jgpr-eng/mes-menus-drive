@@ -1,5 +1,5 @@
 // Speedrive V41 — rendu seul du sixième onglet. Aucune écriture Firebase ici.
-import {freezerReservationsV41} from './stock-week-v41.mjs';
+import {freezerReservationsV41,mealFrozenPartsV4117} from './stock-week-v41.mjs';
 const escape = x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const q = n=>Number(n||0).toLocaleString('fr-FR',{maximumFractionDigits:3});
 const days=['Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi','Dimanche'];
@@ -55,6 +55,16 @@ export function renderStockV41({state,week,weekId,view='home',recipeById,mealDis
      completed?'<div class="v41-stock-actions"><span class="v41-stock-done">✓ Mangé</span>'+
       '<button class="btn tiny secondary" data-action="v41-undo-validation" data-kind="frozen" data-index="'+i+'">Annuler la validation</button></div>':
       '<button class="btn tiny" data-action="v41-eat-frozen" data-index="'+i+'">C’est mangé</button>'));
+   }
+   if(meal?.type!=='frozen')for(const part of mealFrozenPartsV4117(meal)){
+    const lot=stock.freezer?.[part.lotId],key=i+':frozen:'+part.lotId,completed=Boolean(actions[key]||part.consumed);
+    entries.push(row('❄️ '+(lot?.name||recipeById(part.recipeId)?.name||'Plat congelé'),
+     mealLabelFor(i)+' · '+part.portions+' portion'+(part.portions>1?'s':'')+' · congélateur',
+     completed?'<div class="v41-stock-actions"><span class="v41-stock-done">✓ Mangé</span>'+
+      '<button class="btn tiny secondary" data-action="v41-undo-validation" data-kind="frozen-part" data-index="'+i+
+      '" data-id="'+escape(part.lotId)+'">Annuler la validation</button></div>':
+      '<button class="btn tiny" data-action="v41-eat-frozen-part" data-index="'+i+
+      '" data-id="'+escape(part.lotId)+'">C’est mangé</button>'));
    }
    for(const dish of mealDishes(meal)){
     const recipe=recipeById(dish.recipeId),status=actions[i+':'+dish.recipeId];

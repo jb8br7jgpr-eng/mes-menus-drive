@@ -252,7 +252,7 @@ function emptyView(emoji,title,description,button){return '<div class="empty"><d
 function mealDishes(meal){
  if(meal?.type==='recipe'&&meal.recipeId)return [{recipeId:meal.recipeId,people:Number(meal.people)||2}];
  if(meal?.type==='multi'&&Array.isArray(meal.dishes))
-   return meal.dishes.filter(d=>d&&d.type!=='leftovers'&&d.recipeId&&Number(d.people)>0)
+   return meal.dishes.filter(d=>d&&!d.type&&d.recipeId&&Number(d.people)>0)
      .map(d=>({recipeId:d.recipeId,people:Number(d.people)}));
  return []
 }
@@ -263,6 +263,15 @@ function mealProductsV412(meal){
  return meal.products.filter(x=>x?.productId&&Number(x.qty)>0&&units.includes(x.unit))
   .map(x=>({productId:x.productId,qty:Number(x.qty),unit:x.unit}));
 }
+// V41.17 — compatibilite historique + repas composes avec plusieurs plats congeles.
+function mealFrozenV4117(meal){
+ if(!meal)return [];
+ const legacy=meal.type==='frozen'&&meal.lotId?[{lotId:meal.lotId,recipeId:meal.recipeId,portions:meal.portions,consumed:Boolean(meal.consumed)}]:[];
+ const current=Array.isArray(meal.frozen)?meal.frozen:[];
+ const historic=meal.type==='multi'&&Array.isArray(meal.dishes)?meal.dishes.filter(d=>d?.type==='frozen'):[];
+ return [...legacy,...current,...historic].filter(x=>x?.lotId&&Number(x.portions)>0);
+}
+function mealCanEditV4117(meal){return !meal||!['no-meal','ordered'].includes(meal.type)}
 function mealGuestsV412(meal){
  const n=Number(meal?.guests),defaultGuests=Number(state.settings?.people)||2;
  return Number.isInteger(n)&&n>=1&&n<=30?n:Math.max(1,Math.min(30,defaultGuests));
@@ -296,6 +305,9 @@ function mealCard(meal,i){
    })
   }
   mealLeftovers(meal).forEach(x=>{const r=recipeById(x.recipeId);names.push('🍱 Restes : '+(r?.name||'Autre plat')+' · '+x.people+' portion'+(x.people>1?'s':''))});
+  mealFrozenV4117(meal).forEach(x=>{const lot=state.stockV41?.freezer?.[x.lotId];
+    names.push((x.consumed?'✓ ':'❄️ ')+(recipeById(x.recipeId)?.name||lot?.name||'Plat congelé')+' · '+x.portions+' portion'+(x.portions>1?'s':''));
+  });
   if(names.length){classes=' filled';note=names.length===1?'1 plat':names.length+' plats pour ce repas'}
  }
  const productLines=mealProductsV412(meal);
@@ -307,7 +319,7 @@ function mealCard(meal,i){
   classes=' filled';
   note=(note?note+' · ':'')+productLines.length+' produit'+(productLines.length>1?'s':'');
  }
- if((mealDishes(meal).length+productLines.length)>1){
+ if((mealDishes(meal).length+productLines.length+mealFrozenV4117(meal).length)>1){
   note='👥 '+mealGuestsV412(meal)+' convives · '+note;
  }
  const available=mealDishes(meal).reduce((n,d)=>n+Math.max(0,sourceBudget(getWeek(),i,d.recipeId)-usedLeftovers(getWeek(),i,d.recipeId)),0);
@@ -1617,8 +1629,10 @@ function recipeMatchKeyV4116(value){
 function recipeSuggestionsV4116(value){
  const search=norm(value),key=recipeMatchKeyV4116(value);
  if(search.length<2)return [];
- const list=[...(state.ingredientCatalog||[]).map(item=>({kind:'ingredient',item})),
-  ...(state.products||[]).map(item=>({kind:'daily',item}))];
+ // N'utiliser que la source unique de l'onglet Produits, jamais les deux catalogues bruts.
+ const seen=new Set();
+ const list=unifiedCatalogueSourceV4114().map(x=>({kind:x.type,item:x.item}))
+  .filter(x=>{const key=recipeMatchKeyV4116(x.item.name);if(!key||seen.has(key))return false;seen.add(key);return true});
  const words=key.split(' ').filter(Boolean);
  return list.map(x=>{
   const name=norm(x.item.name),other=recipeMatchKeyV4116(name),otherWords=other.split(' ');
@@ -1642,7 +1656,8 @@ function applyRecipeSuggestionV4116(row,kind,id){
 }
 function recipeDailyOptionsV4116(query=''){
  const search=norm(query);
- return (state.products||[]).filter(p=>!search||norm(p.name).includes(search))
+ const allowed=new Set(unifiedCatalogueSourceV4114().filter(x=>x.type==='daily').map(x=>x.id));
+ return (state.products||[]).filter(p=>allowed.has(p.id)&&(!search||norm(p.name).includes(search)))
   .sort((a,b)=>a.name.localeCompare(b.name,'fr')).slice(0,40)
   .map(p=>'<button type="button" class="ingredient-suggestion" data-action="v4116-pick-daily" data-id="'+html(p.id)+'">🧻 '+html(p.name)+'</button>').join('')
   ||'<p class="helper">Aucun produit trouvé.</p>'
@@ -2721,7 +2736,7 @@ function pickMeal(index){
   '<button class="btn secondary wide" data-action="v412-pick-product" data-index="'+index+'">🛒 Ajouter un produit du catalogue</button>'+
   '<button class="btn secondary wide" data-action="choose-leftovers" data-index="'+index+'">🍱 Placer des restes'+(availableRestes?' · '+availableRestes+' portions':'')+'</button></div>';
  if(meal)out+='<div class="meal-transfer-actions">'+
- '<button class="btn secondary" data-action="move-copy-meal" data-mode="copy" data-index="'+index+'" '+(!dishes.length&&!products.length?'disabled':'')+'>⧉ Copier</button>'+
+ '<button class="btn secondary" data-action="move-copy-meal" data-mode="copy" data-index="'+index+'" '+(!dishes.length&&!products.length||mealFrozenV4117(meal).length?'disabled':'')+'>⧉ Copier</button>'+
  '<button class="btn secondary" data-action="move-copy-meal" data-mode="move" data-index="'+index+'">↔ Déplacer</button></div>';
  showModal(menuMealLabelV411(index),out)
 }
@@ -3036,9 +3051,10 @@ function mealLeftovers(meal){
 }
 function mealParts(meal){return [...mealDishes(meal),...mealLeftovers(meal)]}
 function storeMealParts(w,index,parts){
- const old=w.meals[index],attached=mealProductsV412(old),guests=old?.guests;
+ const old=w.meals[index],attached=mealProductsV412(old),guests=old?.guests,frozen=mealFrozenV4117(old);
  const valid=parts.filter(p=>p&&Number.isInteger(Number(p.people))&&Number(p.people)>=1&&Number(p.people)<=30);
- if(!valid.length){w.meals[index]=attached.length?{type:'products',products:attached}:null;
+ if(!valid.length){w.meals[index]=attached.length?{type:'products',products:attached}:frozen.length?{type:'composed'}:null;
+  if(w.meals[index]&&frozen.length)w.meals[index].frozen=frozen;
   if(w.meals[index]&&guests)w.meals[index].guests=guests;return}
  if(valid.length===1){
   const p=valid[0];
@@ -3046,6 +3062,7 @@ function storeMealParts(w,index,parts){
   else w.meals[index]={type:'recipe',recipeId:p.recipeId,people:Number(p.people)}
  }else w.meals[index]={type:'multi',dishes:valid.map(p=>p.type==='leftovers'?{type:'leftovers',recipeId:p.recipeId||null,fromIndex:p.fromIndex,people:Number(p.people)}:{recipeId:p.recipeId,people:Number(p.people)})};
  if(attached.length)w.meals[index].products=attached;
+ if(frozen.length)w.meals[index].frozen=frozen;
  if(guests)w.meals[index].guests=guests;
 }
 function setMealProductsV412(w,index,items){
@@ -3058,7 +3075,8 @@ function setMealProductsV412(w,index,items){
  if(!previous&&cleaned.length){w.meals[index]={type:'products',products:cleaned};return true}
  if(!previous)return true;
  if(['ordered','no-meal'].includes(previous.type))return false;
- if(previous.type==='products'&&!cleaned.length){w.meals[index]=null;return true}
+ if(previous.type==='frozen'){w.meals[index]={type:'composed',frozen:mealFrozenV4117(previous)};return setMealProductsV412(w,index,items)}
+ if(previous.type==='products'&&!cleaned.length){w.meals[index]=mealFrozenV4117(previous).length?{type:'composed',frozen:mealFrozenV4117(previous)}:null;return true}
  const next={...previous};
  if(cleaned.length)next.products=cleaned;else delete next.products;
  w.meals[index]=next;return true
@@ -3142,6 +3160,7 @@ function moveCopyMeal(w,source,target,mode){
  const original=w.meals[source];if(!original)return false;
  const parts=mealParts(original),dishes=mealDishes(original),leftovers=mealLeftovers(original);
  if(isMealDoneV41(w,source)||isMealDoneV41(w,target))return false;
+ if(mode==='copy'&&mealFrozenV4117(original).length)return false; // Ne jamais dupliquer des portions deja reservees.
  if(mode==='copy'&&!dishes.length&&!mealProductsV412(original).length)return false; // Ne jamais recopier des restes seuls.
  if(mode==='copy'){
   clearMealWithPair(w,target);

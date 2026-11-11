@@ -1,4 +1,4 @@
-// V41.21 : unique source de sélection, résultats accolés, aucun doublon.
+// V41.21 : un seul parcours d'ajout, résultats accolés et recherche mixte accompagnements.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
@@ -11,8 +11,7 @@ function slice(a,b){
  assert.ok(first>=0&&last>first,'bloc source absent : '+a);
  return app.slice(first,last);
 }
-
-test('Une navigation de cinq catégories, sans raccourci ni deuxième barre',()=>{
+test('Une seule navigation de cinq catégories, résultats immédiatement dessous',()=>{
  const source=slice('function openMealPickerV4116(', 'function pickMeal(index){');
  assert.match(source,/const modes=\['recipes','side','leftovers','frozen','products'\]/);
  assert.match(source,/v4121-source-nav/);
@@ -20,17 +19,16 @@ test('Une navigation de cinq catégories, sans raccourci ni deuxième barre',()=
  assert.ok(source.indexOf('tabs+')<source.indexOf('mealPickerBodyV4121(index,selected)'));
  assert.doesNotMatch(source,/v4120-quick-sources|v4120-side-shortcuts|v4120-role-picker/);
  assert.doesNotMatch(app,/function mealSideShortcutsV4120\(/);
+ assert.doesNotMatch(app,/data-action="v4120-open-(main|side)"/);
  assert.match(css,/\.v4121-source-nav/);
  assert.match(css,/\.v4121-picker-panel/);
  assert.doesNotThrow(()=>new Function(app));
 });
-
-test('Choix de catégorie : mise à jour locale du panneau sous la barre, sans serveur',()=>{
+test('Le choix de catégorie modifie le panneau en place, jamais le serveur',()=>{
  const code=slice('function switchMealComposerSourceV4121(', 'function openMealPickerV4116(');
  const buttons=['recipes','side','leftovers','frozen','products'].map(kind=>({
   dataset:{kind},active:null,aria:null,
-  classList:{toggle(_,v){this.active=v}},
-  setAttribute(_,value){this.aria=value}
+  classList:{toggle(_,v){this.active=v}},setAttribute(_,value){this.aria=value}
  }));
  const bar={querySelectorAll:()=>buttons,getBoundingClientRect:()=>({top:170})};
  const panel={innerHTML:'ancien contenu'};
@@ -41,8 +39,8 @@ test('Choix de catégorie : mise à jour locale du panneau sous la barre, sans s
   mealPickerBodyV4121:(i,k)=>'<div>'+i+':'+k+'</div>',
   getWeek:()=>({}),isMealDoneV41:()=>false,
   openMealPickerV4116:()=>{throw Error('ne pas reconstruire la fenêtre')},
-  persist:()=>{throw Error('aucune requête cloud par changement')},
-  render:()=>{throw Error('aucun rendu calendrier')}
+  persist:()=>{throw Error('aucune requête cloud')},
+  render:()=>{throw Error('aucun rechargement calendrier')}
  };
  const api=runInNewContext(code+';switchMealComposerSourceV4121',ctx);
  api(1,'side');
@@ -55,8 +53,7 @@ test('Choix de catégorie : mise à jour locale du panneau sous la barre, sans s
  assert.equal(panel.innerHTML,'<div>1:frozen</div>');
  assert.equal(buttons[3].aria,'true');
 });
-
-test('Accompagnement regroupe recettes et produits existants dans un seul panneau',()=>{
+test('Un seul champ et une seule liste pour les accompagnements',()=>{
  const code=slice('function mealPickerBodyV4121(', 'function switchMealComposerSourceV4121(');
  const ctx={
   getWeek:()=>({meals:Array(14).fill(null)}),mealRecipeRoleV4120:'main',
@@ -64,32 +61,61 @@ test('Accompagnement regroupe recettes et produits existants dans un seul pannea
   mealLeftovers:()=>[],mealProductsV412:()=>[],availableLeftoverSources:()=>[],
   recipeTypes:[],normalRecipeType:()=>'',html:v=>String(v),
   mealRecipePickerResults:()=>'<button>Recette riz</button>',
-  mealProductPickerResultsV412:()=>'<button>Tomates Grand Frais</button>',
+  mealSidePickerResultsV4121:()=>'<button>Riz</button><button>Tomates Grand Frais</button>',
+  mealProductPickerResultsV412:()=>'<button>Produit</button>',
   mealComposerGuestsV4119:()=>2
  };
  const ui=runInNewContext(code+';({render:mealPickerBodyV4121,role:()=>mealRecipeRoleV4120})',ctx);
  const side=ui.render(0,'side');
  assert.match(side,/Rechercher un accompagnement/);
- assert.match(side,/Recette riz/);
+ assert.match(side,/Riz/);
  assert.match(side,/Tomates Grand Frais/);
- assert.match(side,/v4121SideProductResults/);
- assert.doesNotMatch(side,/Accompagnements rapides|v4120-role-picker/);
+ assert.match(side,/id="v4121SideResults"/);
+ assert.doesNotMatch(side,/v4121SideProductResults|mealRecipeResults|Accompagnements rapides/);
  assert.equal(ui.role(),'side');
  const main=ui.render(0,'recipes');
  assert.match(main,/Recette riz/);
- assert.doesNotMatch(main,/v4121SideProductResults/);
+ assert.doesNotMatch(main,/v4121SideResults/);
  assert.equal(ui.role(),'main');
 });
-
-test('Les filtres de recherche mettent à jour les recettes ET les produits accompagnements',()=>{
+test('Liste mixte: recettes et produits du catalogue sans doublons de références',()=>{
+ const code=slice('function mealSidePickerResultsV4121(', 'function mealPickerBodyV4121(');
+ const ingredients=[{id:'t1',name:'Tomates',store:'grandfrais',category:'Fruits et légumes'}];
+ const products=[{id:'p1',name:'Riz basmati',store:'carrefour',category:'Épicerie'},
+  {id:'p2',name:'Yaourt',store:'carrefour',category:'Produits frais'}];
+ const week={meals:[{type:'products',products:[{productId:'p2',qty:1,unit:'pièce'}]}]};
+ const ctx={
+  getWeek:()=>week,mealDishes:()=>[],mealProductsV412:m=>m?.products||[],
+  state:{recipes:[{id:'r1',name:'Carottes rôties',category:'Accompagnements'},
+    {id:'r2',name:'Riz en sauce',category:'Riz & céréales'}]},
+  normalRecipeType:v=>v,icons:{},html:v=>String(v),norm:v=>String(v).toLowerCase(),
+  unifiedCatalogueSourceV4114:()=>[
+   {type:'ingredient',id:'t1',item:ingredients[0],name:'Tomates',store:'grandfrais'},
+   {type:'daily',id:'p1',item:products[0],name:'Riz basmati',store:'carrefour'},
+   {type:'daily',id:'p1',item:products[0],name:'Riz basmati',store:'carrefour'},
+   {type:'daily',id:'p2',item:products[1],name:'Yaourt',store:'carrefour'}
+  ],productById:id=>products.find(p=>p.id===id)
+ };
+ const fn=runInNewContext(code+';mealSidePickerResultsV4121',ctx);
+ const result=fn(0);
+ assert.match(result,/Carottes rôties/);
+ assert.match(result,/Tomates/);
+ assert.match(result,/data-kind="ingredient"/);
+ assert.match(result,/Riz basmati/);
+ assert.equal((result.match(/Riz basmati/g)||[]).length,1,'une seule fiche produit par référence');
+ assert.doesNotMatch(result,/Yaourt/,'fiche déjà planifiée non reproposée');
+ assert.match(fn(0,'tomat'),/Tomates/);
+ assert.doesNotMatch(fn(0,'tomat'),/Carottes rôties/);
+});
+test('Recherche commune sans écran ni champ de produit supplémentaire',()=>{
  const src=slice('function refreshMealRecipePicker(){', '// V41.1 :');
- assert.match(src,/sideResults\.innerHTML=mealProductPickerResultsV412\(index,term\)/);
- assert.match(src,/results\.innerHTML=mealRecipePickerResults\(index,term,type\)/);
+ assert.match(src,/side\.innerHTML=mealSidePickerResultsV4121/);
+ assert.match(src,/results\.innerHTML=mealRecipePickerResults/);
+ assert.doesNotMatch(src,/v4121SideProductResults/);
  assert.match(app,/mealProductReturnKindV4121/);
  assert.match(app,/openMealPickerV4116\(index,mealProductReturnKindV4121\)/);
 });
-
-test('Les repas spéciaux et la composition sont conservés, sans modification du stock',()=>{
+test('Repas spéciaux, panier et stock demeurent intacts',()=>{
  const src=slice('function openMealPickerV4116(', 'function pickMeal(index){');
  assert.match(src,/data-action="mark-no-meal"/);
  assert.match(src,/data-action="v41171-mark-ordered"/);

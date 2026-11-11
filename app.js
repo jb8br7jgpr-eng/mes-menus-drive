@@ -2606,10 +2606,34 @@ function quickMealActionsV413(index,meal){
  }
  return out.length?'<div class="v413-meal-quick"><strong>Actions du repas</strong><div class="v413-meal-quick-buttons">'+out.join('')+'</div></div>':'';
 }
+function openMealPickerV4116(index,kind='recipes'){
+ if(!Number.isInteger(index)||index<0||index>13||isMealDoneV41(getWeek(),index))return;
+ if(kind==='products'){openMealProductPickerV412(index);return}
+ const tabs='<div class="v4116-menu-tabs">'+
+ ['recipes','frozen','products'].map((t,i)=>'<button class="v4116-menu-tab '+(kind===t?'active':'')+'" data-action="v4116-open-picker" data-kind="'+t+'" data-index="'+index+'">'+['🍽️ Mes plats','❄️ Congélateur','🛒 Produits'][i]+'</button>').join('')+'</div>';
+ let content='';
+ if(kind==='frozen'){
+  const lots=Object.values(state.stockV41?.freezer||{}).map(l=>({...l,
+   remaining:stockModulesV41?.week.remainingFreezerPortionsV41(state.stockV41,state.weeks,l.lotId,{weekId:currentWeek,index})||0})).filter(l=>l.remaining>0);
+  content='<p class="helper">Ces portions seront réservées sans courses supplémentaires.</p>'+
+   '<div class="field"><label for="v41FrozenMealPortions">Portions à utiliser</label><input id="v41FrozenMealPortions" type="number" min="1" max="30" value="'+Math.min(2,Math.max(1,...lots.map(l=>l.remaining)))+'"></div>'+
+   (lots.length?lots.map(l=>'<button class="picker-item" data-action="v41-replace-frozen" data-index="'+index+'" data-id="'+html(l.lotId)+'">'+
+    '<span class="emoji">❄️</span><span class="grow"><strong>'+html(l.name)+'</strong><small>'+l.remaining+' portions disponibles</small></span><span class="end">＋</span></button>').join(''):
+    '<div class="meal-picker-empty">Aucun plat disponible. Ajoute des portions depuis Stock → Congélateur.</div>');
+ }else content='<div class="field"><label for="mealPeople">Portions à préparer (facultatif)</label><input type="number" id="mealPeople" min="1" max="30" placeholder="Portions habituelles"></div>'+
+   '<div class="meal-picker-filters"><div class="field"><label for="mealRecipeSearch">Rechercher</label><input id="mealRecipeSearch" type="search" placeholder="Ex. poulet, salade…" autocomplete="off"></div>'+
+   '<div class="field"><label for="mealRecipeType">Catégorie</label><select id="mealRecipeType"><option value="all">Toutes</option>'+
+   recipeTypes.map(t=>'<option value="'+html(t)+'">'+html(t)+'</option>').join('')+
+   (state.recipes.some(r=>normalRecipeType(r.category)==='legacy')?'<option value="legacy">Autres (anciens)</option>':'')+'</select></div></div>'+
+   '<div id="mealRecipeCount" class="meal-picker-count">'+state.recipes.length+' plats</div>'+
+   '<div class="recipe-picker meal-picker-scroll"><div id="mealRecipeResults" data-index="'+index+'">'+mealRecipePickerResults(index)+'</div></div>';
+ showModal(menuMealLabelV411(index)+' · Choisir',tabs+content);
+}
 function pickMeal(index){
  const meal=getWeek().meals[index],dishes=mealDishes(meal),leftovers=mealLeftovers(meal),products=mealProductsV412(meal);
  const title=menuMealLabelV411(index);
  const validated=isMealDoneV41(getWeek(),index);
+ if(!meal&&!validated){openMealPickerV4116(index,'recipes');return}
  const summary=meal?.type==='frozen'?'❄️ Plat du congélateur':meal?.type==='ordered'?'🍕 Repas libre / commandé':meal?.type==='no-meal'?'🍽️ Pas de repas · sortie, restaurant ou invitation':
   dishes.map(d=>html(recipeById(d.recipeId)?.name||'Plat'))
    .concat(products.map(x=>html(productById(x.productId)?.name||'Produit')))
@@ -2622,7 +2646,8 @@ function pickMeal(index){
   return
  }
  let out='<div class="v413-meal-top">'+
-  '<button class="btn secondary" data-action="v41-replace-meal" data-index="'+index+'">↔ '+(meal?'Remplacer':'Choisir un repas')+'</button>'+
+  '<button class="btn secondary" data-action="v4116-open-picker" data-kind="recipes" data-index="'+index+'">＋ Choisir un plat</button>'+ 
+ '<button class="btn secondary" data-action="v4116-open-picker" data-kind="frozen" data-index="'+index+'">❄️ Congélateur</button>'
   (meal?'<button class="btn secondary" data-action="remove-meal" data-index="'+index+'">Vider le repas</button>':'')+'</div>'+quick+
   (meal?.type==='no-meal'?'':'<button type="button" class="btn secondary wide v411-no-meal-button" data-action="mark-no-meal" data-index="'+index+'">🍽️ Pas de repas <small>Restaurant, invitation, sortie…</small></button>');
  if(meal?.type==='frozen'||meal?.type==='ordered'||meal?.type==='no-meal'){
@@ -2663,29 +2688,11 @@ function pickMeal(index){
     '" data-id="'+html(x.productId)+'">Retirer</button></div></div>';
   });
  }
- out+='<div class="field"><label for="mealPeople">'+(dishes.length?'Portions à préparer pour le plat supplémentaire':'Combien de portions veux-tu préparer ?')+'</label>'+
- '<input type="number" id="mealPeople" min="1" max="30" value="" placeholder="Auto : portions de base">'+
- '<div class="helper">Par défaut, Speedrive utilise les portions de base du plat : 1 ou 2 portions = aucun reste. Saisis 4 pour préparer davantage et prévoir des restes.</div></div>';
- out+='<div class="section-head"><h3>'+ (dishes.length?'Ajouter un autre plat':'Choisir un plat')+'</h3></div>';
- out+='<div class="meal-picker-filters">'+
- '<div class="field"><label for="mealRecipeSearch">Rechercher un plat</label>'+
- '<input id="mealRecipeSearch" type="search" placeholder="Ex. poulet, salade…" autocomplete="off"></div>'+
- '<div class="field"><label for="mealRecipeType">Type de plat</label>'+
- '<select id="mealRecipeType" aria-label="Filtrer les plats proposés par type">'+
- '<option value="all">Tous les types</option>'+recipeTypes.map(t=>'<option value="'+html(t)+'">'+html(t)+'</option>').join('')+
- (state.recipes.some(r=>normalRecipeType(r.category)==='legacy')?'<option value="legacy">Autres (anciens plats)</option>':'')+
- '</select></div></div>';
- out+='<div id="mealRecipeCount" class="meal-picker-count">'+
- Math.max(0,state.recipes.length-dishes.length)+' plat(s) disponibles</div>';
- const availableRestes=availableLeftoverSources(getWeek(),index).reduce((n,x)=>n+x.available,0);
-  out+='<div class="recipe-picker meal-picker-scroll">'+
- '<button class="picker-item" data-action="choose-leftovers" data-index="'+index+'"><span class="emoji">🍱</span>'+
- '<span class="grow"><strong>🍱 '+(availableRestes?availableRestes+' portion'+(availableRestes>1?'s':'')+' de restes disponible'+(availableRestes>1?'s':''):'Placer des restes ici')+'</strong><small>'+(availableRestes?'Touche pour choisir un plat et placer ses restes':'Choisis leur plat d’origine et les portions disponibles')+'</small></span>'+
- '<span class="end">＋</span></button>'+
- '<div id="mealRecipeResults" data-index="'+index+'">'+mealRecipePickerResults(index)+'</div></div>';
- if(!state.recipes.length)out+='<div class="note" style="margin-top:10px">Ajoute d’abord tes plats au catalogue, puis retrouve-les ici.</div>';
- out+='<button class="btn secondary wide v412-add-product" data-action="v412-pick-product" data-index="'+index+
-  '">＋ Ajouter un produit du catalogue à ce repas</button>';
+ out+='<div class="v4116-meal-choices">'+
+  '<button class="btn wide" data-action="v4116-open-picker" data-kind="recipes" data-index="'+index+'">🍽️ Ajouter un plat de mes recettes</button>'+
+  '<button class="btn secondary wide" data-action="v4116-open-picker" data-kind="frozen" data-index="'+index+'">❄️ Choisir dans mon congélateur</button>'+
+  '<button class="btn secondary wide" data-action="v4116-open-picker" data-kind="products" data-index="'+index+'">🛒 Ajouter un produit du catalogue</button>'+
+  '<button class="btn secondary wide" data-action="choose-leftovers" data-index="'+index+'">🍱 Placer des restes</button></div>';
  if(meal)out+='<div class="meal-transfer-actions">'+
  '<button class="btn secondary" data-action="move-copy-meal" data-mode="copy" data-index="'+index+'" '+(!dishes.length&&!products.length?'disabled':'')+'>⧉ Copier</button>'+
  '<button class="btn secondary" data-action="move-copy-meal" data-mode="move" data-index="'+index+'">↔ Déplacer</button></div>';
@@ -3293,6 +3300,8 @@ document.addEventListener('click',e=>{
  if(mode==='v34-audit-local'){void showV34ReadOnlyAudit();return}
  if(mode==='v34-audit-back'){settingsModal();return}
  const index=Number(a.dataset.index),w=getWeek(),id=a.dataset.id;
+ if(mode==='v41-replace-frozen'&&w.meals[index]&&w.meals[index].type!=='frozen'&&
+     !confirm('Remplacer le repas prévu par ce plat du congélateur ?'))return;
  if(mode==='v41-stock-section'){
   stockViewV41=['home','freezer','week'].includes(a.dataset.view)?a.dataset.view:'home';render(true);return
  }
@@ -3425,6 +3434,7 @@ document.addEventListener('click',e=>{
    document.querySelector('[data-meal-day="'+day+'"]')?.scrollIntoView({behavior:'smooth',block:'start'});
   }
   else if(mode==='pick-meal')pickMeal(index);
+  else if(mode==='v4116-open-picker')openMealPickerV4116(index,a.dataset.kind||'recipes');
   else if(mode==='mark-no-meal'){
    if(!Number.isInteger(index)||index<0||index>13)return;
    if(isMealDoneV41(w,index)){

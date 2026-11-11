@@ -2825,7 +2825,7 @@ function mealComposerVisualV4119(index,meal){
  const dishes=mealDishes(preview),leftovers=mealLeftovers(preview),frozen=mealFrozenV4117(preview),
   products=mealProductsV412(preview);
  const count=dishes.length+leftovers.length+frozen.length+products.length;
- const rows=[]; const rows=[];
+ const rows=[];
  dishes.forEach((d,n)=>{
   const name=recipeById(d.recipeId)?.name||'Recette supprimée',here=portionsEatenHere(d,dishes,guests),
    remaining=Math.max(0,Number(d.people)-here);

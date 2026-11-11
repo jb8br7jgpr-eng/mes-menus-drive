@@ -1714,7 +1714,7 @@ function normalizeIngredientCatalog(){
  if(distinct.size!==state.ingredientCatalog.length){state.ingredientCatalog=[...distinct.values()];changed=true}
  for(const recipe of state.recipes){
   for(const line of (recipe.ingredients||[])){
-   if(line.sourceKind==='daily'&&line.productId&&productById(line.productId))continue;
+   if(line.sourceKind==='daily')continue;
    let ing=ingredientById(line.ingredientId);
    if(!ing)ing=ingredientByName(line.name);
    if(!ing){
@@ -2427,7 +2427,7 @@ async function importRecipeIngredientsV417(id,button){
   if($('#recipeForm')!==form||!$('#ingredientRows'))return;
   const imported=prepareRecipeImportV417(source,portions,{scale:Boolean($('#v417ScaleToPortions')?.checked)})
    .map(line=>{
-    const ing=ingredientById(line.ingredientId)||ingredientByName(line.name);
+    const ing=line.sourceKind==='daily'?null:(ingredientById(line.ingredientId)||ingredientByName(line.name));
     return {...line,name:ing?.name||line.name,
      store:ing?ingredientStore(ing):line.store||ingredientDefaultStore(line.name,line.productId)};
    });
@@ -2436,7 +2436,9 @@ async function importRecipeIngredientsV417(id,button){
    return {name,qty:row.querySelector('.ingredient-qty')?.value||'',
     unit:row.querySelector('.ingredient-unit')?.value||'g',
     store:row.querySelector('.ingredient-store')?.value||'carrefour',
-    ingredientId:ingredientByName(name)?.id||null};
+    ingredientId:row.dataset.refKind==='ingredient'?row.dataset.refId||null:ingredientByName(name)?.id||null,
+    productId:row.dataset.refKind==='daily'?row.dataset.refId||null:null,
+    sourceKind:row.dataset.refKind==='daily'?'daily':null};
   });
   const plan=mergeRecipeIngredientsV417(current,imported);
   // Le changement ne concerne que l'éditeur. Ni persist(), ni menus,

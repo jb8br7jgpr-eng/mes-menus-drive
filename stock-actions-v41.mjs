@@ -553,7 +553,9 @@ export function handleStockActionV41(ctx) {
   return true
  }
  if(mode==='v41-courses-done'){
-  const selected=ctx.shopping().filter(x=>x.checked&&!x.excluded&&!x.covered);
+  const selection=Array.isArray(ctx.selectedPurchaseIds)?new Set(ctx.selectedPurchaseIds):null;
+  const selected=ctx.shopping().filter(x=>!x.excluded&&!x.covered&&
+   (selection?selection.has(x.id):x.checked));
   const result=purchasedMovementsV41(selected,state.ingredientCatalog,state.products);
   if(!result.movements.length){ctx.toast(result.warnings.length?'Relie ces achats à une fiche Produit avant de les enregistrer.':'Aucun nouvel achat coché à valider.');return true}
   try {

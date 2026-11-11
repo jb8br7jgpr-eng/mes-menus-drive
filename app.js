@@ -2707,7 +2707,8 @@ function pickMeal(index){
  const summary=meal?.type==='frozen'?'❄️ Plat du congélateur':meal?.type==='ordered'?'🍕 Repas libre / commandé':meal?.type==='no-meal'?'🍽️ Pas de repas · sortie, restaurant ou invitation':
   dishes.map(d=>html(recipeById(d.recipeId)?.name||'Plat'))
    .concat(products.map(x=>html(productById(x.productId)?.name||'Produit')))
-   .concat(leftovers.map(d=>'🍱 Restes')).join(' · ')||'Repas libre';
+   .concat(leftovers.map(d=>'🍱 Restes'))
+   .concat(mealFrozenV4117(meal).map(d=>'❄️ '+(state.stockV41?.freezer?.[d.lotId]?.name||'Plat congelé'))).join(' · ')||'Repas libre';
  const quick=quickMealActionsV413(index,meal);
  if(validated){
   showModal(title,'<div class="v413-meal-state"><strong>✓ Repas déjà validé dans le stock</strong><p>'+summary+
@@ -2718,6 +2719,8 @@ function pickMeal(index){
  let out='<div class="v413-meal-top">'+
   '<button class="btn secondary" data-action="v4116-open-picker" data-kind="recipes" data-index="'+index+'">＋ Choisir un plat</button>'+ 
  '<button class="btn secondary" data-action="v4116-open-picker" data-kind="frozen" data-index="'+index+'">❄️ Congélateur</button>'+
+  '<button class="btn secondary" data-action="v4116-open-picker" data-kind="leftovers" data-index="'+index+'">🍱 Restes</button>'+
+  '<button class="btn secondary" data-action="v4116-open-picker" data-kind="products" data-index="'+index+'">🛒 Produits</button>'+
   '<button class="btn secondary" data-action="v41-replace-meal" data-index="'+index+'">↔ Autres possibilités</button>'+
   (meal?'<button class="btn secondary" data-action="remove-meal" data-index="'+index+'">Vider le repas</button>':'')+'</div>'+quick+
   (meal?.type==='no-meal'?'':'<button type="button" class="btn secondary wide v411-no-meal-button" data-action="mark-no-meal" data-index="'+index+'">🍽️ Pas de repas <small>Restaurant, invitation, sortie…</small></button>');
@@ -2725,11 +2728,22 @@ function pickMeal(index){
   showModal(title,'<p class="helper">'+summary+'</p>'+out);
   return
  }
- if(dishes.length||products.length||leftovers.length){
+ if(dishes.length||products.length||leftovers.length||mealFrozenV4117(meal).length){
   out+='<div class="v412-guests"><label for="v412MealGuests">👥 Personnes à table (pour tout le repas)</label>'+
    '<div class="v412-guests-controls"><input id="v412MealGuests" type="number" min="1" max="30" value="'+mealGuestsV412(meal)+'">'+
    '<button class="btn tiny secondary" data-action="v412-save-guests" data-index="'+index+'">✓ Modifier</button></div>'+
    '<small>Ce nombre ne multiplie jamais les ingrédients de tes recettes. Chaque plat conserve ses propres portions préparées et ses restes.</small></div>';
+ }
+ if(mealFrozenV4117(meal).length){
+  out+='<div class="section-head"><h3>❄️ Congélateur</h3></div>';
+  for(const part of mealFrozenV4117(meal)){
+   const lot=state.stockV41?.freezer?.[part.lotId];
+   out+='<div class="meal-dish"><div class="grow"><strong>'+html(lot?.name||recipeById(part.recipeId)?.name||'Plat congelé')+
+    '</strong><div class="helper">'+part.portions+' portion'+(part.portions>1?'s':'')+
+    (part.consumed?' · ✓ mangées':' · réservées · sans nouvelles courses')+'</div></div>'+
+    (part.consumed?'':'<button class="btn tiny ghost" data-action="v4117-remove-frozen" data-index="'+index+
+     '" data-id="'+html(part.lotId)+'">Retirer</button>')+'</div>';
+  }
  }
  if(leftovers.length){
   out+='<div class="section-head"><h3>Restes prévus pour ce repas</h3></div>';
@@ -2763,8 +2777,8 @@ function pickMeal(index){
  out+='<div class="v4116-meal-choices">'+
   '<button class="btn wide" data-action="v4116-open-picker" data-kind="recipes" data-index="'+index+'">🍽️ Ajouter un plat de mes recettes</button>'+
   '<button class="btn secondary wide" data-action="v4116-open-picker" data-kind="frozen" data-index="'+index+'">❄️ Choisir dans mon congélateur</button>'+
-  '<button class="btn secondary wide" data-action="v412-pick-product" data-index="'+index+'">🛒 Ajouter un produit du catalogue</button>'+
-  '<button class="btn secondary wide" data-action="choose-leftovers" data-index="'+index+'">🍱 Placer des restes'+(availableRestes?' · '+availableRestes+' portions':'')+'</button></div>';
+  '<button class="btn secondary wide" data-action="v4116-open-picker" data-kind="products" data-index="'+index+'">🛒 Ajouter un produit du catalogue</button>'+
+  '<button class="btn secondary wide" data-action="v4116-open-picker" data-kind="leftovers" data-index="'+index+'">🍱 Placer des restes'+(availableRestes?' · '+availableRestes+' portions':'')+'</button></div>';
  if(meal)out+='<div class="meal-transfer-actions">'+
  '<button class="btn secondary" data-action="move-copy-meal" data-mode="copy" data-index="'+index+'" '+(!dishes.length&&!products.length||mealFrozenV4117(meal).length?'disabled':'')+'>⧉ Copier</button>'+
  '<button class="btn secondary" data-action="move-copy-meal" data-mode="move" data-index="'+index+'">↔ Déplacer</button></div>';
@@ -2782,6 +2796,7 @@ function mealProductPickerResultsV412(index,term=''){
 }
 function openMealProductPickerV412(index){
  if(!Number.isInteger(index)||index<0||index>13||isMealDoneV41(getWeek(),index))return;
+ openMealPickerV4116(index,'products');return;
  if(!state.products?.length){toast('Ajoute d’abord un produit dans le catalogue Produits.');return}
  showModal('🛒 Ajouter un produit au repas','<p class="helper">Choisis une référence déjà enregistrée. Les quantités seront ajoutées aux courses lorsque tu les généreras.</p>'+
   '<div class="field"><label for="v412ProductSearch">Rechercher un produit</label>'+
@@ -2802,7 +2817,7 @@ function editMealProductV412(index,productId){
    selectOptions(units,preferred)+'</select></div>'+
   '<p class="helper">La liste de courses tient compte du conditionnement indiqué dans la fiche Produit. Le stock sera retiré une seule fois après « C’est mangé ».</p>'+
   '<button class="btn wide" data-action="v412-save-meal-product" data-index="'+index+'" data-id="'+html(productId)+'">✓ Enregistrer dans le repas</button>'+
-  '<button class="btn secondary wide" data-action="pick-meal" data-index="'+index+'">← Retour au repas</button>');
+  '<button class="btn secondary wide" data-action="v4116-open-picker" data-kind="products" data-index="'+index+'">← Retour aux produits</button>');
 }
 function extraSearchItems(term=''){
  const needle=norm(term),linked=new Set((state.ingredientCatalog||[]).map(i=>i.productId).filter(Boolean));
@@ -3536,6 +3551,29 @@ document.addEventListener('click',e=>{
   }
   else if(mode==='pick-meal')pickMeal(index);
   else if(mode==='v4116-open-picker')openMealPickerV4116(index,a.dataset.kind||'recipes');
+  else if(mode==='v4117-add-frozen'){
+   if(isMealDoneV41(w,index)){toast('Annule la validation du repas avant de le modifier.');return}
+   const qty=Number($('#v4117FrozenPortions')?.value);
+   if(!stockModulesV41?.week?.addFrozenToMealV4117){toast('Module congélateur indisponible.');return}
+   const before=weekBeforeUndo();
+   try{
+    state.weeks=stockModulesV41.week.addFrozenToMealV4117(state.weeks,state.stockV41,currentWeek,index,id,qty);
+    persist();render(true);pickMeal(index);
+    toastWeekUndo('Portions congelées ajoutées au repas.',before,index)
+   }catch(error){toast(error.message||'Impossible d’ajouter ces portions.')}
+  }
+  else if(mode==='v4117-remove-frozen'){
+   if(isMealDoneV41(w,index)){toast('Annule la validation avant de retirer des portions.');return}
+   const current=w.meals[index],parts=mealFrozenV4117(current);
+   if(!current||!parts.some(x=>x.lotId===id))return;
+   const before=weekBeforeUndo(),remaining=parts.filter(x=>x.lotId!==id);
+   if(current.type==='frozen'){w.meals[index]=null}
+   else{
+    if(remaining.length)current.frozen=remaining;else delete current.frozen;
+    if(current.type==='composed'&&!remaining.length&&!mealProductsV412(current).length)w.meals[index]=null;
+   }
+   persist();render(true);pickMeal(index);toastWeekUndo('Portions retirées du planning.',before,index)
+  }
   else if(mode==='mark-no-meal'){
    if(!Number.isInteger(index)||index<0||index>13)return;
    if(isMealDoneV41(w,index)){
@@ -3714,7 +3752,7 @@ document.addEventListener('click',e=>{
    row.querySelector('.ingredient-unit').value=preferredIngredientUnit(ing);
    refreshIngredientEntry(row);row.querySelector('.ingredient-qty')?.focus()
   }
-  else if(mode==='choose-recipe'){if(isMealDoneV41(w,index)){toast('Ce repas a déjà été validé.');return}const portions=peopleInput(id);if(portions===null){toast('Choisis entre 1 et 30 portions.');return}if(!addRecipeToMeal(w,index,id,portions)){toast('Ce plat est déjà présent dans ce repas. Modifie plutôt ses portions.');return}persist();closeModal();renderMealContext(index)}
+  else if(mode==='choose-recipe'){if(isMealDoneV41(w,index)){toast('Ce repas a déjà été validé.');return}const portions=peopleInput(id);if(portions===null){toast('Choisis entre 1 et 30 portions.');return}if(!addRecipeToMeal(w,index,id,portions)){toast('Ce plat est déjà présent dans ce repas. Modifie plutôt ses portions.');return}persist();render(true);pickMeal(index)}
   else if(mode==='v412-pick-product')openMealProductPickerV412(index);
   else if(mode==='v412-select-product'||mode==='v412-edit-meal-product')editMealProductV412(index,id);
   else if(mode==='v412-save-meal-product'){
@@ -3727,7 +3765,7 @@ document.addEventListener('click',e=>{
    next.push({productId:id,qty,unit});
    const before=weekBeforeUndo();
    if(!setMealProductsV412(w,index,next)){toast('Impossible d’ajouter ce produit à ce repas.');return}
-   persist();closeModal();renderMealContext(index);
+   persist();render(true);pickMeal(index);
    toastWeekUndo('Produit enregistré pour le repas.',before,index)
   }
   else if(mode==='v412-remove-meal-product'){
@@ -3749,7 +3787,7 @@ document.addEventListener('click',e=>{
    const source=Number(a.dataset.source),qty=Number($('#leftoverPeople')?.value);
    if(!Number.isInteger(qty)||qty<1||qty>30){toast('Choisis entre 1 et 30 portions de restes.');return}
    if(!addLeftoversToMeal(w,index,source,id,qty)){toast('Cette quantité de restes n’est plus disponible.');pickLeftoverSource(index);return}
-   persist();closeModal();renderMealContext(index);toast('Restes placés au repas choisi !')
+   persist();render(true);pickMeal(index);toast('Restes placés au repas choisi !')
   }
   else if(mode==='remove-leftover'){
    const li=Number(a.dataset.leftover),parts=mealParts(w.meals[index]),left=mealLeftovers(w.meals[index]);

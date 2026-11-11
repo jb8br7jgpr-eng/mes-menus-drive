@@ -3826,7 +3826,75 @@ document.addEventListener('click',e=>{
     else if(!mealCanEditV4117(meal))showSpecialMealV4119(index,meal);
     else openMealPickerV4116(index,'recipes');
    }
-   else if(mode==='v4118-details')pickMeal(index);
+   else if(mode==='v4119-finish'){
+   closeModal();renderMealContext(index)
+  }
+  else if(mode==='v4119-guests-step'){
+   if(isMealDoneV41(w,index))return;
+   const delta=Number(a.dataset.delta),people=mealComposerGuestsV4119(index,w.meals[index]),next=people+delta;
+   if(![-1,1].includes(delta)||next<1||next>30||!setMealGuestsV412(w,index,next))return;
+   const kind=a.closest('[data-v4119-kind]')?.dataset.v4119Kind||'recipes';
+   persist();render(true);openMealPickerV4116(index,kind);
+  }
+  else if(mode==='v4119-dish-step'){
+   if(isMealDoneV41(w,index))return;
+   const pos=Number(a.dataset.dish),delta=Number(a.dataset.delta),dishes=mealDishes(w.meals[index]);
+   if(!Number.isInteger(pos)||![-1,1].includes(delta)||!dishes[pos])return;
+   const next=dishes[pos].people+delta;
+   if(next<1||next>30)return;
+   const before=weekBeforeUndo();
+   dishes[pos].people=next;setMealDishes(w,index,dishes);
+   persist();render(true);openMealPickerV4116(index,'recipes');
+   toastWeekUndo('Portions préparées actualisées.',before,index)
+  }
+  else if(mode==='v4119-edit-frozen'){
+   if(isMealDoneV41(w,index)){toast('Repas déjà validé : annule sa validation avant de modifier le congélateur.');return}
+   const part=mealFrozenV4117(w.meals[index]).find(p=>p.lotId===id);
+   if(!part||part.consumed)return;
+   const lot=state.stockV41?.freezer?.[id],free=stockModulesV41?.week?.remainingFreezerPortionsV41?.(
+    state.stockV41,state.weeks,id,{weekId:currentWeek,index})??0;
+   if(!lot)return;
+   const max=Math.min(30,Number(free)+Number(part.portions));
+   showModal('❄️ Modifier · '+html(lot.name),
+    '<p class="helper">Modifie la réservation du congélateur pour ce repas. Aucune consommation de stock ne sera enregistrée avant « C’est mangé ».</p>'+
+    '<div class="field"><label for="v4119FrozenAdjust">Portions à utiliser</label>'+
+    '<input id="v4119FrozenAdjust" type="number" inputmode="numeric" step="1" min="1" max="'+max+'" value="'+part.portions+'"></div>'+
+    '<small>'+max+' portions au maximum (autres repas déjà réservés pris en compte).</small>'+
+    '<button class="btn wide" data-action="v4119-save-frozen" data-index="'+index+'" data-id="'+html(id)+'">✓ Enregistrer</button>'+
+    '<button class="btn secondary wide" data-action="v4116-open-picker" data-kind="frozen" data-index="'+index+'">← Retour au repas</button>');
+  }
+  else if(mode==='v4119-save-frozen'){
+   if(isMealDoneV41(w,index))return;
+   const amount=Number($('#v4119FrozenAdjust')?.value),previous=w.meals[index];
+   const part=mealFrozenV4117(previous).find(p=>p.lotId===id);
+   if(!part||part.consumed||!Number.isInteger(amount)||amount<1||amount>30){toast('Vérifie le nombre de portions.');return}
+   if(amount===Number(part.portions)){openMealPickerV4116(index,'frozen');return}
+   if(!stockModulesV41?.week?.addFrozenToMealV4117)return;
+   try{
+    const before=weekBeforeUndo(),draft=JSON.parse(JSON.stringify(state.weeks));
+    const old=draft[currentWeek].meals[index];
+    if(old.type==='frozen'&&old.lotId===id){
+     draft[currentWeek].meals[index]={type:'composed',...(old.guests?{guests:old.guests}:{})};
+    }else{
+     if(Array.isArray(old.frozen))old.frozen=old.frozen.filter(x=>x.lotId!==id);
+     if(old.type==='multi'&&Array.isArray(old.dishes))old.dishes=old.dishes.filter(x=>!(x.type==='frozen'&&x.lotId===id));
+    }
+    const next=stockModulesV41.week.addFrozenToMealV4117(draft,state.stockV41,currentWeek,index,id,amount);
+    state.weeks=next;
+    applyMealDraftGuestsV4119(getWeek(),index);
+    persist();render(true);openMealPickerV4116(index,'frozen');
+    toastWeekUndo('Portions du congélateur modifiées.',before,index)
+   }catch(err){toast(err.message||'Impossible de modifier la réservation du congélateur.')}
+  }
+  else if(mode==='v4119-replace-special'){
+   if(isMealDoneV41(w,index))return;
+   if(!['no-meal','ordered'].includes(w.meals[index]?.type))return;
+   const before=weekBeforeUndo();
+   clearMealWithPair(w,index);
+   persist();render(true);openMealPickerV4116(index,'recipes');
+   toastWeekUndo('Repas prêt à être composé.',before,index)
+  }
+  else if(mode==='v4118-details')pickMeal(index);
   else if(mode==='v4116-open-picker')openMealPickerV4116(index,a.dataset.kind||'recipes');
   else if(mode==='v4117-add-frozen'){
    if(isMealDoneV41(w,index)){toast('Annule la validation du repas avant de le modifier.');return}

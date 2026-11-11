@@ -101,6 +101,9 @@ test('calendrier → composeur visuel et etats speciaux accessibles',()=>{
  assert.match(app,/v4119-guests-step/);
  assert.match(app,/v4119-edit-frozen/);
  assert.match(app,/v4119-save-frozen/);
+ assert.match(app,/v4119-edit-leftover/);
+ assert.match(app,/v4119-save-leftover/);
+ assert.match(app,/source\.available\|\|0/);
  assert.match(app,/id="v4119ProductServings"/);
  assert.match(app,/v4119-main-product-field/);
  assert.match(css,/\.v4119-portion\.is-filled/);

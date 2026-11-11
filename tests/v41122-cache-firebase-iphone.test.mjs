@@ -29,12 +29,12 @@ test('V41.12.2 : le bouton Compte et sauvegardes garde un gestionnaire quand le 
  assert.match(ui,/loadServerDiscardingLocalDraft\("ABANDONNER_LE_BROUILLON"\)/);
 });
 test('V41.15.4 : ressources préparées et même session Firebase',()=>{
- assert.match(index,/styles\.css\?v=20261111-41-17-compose/);
- assert.match(index,/app\.js\?v=20261111-41-17-compose/);
+ assert.match(index,/styles\.css\?v=20261111-41-17-1-choice/);
+ assert.match(index,/app\.js\?v=20261111-41-17-1-choice/);
  assert.match(index,/firebase\/v34-ui\.js\?v=20261104-41-12-2-release/);
- assert.match(sw,/CACHE='menus-drive-v41-17-compose-20261111'/);
- assert.match(sw,/styles\.css\?v=20261111-41-17-compose/);
- assert.match(sw,/app\.js\?v=20261111-41-17-compose/);
+ assert.match(sw,/CACHE='menus-drive-v41-17-1-choice-20261111'/);
+ assert.match(sw,/styles\.css\?v=20261111-41-17-1-choice/);
+ assert.match(sw,/app\.js\?v=20261111-41-17-1-choice/);
  assert.match(index,/rayon-filters-v4114\.js\?v=20261106-41-14-1-stage/);
  assert.match(index,/ux-v4115\.js\?v=20261106-41-15-ux-stage/);
  assert.match(sw,/ux-v4115\.js\?v=20261106-41-15-ux-stage/);

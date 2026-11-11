@@ -63,9 +63,9 @@ test('V41.16 : menus, congelateur, scroll independant et boutons stock',()=>{
  assert.match(stockActions,/lot\.portions<=reserved/);
 });
 test('V41.16 : ressources Safari et cache coherents',()=>{
- assert.match(index,/app\.js\?v=20261111-41-16-ui/);
- assert.match(index,/styles\.css\?v=20261111-41-16-ui/);
- assert.match(sw,/menus-drive-v41-16-ui-20261111/);
- assert.match(sw,/app\.js\?v=20261111-41-16-ui/);
- assert.match(sw,/styles\.css\?v=20261111-41-16-ui/);
+ assert.match(index,/app\.js\?v=20261111-41-17-compose/);
+ assert.match(index,/styles\.css\?v=20261111-41-17-compose/);
+ assert.match(sw,/menus-drive-v41-17-compose-20261111/);
+ assert.match(sw,/app\.js\?v=20261111-41-17-compose/);
+ assert.match(sw,/styles\.css\?v=20261111-41-17-compose/);
 });

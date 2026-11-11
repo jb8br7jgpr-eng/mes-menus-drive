@@ -3854,7 +3854,7 @@ document.addEventListener('click',e=>{
    const lot=state.stockV41?.freezer?.[id],free=stockModulesV41?.week?.remainingFreezerPortionsV41?.(
     state.stockV41,state.weeks,id,{weekId:currentWeek,index})??0;
    if(!lot)return;
-   const max=Math.min(30,Number(free)+Number(part.portions));
+   const max=Math.min(30,Math.max(Number(free),Number(part.portions)));
    showModal('❄️ Modifier · '+html(lot.name),
     '<p class="helper">Modifie la réservation du congélateur pour ce repas. Aucune consommation de stock ne sera enregistrée avant « C’est mangé ».</p>'+
     '<div class="field"><label for="v4119FrozenAdjust">Portions à utiliser</label>'+

@@ -260,8 +260,18 @@ function mealDishes(meal){
 // Les produits restent référencés par ID ; le catalogue n'est jamais modifié.
 function mealProductsV412(meal){
  if(!Array.isArray(meal?.products))return [];
- return meal.products.filter(x=>x?.productId&&Number(x.qty)>0&&units.includes(x.unit))
-  .map(x=>({productId:x.productId,qty:Number(x.qty),unit:x.unit}));
+ return meal.products.filter(x=>x&&(x.productId||x.ingredientId)&&Number(x.qty)>0&&units.includes(x.unit))
+  .map(x=>({productId:x.productId||null,ingredientId:x.ingredientId||null,qty:Number(x.qty),unit:x.unit}));
+}
+// V41.18 : conserver l'identifiant des ingrédients sans fiche commerciale.
+function mealProductRefV4118(item){
+ return item?.ingredientId?'ingredient:'+item.ingredientId:String(item?.productId||'');
+}
+function mealProductInfoV4118(item){
+ const ingredient=item?.ingredientId?ingredientById(item.ingredientId):null;
+ const product=productById(item?.productId||ingredient?.productId);
+ return {ingredient,product,name:ingredient?.name||product?.name||'Produit supprimé',
+  store:ingredient?ingredientStore(ingredient):(product?.store||'carrefour')};
 }
 // V41.17 — compatibilite historique + repas composes avec plusieurs plats congeles.
 function mealFrozenV4117(meal){
@@ -312,8 +322,8 @@ function mealCard(meal,i){
  }
  const productLines=mealProductsV412(meal);
  for(const x of productLines){
-  const p=productById(x.productId),done=getWeek().v41MealActions?.[i+':product:'+x.productId];
-  names.push((done?'✓ ':'🛒 ')+(p?.name||'Produit supprimé')+' · '+x.qty+' '+x.unit);
+  const info=mealProductInfoV4118(x),done=getWeek().v41MealActions?.[i+':product:'+mealProductRefV4118(x)];
+  names.push((done?'✓ ':'🛒 ')+info.name+' · '+x.qty+' '+x.unit);
  }
  if(productLines.length){
   classes=' filled';
@@ -1892,11 +1902,12 @@ function collectRecipeIngredients(w){
   })
  }));
  (w.meals||[]).forEach((meal,index)=>mealProductsV412(meal).forEach(x=>{
-  if(w.v41MealActions?.[index+':product:'+x.productId])return;
-  const p=productById(x.productId);if(!p)return;
-  const linked=(state.ingredientCatalog||[]).filter(i=>i.productId===p.id);
-  lines.push({name:p.name,qty:x.qty,unit:x.unit,productId:p.id,
-   ingredientId:linked.length===1?linked[0].id:null});
+  if(w.v41MealActions?.[index+':product:'+mealProductRefV4118(x)])return;
+  const info=mealProductInfoV4118(x),ing=info.ingredient,p=info.product;
+  if(!ing&&!p)return;
+  const linked=!ing&&p?(state.ingredientCatalog||[]).filter(i=>i.productId===p.id):[];
+  lines.push({name:info.name,qty:x.qty,unit:x.unit,productId:p?.id||null,
+   ingredientId:ing?.id||(linked.length===1?linked[0].id:null)});
  }));
  return lines
 }
@@ -2598,10 +2609,10 @@ function undoMealValidationControlsV41(index,meal){
   if(actions[key]){recognizedKeys.add(key);make('frozen-part',item.lotId,null,state.stockV41?.freezer?.[item.lotId]?.name||'Congélateur')}
  }
  for(const item of mealProductsV412(meal)){
-  const key=index+':product:'+item.productId;
+  const ref=mealProductRefV4118(item),key=index+':product:'+ref;
   if(actions[key]){
    recognizedKeys.add(key);
-   make('product',item.productId,null,productById(item.productId)?.name||'Produit');
+   make('product',ref,null,mealProductInfoV4118(item).name);
   }
  }
  for(const dish of mealDishes(meal)){
@@ -2646,11 +2657,10 @@ function quickMealActionsV413(index,meal){
   out.push(button('v41-freeze-recipe','❄️ Au congélateur · '+title,id,true));
  }
  for(const item of mealProductsV412(meal)){
-  const key=index+':product:'+item.productId;
+  const ref=mealProductRefV4118(item),key=index+':product:'+ref;
   if(done[key])continue;
-  const p=productById(item.productId);
-  out.push(button('v41-eat-product','✓ C’est mangé · '+html(p?.name||'Produit'),
-   ' data-id="'+html(item.productId)+'"'));
+  out.push(button('v41-eat-product','✓ C’est mangé · '+html(mealProductInfoV4118(item).name),
+   ' data-id="'+html(ref)+'"'));
  }
  for(const leftover of mealLeftovers(meal)){
   const key=index+':leftovers:'+leftover.fromIndex+':'+leftover.recipeId;
@@ -3143,10 +3153,12 @@ function storeMealParts(w,index,parts){
 }
 function setMealProductsV412(w,index,items){
  if(!Number.isInteger(index)||index<0||index>13)return false;
- const cleaned=items.filter(x=>x&&productById(x.productId)&&Number.isFinite(Number(x.qty))&&
-  Number(x.qty)>0&&Number(x.qty)<=100000&&units.includes(x.unit))
-  .map(x=>({productId:x.productId,qty:Number(x.qty),unit:x.unit}));
- if(cleaned.length!==items.length||new Set(cleaned.map(x=>x.productId)).size!==cleaned.length)return false;
+ const cleaned=items.filter(x=>x&&(x.ingredientId?ingredientById(x.ingredientId):productById(x.productId))&&
+  Number.isFinite(Number(x.qty))&&Number(x.qty)>0&&Number(x.qty)<=100000&&units.includes(x.unit))
+  .map(x=>({productId:x.productId||null,ingredientId:x.ingredientId||null,qty:Number(x.qty),unit:x.unit}));
+ if(cleaned.length!==items.length||new Set(cleaned.map(mealProductRefV4118)).size!==cleaned.length)return false;
+ const physical=cleaned.map(x=>x.productId?'product:'+x.productId:'ingredient:'+x.ingredientId);
+ if(new Set(physical).size!==cleaned.length)return false;
  const previous=w.meals[index];
  if(!previous&&cleaned.length){w.meals[index]={type:'products',products:cleaned};return true}
  if(!previous)return true;

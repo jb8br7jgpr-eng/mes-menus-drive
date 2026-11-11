@@ -1439,3 +1439,49 @@
  .v4119-card-title .btn{font-size:10px}
  .v4119-stepper{gap:5px}
 }
+
+/* V41.20 — assiette plus lisible : actions directes, accompagnements, état local. */
+.v4120-quick-sources{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.v4120-quick-sources button{min-width:0;min-height:65px;border-radius:14px;
+ background:#fff;border:1px solid #d9e7d7;display:flex;align-items:center;
+ justify-content:space-between;gap:6px;padding:12px 10px;color:#2d5038;
+ font-size:12px;font-weight:750;text-align:left;box-shadow:0 3px 10px #254e2d09;
+ cursor:pointer;touch-action:manipulation}
+.v4120-quick-sources button:nth-child(2){background:#f2f9ec;border-color:#b7d7b9}
+.v4120-quick-sources button span{flex:1;min-width:0;overflow-wrap:anywhere}
+.v4120-quick-sources button b{font-size:22px;font-weight:600;color:#37844e}
+.v4120-quick-sources button:active{transform:scale(.985)}
+.v4120-side-shortcuts{border:1px solid #dfeadd;background:#f8fbf6;border-radius:14px;
+ padding:10px 11px;display:grid;gap:6px}
+.v4120-side-shortcuts>strong{font-size:13px;color:#325b3b}
+.v4120-side-shortcuts>small{font-size:11px;color:#708472}
+.v4120-side-chips{display:flex;gap:7px;overflow-x:auto;scroll-snap-type:x proximity;
+ overscroll-behavior-x:contain;-webkit-overflow-scrolling:touch;padding:3px 0 6px}
+.v4120-side-chip{display:flex;align-items:center;gap:6px;flex:0 0 auto;
+ max-width:200px;scroll-snap-align:start;min-height:43px;border:1px solid #cbded0;
+ border-radius:12px;background:white;color:#345f43;padding:7px 9px;font-size:12px;
+ font-weight:650;white-space:normal;text-align:left}
+.v4120-side-chip span:nth-child(2){overflow-wrap:anywhere}
+.v4120-side-chip b{color:#388451;font-size:19px}
+.v4120-role-picker{background:#f2f7ef;border:1px solid #dbe9d8;border-radius:14px;
+ padding:11px;display:grid;gap:8px}
+.v4120-role-picker>span{font-size:12px;font-weight:800;color:#3c6246}
+.v4120-role-options{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
+.v4120-role-options button{min-height:44px;border-radius:11px;border:1px solid #d2dfd1;
+ background:white;color:#477052;font-size:12px;font-weight:750;padding:8px 4px}
+.v4120-role-options button.active{background:#deeedc;border-color:#7aae82;color:#245a38}
+.v4120-role-picker small{font-size:11px;color:#607969;line-height:1.4}
+.v4120-side-card{background:#f5fbef;border-color:#bddcb9}
+.v4120-role-link{margin-top:6px;background:transparent;border:0;padding:3px 0;
+ font-size:11px;font-weight:700;color:#387b4d;text-align:left;text-decoration:underline;
+ text-underline-offset:2px}
+.v4119-quantity span small{display:block;color:#6c8170;font-size:10px}
+.v4119-my-meal>.v4119-section-top{padding-bottom:5px}
+.v4119-composer .v4117-composer-tabs{margin-top:4px}
+.v4119-visual .v4119-coverage-state{margin-bottom:5px}
+@media(max-width:390px){
+ .v4120-quick-sources button{padding:9px 7px;font-size:11px;min-height:60px}
+ .v4120-side-shortcuts{padding:9px}
+ .v4120-role-options button{font-size:11px}
+ .v4119-quantity span small{max-width:120px}
+}

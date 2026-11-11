@@ -3145,7 +3145,7 @@ function setMealProductsV412(w,index,items){
  if(!previous)return true;
  if(['ordered','no-meal'].includes(previous.type))return false;
  if(previous.type==='frozen'){w.meals[index]={type:'composed',frozen:(typeof mealFrozenV4117==='function'?mealFrozenV4117(previous):[])};return setMealProductsV412(w,index,items)}
- if(previous.type==='products'&&!cleaned.length){const remainingFrozen=typeof mealFrozenV4117==='function'?(typeof mealFrozenV4117==='function'?mealFrozenV4117(previous):[]):[];
+ if(previous.type==='products'&&!cleaned.length){const remainingFrozen=typeof mealFrozenV4117==='function'?mealFrozenV4117(previous):[];
  w.meals[index]=remainingFrozen.length?{type:'composed',frozen:remainingFrozen}:null;return true}
  const next={...previous};
  if(cleaned.length)next.products=cleaned;else delete next.products;

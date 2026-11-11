@@ -2753,6 +2753,91 @@ function mealComposerSelectedV4118(index,meal){
   '<button class="btn tiny ghost" data-action="remove-meal" data-index="'+index+'">Vider</button></div>'+
   quickMealActionsV413(index,meal)+'</div>';
 }
+// V41.19 : assembleur visuel, sans deduire le stock a la planification.
+function mealComposerVisualV4119(index,meal){
+ const guests=mealComposerGuestsV4119(index,meal),coverage=mealPortionCoverageV4119(meal,guests);
+ const dishes=mealDishes(meal),leftovers=mealLeftovers(meal),frozen=mealFrozenV4117(meal),products=mealProductsV412(meal);
+ const count=dishes.length+leftovers.length+frozen.length+products.length;
+ const visible=Math.min(guests,8),tiles=Array.from({length:visible},(_,n)=>
+  '<div class="v4119-portion'+(n<coverage.filled?' is-filled':'')+'" aria-label="Portion '+(n+1)+(n<coverage.filled?' prévue':' à compléter')+'">'+
+  '<span class="v4119-portion-symbol">'+(n<coverage.filled?'✓':'＋')+'</span>'+
+  '<small>Portion '+(n+1)+'</small></div>').join('');
+ const rows=[];
+ dishes.forEach((d,n)=>{
+  const name=recipeById(d.recipeId)?.name||'Recette supprimée',here=portionsEatenHere(d,dishes,guests),
+   remaining=Math.max(0,Number(d.people)-here);
+  rows.push('<article class="v4119-card"><div class="v4119-card-title"><span class="v4119-icon">🍲</span>'+
+   '<div class="grow"><strong>'+html(name)+'</strong><small>Recette · '+here+' portion'+(here>1?'s':'')+
+   ' prévues ici'+(remaining?' · '+remaining+' reste'+(remaining>1?'s':'')+' possible'+(remaining>1?'s':''):'')+'</small></div>'+
+   '<button class="btn tiny ghost" data-action="remove-dish" data-index="'+index+'" data-dish="'+n+'" aria-label="Retirer '+html(name)+'">Retirer</button></div>'+
+   '<div class="v4119-quantity"><span>Portions préparées</span><div class="v4119-stepper">'+
+   '<button type="button" data-action="v4119-dish-step" data-index="'+index+'" data-dish="'+n+'" data-delta="-1" '+(d.people<=1?'disabled':'')+' aria-label="Diminuer les portions de '+html(name)+'">−</button>'+
+   '<strong>'+d.people+'</strong>'+
+   '<button type="button" data-action="v4119-dish-step" data-index="'+index+'" data-dish="'+n+'" data-delta="1" '+(d.people>=30?'disabled':'')+' aria-label="Augmenter les portions de '+html(name)+'">＋</button></div></div></article>');
+ });
+ frozen.forEach(part=>{
+  const lot=state.stockV41?.freezer?.[part.lotId],
+   name=lot?.name||recipeById(part.recipeId)?.name||'Plat congelé';
+  rows.push('<article class="v4119-card"><div class="v4119-card-title"><span class="v4119-icon">❄️</span>'+
+   '<div class="grow"><strong>'+html(name)+'</strong><small>Congélateur · '+part.portions+
+   ' portion'+(part.portions>1?'s':'')+' réservée'+(part.portions>1?'s':'')+
+   (part.consumed?' · déjà mangées':' · sans courses supplémentaires')+'</small></div>'+
+   (part.consumed?'':'<button class="btn tiny ghost" data-action="v4117-remove-frozen" data-index="'+index+'" data-id="'+html(part.lotId)+'">Retirer</button>')+
+   '</div>'+(part.consumed?'':'<div class="v4119-quantity"><span>Portions du congélateur</span>'+
+   '<button class="btn tiny secondary" data-action="v4119-edit-frozen" data-index="'+index+'" data-id="'+html(part.lotId)+'">Modifier · '+part.portions+'</button></div>')+'</article>');
+ });
+ leftovers.forEach((p,n)=>{
+  const name=recipeById(p.recipeId)?.name||'Restes';
+  rows.push('<article class="v4119-card"><div class="v4119-card-title"><span class="v4119-icon">🍱</span>'+
+   '<div class="grow"><strong>'+html(name)+'</strong><small>Restes · '+p.people+' portion'+(p.people>1?'s':'')+
+   ' · pas de nouvelles courses</small></div>'+
+   '<button class="btn tiny ghost" data-action="remove-leftover" data-index="'+index+'" data-leftover="'+n+'">Retirer</button></div></article>');
+ });
+ products.forEach(p=>{
+  const info=mealProductInfoV4118(p),ref=mealProductRefV4118(p);
+  rows.push('<article class="v4119-card v4119-product-card"><div class="v4119-card-title">'+
+   '<span class="v4119-icon">'+(info.store==='grandfrais'?'🥬':'🛒')+'</span>'+
+   '<div class="grow"><strong>'+html(info.name)+'</strong><small>'+html(info.store==='grandfrais'?'Grand Frais':'Carrefour')+
+   ' · '+html(quantity(p.qty,p.unit))+(p.servings?' · '+p.servings+' portion'+(p.servings>1?'s':'')+' principale'+(p.servings>1?'s':''):' · complément')+'</small></div>'+
+   '<button class="btn tiny ghost" data-action="v412-remove-meal-product" data-index="'+index+
+   '" data-id="'+html(ref)+'">Retirer</button></div>'+
+   '<div class="v4119-quantity"><span>'+(p.servings?'Aliment principal':'Produit en complément')+'</span>'+
+   '<button class="btn tiny secondary" data-action="v412-edit-meal-product" data-index="'+index+
+   '" data-kind="'+(p.ingredientId?'ingredient':'daily')+'" data-id="'+html(p.ingredientId||p.productId)+'">Modifier</button></div></article>');
+ });
+ const status=coverage.missing?'<strong>'+coverage.missing+' portion'+(coverage.missing>1?'s':'')+' à compléter</strong>':
+  '<strong>✓ '+guests+' portion'+(guests>1?'s':'')+' prévue'+(guests>1?'s':'')+'</strong>';
+ const note=coverage.planned>guests?'Plusieurs plats peuvent être servis aux mêmes convives. Les cases restent indicatives.':
+  'Les accompagnements ne remplissent pas les cases, sauf si tu les déclares comme plat principal.';
+ return '<div class="v4119-visual">'+
+  '<section class="v4119-people"><div class="v4119-section-top"><div><strong>👥 Personnes à table</strong><small>Le nombre de couverts pour ce repas</small></div>'+
+  '<div class="v4119-stepper"><button type="button" data-action="v4119-guests-step" data-index="'+index+'" data-delta="-1" '+(guests<=1?'disabled':'')+' aria-label="Une personne en moins">−</button>'+
+  '<strong class="v4119-people-count">'+guests+'</strong>'+
+  '<button type="button" data-action="v4119-guests-step" data-index="'+index+'" data-delta="1" '+(guests>=30?'disabled':'')+' aria-label="Une personne en plus">＋</button></div></div></section>'+
+  '<section class="v4119-coverage"><div class="v4119-section-top"><strong>🍽️ Couverture du repas</strong>'+
+  '<span>'+coverage.filled+' / '+guests+' portions</span></div>'+
+  '<div class="v4119-portion-grid">'+tiles+'</div>'+
+  (guests>8?'<small>Et '+(guests-8)+' autres couverts pris en compte.</small>':'')+
+  '<p class="v4119-coverage-state'+(coverage.missing?' needs-more':'')+'">'+status+'</p>'+
+  '<small class="v4119-coverage-note">'+note+'</small></section>'+
+  '<section class="v4119-my-meal"><div class="v4119-section-top"><strong>Mon repas</strong><span>'+
+  count+' élément'+(count>1?'s':'')+'</span></div>'+
+  (rows.length?'<div class="v4119-card-list">'+rows.join('')+'</div>':
+   '<div class="v4119-empty"><span>🍽️</span><strong>Ton repas est encore vide</strong><small>Choisis un plat, des restes ou un produit pour commencer.</small></div>')+
+  (count?'<details class="v4119-more"><summary>Autres actions du repas</summary>'+
+   '<div class="v4119-more-actions"><button class="btn secondary" data-action="move-copy-meal" data-mode="move" data-index="'+index+'">Déplacer</button>'+
+   '<button class="btn secondary" data-action="move-copy-meal" data-mode="copy" data-index="'+index+
+   '" '+(!dishes.length&&!products.length||frozen.length?'disabled':'')+'>Copier</button>'+
+   '<button class="btn secondary" data-action="remove-meal" data-index="'+index+'">Vider le repas</button></div>'+
+   quickMealActionsV413(index,meal)+'</details>':'')+'</section></div>';
+}
+function showSpecialMealV4119(index,meal){
+ const no=meal?.type==='no-meal',title=no?'🍽️ Pas de repas':'🍕 Repas commandé';
+ showModal(menuMealLabelV411(index)+' · Mon repas','<div class="v4119-special"><div class="v4119-special-icon">'+(no?'🍽️':'🍕')+'</div>'+
+  '<h3>'+title+'</h3><p>'+(no?'Restaurant, invitation ou repas à l’extérieur.':'Repas commandé, sans ingrédients à acheter.')+'</p>'+
+  '<button class="btn wide" data-action="v4119-replace-special" data-index="'+index+'">＋ Composer un repas à la place</button>'+
+  '<button class="btn secondary wide" data-action="v4119-finish" data-index="'+index+'">✓ Terminer</button></div>');
+}
 function openMealPickerV4116(index,kind='recipes'){
  const meal=getWeek().meals[index];
  if(!Number.isInteger(index)||index<0||index>13||isMealDoneV41(getWeek(),index))return;

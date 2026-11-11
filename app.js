@@ -85,7 +85,64 @@ function writeSnapshot(snapshot,label='Sauvegarde automatique',force=false){
 const V34_CLOUD_ACTIVE = true;
 let v34CloudRuntime = null;
 let saveQueue=Promise.resolve(),saveError=false;
+// V41.20 : gestes instantanés dans le composeur, sauvegarde au départ ou à l'ajout.
+let mealComposerDraftV4120=null;
+let mealRecipeRoleV4120='main';
+function mealDraftV4120(index,create=false){
+ if(mealComposerDraftV4120&&(mealComposerDraftV4120.week!==currentWeek||mealComposerDraftV4120.index!==index)){
+  if(create)persist();
+  else return null;
+ }
+ if(!mealComposerDraftV4120&&create)
+  mealComposerDraftV4120={week:currentWeek,index,portions:{},roles:{}};
+ return mealComposerDraftV4120?.week===currentWeek&&mealComposerDraftV4120?.index===index?mealComposerDraftV4120:null;
+}
+function mealComposerPreviewV4120(index,meal){
+ const draft=mealDraftV4120(index);
+ if(!meal||!draft)return meal;
+ const copy={...meal},side=new Set(Array.isArray(meal.sideRecipeIds)?meal.sideRecipeIds:[]);
+ for(const [id,value] of Object.entries(draft.roles||{})){
+  if(value)side.add(id);else side.delete(id);
+ }
+ copy.sideRecipeIds=[...side];
+ if(copy.type==='recipe'&&draft.portions[copy.recipeId])copy.people=draft.portions[copy.recipeId];
+ if(copy.type==='multi'&&Array.isArray(copy.dishes))
+  copy.dishes=copy.dishes.map(d=>d.type?d:{...d,people:draft.portions[d.recipeId]||d.people});
+ return copy;
+}
+function commitMealComposerDraftV4120(){
+ const draft=mealComposerDraftV4120;
+ if(!draft)return false;
+ mealComposerDraftV4120=null;
+ const w=state.weeks?.[draft.week],index=draft.index;
+ if(!w||!Number.isInteger(index)||index<0||index>13||isMealDoneV41(w,index))return false;
+ let changed=false;
+ if(Number.isInteger(draft.guests))changed=setMealGuestsV412(w,index,draft.guests)||changed;
+ if(w.meals[index]){
+  const dishes=mealDishes(w.meals[index]),next=dishes.map(d=>({...d,
+   people:draft.portions[d.recipeId]||d.people}));
+  if(next.some((d,i)=>d.people!==dishes[i].people)){setMealDishes(w,index,next);changed=true}
+  const ids=new Set(mealDishes(w.meals[index]).map(d=>d.recipeId));
+  const side=new Set((w.meals[index].sideRecipeIds||[]).filter(id=>ids.has(id)));
+  for(const [id,active] of Object.entries(draft.roles)){
+   if(!ids.has(id))continue;
+   if(active)side.add(id);else side.delete(id);
+  }
+  const previous=JSON.stringify(w.meals[index].sideRecipeIds||[]),nextRoles=JSON.stringify([...side]);
+  if(previous!==nextRoles){
+   if(side.size)w.meals[index].sideRecipeIds=[...side];
+   else delete w.meals[index].sideRecipeIds;
+   changed=true;
+  }
+ }
+ return changed;
+}
+function refreshMealVisualV4120(index){
+ const view=modalRoot.querySelector('.v4119-visual');
+ if(view)view.outerHTML=mealComposerVisualV4119(index,getWeek().meals[index]);
+}
 function persist(){
+ commitMealComposerDraftV4120();
  const snapshot=JSON.parse(JSON.stringify(state));
  let cloudPendingError=null;
  if(V34_CLOUD_ACTIVE){
@@ -2449,6 +2506,8 @@ function showModal(title,body,autoFocus=true){
  if(first)first.focus({preventScroll:true})
 }
 function closeModal(){
+ if(mealComposerDraftV4120)persist();
+ mealRecipeRoleV4120='main';
  const modalLock=typeof modalPageLockV4116==='undefined'?null:modalPageLockV4116;
  if(modalLock){
   const b=document.body.style;
@@ -2755,8 +2814,10 @@ function mealComposerSelectedV4118(index,meal){
 }
 // V41.19 : assembleur visuel, sans deduire le stock a la planification.
 function mealComposerVisualV4119(index,meal){
- const guests=mealComposerGuestsV4119(index,meal),coverage=mealPortionCoverageV4119(meal,guests);
- const dishes=mealDishes(meal),leftovers=mealLeftovers(meal),frozen=mealFrozenV4117(meal),products=mealProductsV412(meal);
+ const preview=mealComposerPreviewV4120(index,meal);
+ const guests=mealComposerGuestsV4119(index,meal),coverage=mealPortionCoverageV4119(preview,guests);
+ const dishes=mealDishes(preview),leftovers=mealLeftovers(preview),frozen=mealFrozenV4117(preview),
+  products=mealProductsV412(preview),sideIds=new Set(preview?.sideRecipeIds||[]);
  const count=dishes.length+leftovers.length+frozen.length+products.length;
  const visible=Math.min(guests,8),tiles=Array.from({length:visible},(_,n)=>
   '<div class="v4119-portion'+(n<coverage.filled?' is-filled':'')+'" aria-label="Portion '+(n+1)+(n<coverage.filled?' prévue':' à compléter')+'">'+
@@ -3339,6 +3400,7 @@ function mealLeftovers(meal){
 function mealParts(meal){return [...mealDishes(meal),...mealLeftovers(meal)]}
 function storeMealParts(w,index,parts){
  const old=w.meals[index],attached=mealProductsV412(old),guests=old?.guests||w.v4119GuestChoices?.[index],
+ sideIds=Array.isArray(old?.sideRecipeIds)?old.sideRecipeIds:[],
  frozen=typeof mealFrozenV4117==='function'?mealFrozenV4117(old):[];
  const valid=parts.filter(p=>p&&Number.isInteger(Number(p.people))&&Number(p.people)>=1&&Number(p.people)<=30);
  if(!valid.length){w.meals[index]=attached.length?{type:'products',products:attached}:frozen.length?{type:'composed'}:null;
@@ -3352,6 +3414,8 @@ function storeMealParts(w,index,parts){
  if(attached.length)w.meals[index].products=attached;
  if(frozen.length)w.meals[index].frozen=frozen;
  if(guests)w.meals[index].guests=guests;
+ const retained=sideIds.filter(id=>mealDishes(w.meals[index]).some(d=>d.recipeId===id));
+ if(retained.length)w.meals[index].sideRecipeIds=retained;
 }
 function setMealProductsV412(w,index,items){
  if(!Number.isInteger(index)||index<0||index>13)return false;
@@ -3378,7 +3442,7 @@ function setMealProductsV412(w,index,items){
 }
 // V41.19 : choix des couverts conservé même si la case du calendrier est encore vide.
 function mealComposerGuestsV4119(index,meal){
- const choice=Number(meal?.guests??getWeek().v4119GuestChoices?.[index]);
+ const draft=mealDraftV4120(index),choice=Number(draft?.guests??meal?.guests??getWeek().v4119GuestChoices?.[index]);
  return Number.isInteger(choice)&&choice>=1&&choice<=30?choice:mealGuestsV412(meal);
 }
 function applyMealDraftGuestsV4119(w,index){
@@ -3388,7 +3452,8 @@ function applyMealDraftGuestsV4119(w,index){
 }
 function mealPortionCoverageV4119(meal,guests){
  // Repere visuel : ne modifie jamais le nombre de portions cuisinees ni le stock.
- const recipes=mealDishes(meal).reduce((n,d)=>n+Math.min(Number(d.people)||0,guests),0);
+ const sides=new Set(meal?.sideRecipeIds||[]);
+ const recipes=mealDishes(meal).reduce((n,d)=>n+(sides.has(d.recipeId)?0:Math.min(Number(d.people)||0,guests)),0);
  const frozen=mealFrozenV4117(meal).reduce((n,d)=>n+(Number(d.portions)||0),0);
  const leftovers=mealLeftovers(meal).reduce((n,d)=>n+(Number(d.people)||0),0);
  const products=mealProductsV412(meal).reduce((n,d)=>n+(Number(d.servings)||0),0);

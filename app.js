@@ -2709,8 +2709,15 @@ function openMealPickerV4116(index,kind='recipes'){
    '</select></div></div><div id="mealRecipeCount" class="meal-picker-count">'+state.recipes.length+' plats</div>'+
    '<div class="v4117-composer-list"><div id="mealRecipeResults" data-index="'+index+'">'+mealRecipePickerResults(index)+'</div></div>';
  }
+ // V41.17.1 : les choix sans recette sont toujours accessibles, y compris sur une case vide.
+ const otherChoices='<div class="v41171-choices"><span class="v41171-choices-caption">Autres possibilités</span>'+
+  '<div class="v41171-choices-actions">'+
+  '<button type="button" class="btn secondary v41171-no-meal" data-action="mark-no-meal" data-index="'+index+'">🍽️ Pas de repas<small>Restaurant, invitation, sortie…</small></button>'+
+  '<button type="button" class="btn secondary v41171-ordered" data-action="v41171-mark-ordered" data-index="'+index+'">🍕 Repas libre / commandé<small>Sans recette ni courses à générer</small></button>'+
+  '</div></div>';
  showModal(menuMealLabelV411(index)+' · Composer',tabs+
-  '<div class="v4117-composer-count">'+chosen+' élément'+(chosen>1?'s':'')+' dans le repas</div>'+body+
+  '<div class="v4117-composer-count">'+chosen+' élément'+(chosen>1?'s':'')+' dans le repas</div>'+
+  otherChoices+body+
   (chosen?'<button class="btn secondary wide" data-action="pick-meal" data-index="'+index+'">✓ Voir mon repas</button>':''));
 }
 function pickMeal(index){
@@ -3598,6 +3605,19 @@ document.addEventListener('click',e=>{
     if(current.type==='composed'&&!remaining.length&&!mealProductsV412(current).length)w.meals[index]=null;
    }
    persist();render(true);pickMeal(index);toastWeekUndo('Portions retirées du planning.',before,index)
+  }
+  else if(mode==='v41171-mark-ordered'){
+   if(!Number.isInteger(index)||index<0||index>13)return;
+   if(isMealDoneV41(w,index)){
+    toast('Ce repas est déjà validé dans le stock. Annule d’abord sa validation.');return
+   }
+   if(w.meals[index]?.type==='ordered'){closeModal();pickMeal(index);return}
+   if(w.meals[index]&&!confirm('Remplacer tout le repas prévu par « Repas libre / commandé » ? Les éventuels restes liés à ce plat seront retirés du planning.'))return;
+   const before=weekBeforeUndo();
+   clearMealWithPair(w,index);
+   w.meals[index]={type:'ordered'};
+   persist();closeModal();renderMealContext(index);
+   toastWeekUndo('Créneau marqué « Repas libre / commandé ».',before,index)
   }
   else if(mode==='mark-no-meal'){
    if(!Number.isInteger(index)||index<0||index>13)return;

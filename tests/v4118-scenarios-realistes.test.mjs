@@ -68,6 +68,7 @@ test('V41.18 : les courses recoivent le bon ingredient sans fiche commerciale',(
  assert.equal(result[0].ingredientId,'tomates');
  assert.equal(result[0].productId,null);
  assert.equal(result[0].qty,2);
+ assert.equal(result[0].sourceKind,'meal-product','source distincte des ingrédients de recette');
  assert.equal(w.generatedIngredients,undefined,'la generation doit rester explicite');
 });
 
@@ -125,6 +126,7 @@ test('V41.18 : les quatre sources, quantites et nouveau flux achats restent pres
  assert.match(app,/menuShoppingChangesV4118/);
  assert.match(app,/Mettre à jour ma liste/);
  assert.match(app,/Enregistrer mes achats/);
+ assert.match(app,/x\.sourceKind==='meal-product'\?'Repas':'Recettes'/);
  assert.doesNotMatch(app,/Enregistrer uniquement les articles cochés/);
  assert.match(ui,/ingredient\.ingredientId|product\.ingredientId/);
  assert.match(index,/41-18-compose/);

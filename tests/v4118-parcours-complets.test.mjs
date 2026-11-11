@@ -72,10 +72,10 @@ test('Les quantites proposees pour un produit a la piece sont celles des convive
  assert.match(body,/Conditionnement : 4 pièce/);
  assert.match(body,/Quantité prévue pour le repas/);
 });
-test('Le compositeur affiche ses quatre sources et le repas courant',()=>{
+test('Le composeur affiche ses cinq sources sans doublon',()=>{
  assert.match(app,/function mealComposerSelectedV4118\(/);
  assert.match(app,/mealComposerVisualV4119\(index,meal\)/);
- assert.match(app,/const modes=\['recipes','leftovers','frozen','products'\]/);
+ assert.match(app,/const modes=\['recipes','side','leftovers','frozen','products'\]/);
  assert.match(app,/data-action="v4119-finish"/);
  assert.match(app,/data-action="save-dish-portions"/);
  assert.match(css,/\.v4119-card/);

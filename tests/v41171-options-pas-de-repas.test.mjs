@@ -16,9 +16,9 @@ function renderChoices(kind='recipes',meal=null){
  let modal=null;const w={meals:Array(14).fill(null)};w.meals[1]=meal;
  const ctx={
   getWeek:()=>w,isMealDoneV41:()=>false,mealCanEditV4117:()=>true,
-  mealComposerGuestsV4119:()=>2,mealComposerVisualV4119:()=>'<div class="v4119-visual">Repas visuel</div>',
   mealDishes:()=>[],mealLeftovers:()=>[],mealFrozenV4117:()=>[],mealProductsV412:()=>[],
   mealComposerGuestsV4119:()=>2,mealComposerVisualV4119:()=>'<div>Composeur visuel</div>',
+  mealRecipeRoleV4120:'main',mealSideShortcutsV4120:()=>'',
   state:{recipes:[],stockV41:{freezer:{}},weeks:{}},
   recipeTypes:[],normalRecipeType:()=>'',menuMealLabelV411:()=> 'Samedi midi',
   mealRecipePickerResults:()=>'<div>Aucun plat</div>',recipeById:()=>null,

@@ -46,7 +46,7 @@ test('choix du nombre de couverts sans creer de faux repas vide',()=>{
  const guestSrc=section('function mealComposerGuestsV4119(', 'function mealPortionCoverageV4119(');
  const saveSrc=section('function setMealGuestsV412(', '// « Préparées »');
  const w={meals:Array(14).fill(null),v41MealActions:{}};
- const ctx={getWeek:()=>w,mealGuestsV412:()=>2,isMealDoneV41:()=>false,reconcileLeftovers:()=>{}};
+ const ctx={getWeek:()=>w,mealGuestsV412:()=>2,mealDraftV4120:()=>null,isMealDoneV41:()=>false,reconcileLeftovers:()=>{}};
  const api=runInNewContext(guestSrc+saveSrc+';({mealComposerGuestsV4119,setMealGuestsV412,applyMealDraftGuestsV4119})',ctx);
  assert.equal(api.mealComposerGuestsV4119(0,null),2);
  assert.equal(api.setMealGuestsV412(w,0,5),true);
@@ -116,7 +116,7 @@ test('les cases visuelles correspondent aux convives et restent lisibles',()=>{
  const src=section('function mealComposerVisualV4119(', 'function showSpecialMealV4119(');
  const meal={type:'multi',dishes:[{recipeId:'chili',people:1}],products:[]};
  const visual=runInNewContext(src+';mealComposerVisualV4119',{
-   mealComposerGuestsV4119:()=>3,mealPortionCoverageV4119:coverage,
+   mealComposerGuestsV4119:()=>3,mealComposerPreviewV4120:(_index,meal)=>meal,mealPortionCoverageV4119:coverage,
    mealDishes:dishes,mealLeftovers:leftover,mealFrozenV4117:freezer,mealProductsV412:products,
    recipeById:()=>({name:'Chili'}),state:{stockV41:{freezer:{}}},
    portionsEatenHere:()=>1,mealProductInfoV4118:()=>null,mealProductRefV4118:()=>null,
@@ -125,7 +125,7 @@ test('les cases visuelles correspondent aux convives et restent lisibles',()=>{
  const view=visual(0,meal);
  assert.equal((view.match(/class="v4119-portion(?: is-filled)?"/g)||[]).length,3);
  assert.equal((view.match(/class="v4119-portion is-filled"/g)||[]).length,1);
- assert.match(view,/2 portions à compléter/);
- assert.match(view,/Portions préparées/);
+ assert.match(view,/2 couverts à compléter/);
+ assert.match(view,/À préparer/);
  assert.match(view,/data-action="v4119-dish-step"/);
 });

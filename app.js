@@ -2671,8 +2671,8 @@ function mealRecipePickerResults(index,searchTerm='',type='all'){
   (!term||norm(r.name).includes(term))&&
   (type==='all'||normalRecipeType(r.category)===type));
  filtered.sort((a,b)=>a.name.localeCompare(b.name,'fr',{sensitivity:'base'}));
- const renderItem=r=>'<button class="picker-item" data-action="choose-recipe" data-role="main
-  '" data-id="'+html(r.id)+'" data-index="'+index+'">'+
+ const renderItem=r=>'<button class="picker-item" data-action="choose-recipe" data-role="main"'+
+  ' data-id="'+html(r.id)+'" data-index="'+index+'">'+
   '<span class="emoji">'+html(icons[normalRecipeType(r.category)]||'🍽️')+'</span><span class="grow"><strong>'+html(r.name)+'</strong>'+
   '<small>'+html(normalRecipeType(r.category)==='legacy'?(r.category||'Autre'):normalRecipeType(r.category))+
   ' · '+r.ingredients.length+' ingrédient'+(r.ingredients.length>1?'s':'')+' · '+r.people+' portions de base</small></span><span class="end">＋</span></button>';

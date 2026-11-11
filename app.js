@@ -2379,7 +2379,7 @@ function showModal(title,body,autoFocus=true){
  if(first)first.focus({preventScroll:true})
 }
 function closeModal(){
- const modalLock=modalPageLockV4116;
+ const modalLock=typeof modalPageLockV4116==='undefined'?null:modalPageLockV4116;
  if(modalLock){
   const b=document.body.style;
   b.position=modalLock.position;b.top=modalLock.top;
@@ -2713,11 +2713,12 @@ function pickMeal(index){
     '" data-id="'+html(x.productId)+'">Retirer</button></div></div>';
   });
  }
+ const availableRestes=availableLeftoverSources(getWeek(),index).reduce((n,x)=>n+x.available,0);
  out+='<div class="v4116-meal-choices">'+
   '<button class="btn wide" data-action="v4116-open-picker" data-kind="recipes" data-index="'+index+'">🍽️ Ajouter un plat de mes recettes</button>'+
   '<button class="btn secondary wide" data-action="v4116-open-picker" data-kind="frozen" data-index="'+index+'">❄️ Choisir dans mon congélateur</button>'+
-  '<button class="btn secondary wide" data-action="v4116-open-picker" data-kind="products" data-index="'+index+'">🛒 Ajouter un produit du catalogue</button>'+
-  '<button class="btn secondary wide" data-action="choose-leftovers" data-index="'+index+'">🍱 Placer des restes</button></div>';
+  '<button class="btn secondary wide" data-action="v412-pick-product" data-index="'+index+'">🛒 Ajouter un produit du catalogue</button>'+
+  '<button class="btn secondary wide" data-action="choose-leftovers" data-index="'+index+'">🍱 Placer des restes'+(availableRestes?' · '+availableRestes+' portions':'')+'</button></div>';
  if(meal)out+='<div class="meal-transfer-actions">'+
  '<button class="btn secondary" data-action="move-copy-meal" data-mode="copy" data-index="'+index+'" '+(!dishes.length&&!products.length?'disabled':'')+'>⧉ Copier</button>'+
  '<button class="btn secondary" data-action="move-copy-meal" data-mode="move" data-index="'+index+'">↔ Déplacer</button></div>';

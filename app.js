@@ -1562,7 +1562,7 @@ function renderProduits(){
  });
  out+='<div class="section-head"><h2>Votre catalogue</h2><span class="pill" id="catalogueCount">'+n+' produit'+(n>1?'s':'')+'</span></div>'+
  '<div id="catalogueResults">'+unifiedCatalogueRows()+'</div>'+
- '<p class="helper catalog-footer">Ingrédients : recettes et courses. Quotidien : courses uniquement. Magasin et stock maison se gèrent depuis Courses.</p>';
+ '<p class="helper catalog-footer">Les fiches du catalogue alimentent les courses et peuvent entrer dans tes recettes ou repas. Le magasin et le stock sont gérés dans Courses et Stock.</p>';
  return out
 }
 function refreshCatalogueV40(){
@@ -1575,9 +1575,9 @@ function refreshCatalogueV40(){
 function chooseUnifiedProductType(){
  const suggested=catalogueTypeFilter==='daily'?'daily':'ingredient';
  showModal('Ajouter un produit',
-  '<p class="helper">Choisis si ce produit pourra apparaître dans tes recettes. Les deux types utilisent les mêmes magasins et la même liste de courses.</p>'+
+  '<p class="helper">Choisis comment classer ce produit. Un achat du quotidien peut aussi compléter une recette ou un repas.</p>'+
   '<div class="catalogue-create-types"><button class="btn wide '+(suggested==='ingredient'?'':'secondary')+'" data-action="new-unified-kind" data-kind="ingredient">🥕 Ingrédient <small>Recettes et courses</small></button>'+
-  '<button class="btn wide '+(suggested==='daily'?'':'secondary')+'" data-action="new-unified-kind" data-kind="daily">🧻 Achat du quotidien <small>Courses uniquement</small></button></div>');
+  '<button class="btn wide '+(suggested==='daily'?'':'secondary')+'" data-action="new-unified-kind" data-kind="daily">🧻 Achat du quotidien <small>Courses, recettes et repas</small></button></div>');
 }
 function unifiedToCourses(type,id){
  const item=type==='ingredient'?ingredientById(id):productById(id);if(!item)return;

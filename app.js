@@ -3990,19 +3990,6 @@ document.addEventListener('click',e=>{
    else if(mode==='v4119-finish'){
    closeModal();renderMealContext(index)
   }
-  else if(mode==='v4120-open-main'){
-   mealRecipeRoleV4120='main';openMealPickerV4116(index,'recipes');
-  }
-  else if(mode==='v4120-open-side'){
-   mealRecipeRoleV4120='side';openMealPickerV4116(index,'recipes');
-  }
-  else if(mode==='v4120-recipe-role'){
-   mealRecipeRoleV4120=a.dataset.role==='side'?'side':'main';
-   const box=modalRoot.querySelector('.v4120-role-options');
-   box?.querySelectorAll('[data-action="v4120-recipe-role"]').forEach(button=>
-    button.classList.toggle('active',button.dataset.role===mealRecipeRoleV4120));
-   refreshMealRecipePicker(); // ni serveur ni réouverture de fenêtre
-  }
   else if(mode==='v4120-toggle-side'){
    if(isMealDoneV41(w,index))return;
    const current=mealComposerPreviewV4120(index,w.meals[index]),

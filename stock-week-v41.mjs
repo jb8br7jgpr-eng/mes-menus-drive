@@ -62,7 +62,7 @@ export function addFrozenToMealV4117(weeks,stock,weekId,index,lotId,portions){
  const lot=normalizeStockV41(stock).freezer[lotId];
  if(!lot||lot.portions<1)throw Error('Ce plat n’est plus dans le congélateur.');
  const old=weeks?.[weekId]?.meals?.[index]||null;
- if(old&&['ordered','no-meal'].includes(old.type))throw Error('Remplace d’abord « Pas de repas » ou « Repas libre ».');
+ if(old&&['ordered','no-meal'].includes(old.type))throw Error('Remplace d’abord « Pas de repas » ou « Repas commandé ».');
  const parts=mealFrozenPartsV4117(old);
  if(parts.some(x=>x.lotId===lotId))throw Error('Ce plat est déjà présent dans le repas. Modifie ou retire ses portions.');
  if(Object.keys(weeks?.[weekId]?.v41MealActions||{}).some(x=>x.startsWith(index+':')))

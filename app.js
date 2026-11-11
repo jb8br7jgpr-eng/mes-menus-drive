@@ -2909,41 +2909,10 @@ function showSpecialMealV4119(index,meal){
   '<button class="btn wide" data-action="v4119-replace-special" data-index="'+index+'">＋ Composer un repas à la place</button>'+
   '<button class="btn secondary wide" data-action="v4119-finish" data-index="'+index+'">✓ Terminer</button></div>');
 }
-// Raccourcis vers des produits déjà existants, sans aucune fiche supplémentaire.
-function mealSideShortcutsV4120(index){
- const excluded=new Set(mealProductsV412(getWeek().meals[index]).map(p=>
-  p.productId?'p:'+p.productId:'i:'+p.ingredientId));
- const physicalSeen=new Set(),matches=unifiedCatalogueSourceV4114().filter(entry=>{
-  const item=entry.item||{},cat=norm(entry.category||item.category||''),name=norm(entry.name);
-  if(!/accompagnement|legume|fruit|salade|crudite|epicerie|frais/.test(cat)&&
-     !/riz|pomme de terre|tomate|carotte|salade|haricot|brocoli|puree|courgette|pates/.test(name))return false;
-  const key=item.productId?'p:'+item.productId:entry.type==='ingredient'?'i:'+entry.id:'p:'+entry.id;
-  if(excluded.has(key)||physicalSeen.has(key))return false;
-  physicalSeen.add(key);return true;
- }).sort((a,b)=>Number(Boolean(b.item?.frequent))-Number(Boolean(a.item?.frequent))||
-  a.name.localeCompare(b.name,'fr')).slice(0,6);
- return matches.length?'<div class="v4120-side-shortcuts"><strong>🥦 Accompagnements rapides</strong>'+
-  '<small>Depuis tes produits existants · choisis ensuite la quantité</small>'+
-  '<div class="v4120-side-chips">'+matches.map(x=>
-   '<button type="button" class="v4120-side-chip" data-action="v412-select-product" data-index="'+index+
-   '" data-kind="'+html(x.type)+'" data-id="'+html(x.id)+'">'+
-   '<span>'+(x.store==='grandfrais'?'🥬':'🥦')+'</span><span>'+html(x.name)+'</span><b>＋</b></button>').join('')+
-  '</div></div>':'';
-}
-function openMealPickerV4116(index,kind='recipes'){
+// V41.21 — une seule catégorie sélectionnée, avec son contenu juste dessous.
+function mealPickerBodyV4121(index,kind){
  const meal=getWeek().meals[index];
- if(!Number.isInteger(index)||index<0||index>13||isMealDoneV41(getWeek(),index))return;
- if(!mealCanEditV4117(meal)){toast('Retire d’abord « Pas de repas » ou « Repas commandé » pour composer ce repas.');return}
- const modes=['recipes','leftovers','frozen','products'];
- const tabs='<div class="v4117-composer-tabs">'+modes.map((t,i)=>
-  '<button class="v4117-composer-tab'+(kind===t?' active':'')+'" data-action="v4116-open-picker" data-kind="'+t+
-  '" data-index="'+index+'">'+['🍽️ Recettes','🍱 Restes','❄️ Congélateur','🛒 Produits'][i]+'</button>').join('')+'</div>';
- const chosen=mealDishes(meal).length+mealLeftovers(meal).length+mealFrozenV4117(meal).length+mealProductsV412(meal).length;
- const quick='<div class="v4120-quick-sources">'+
-  '<button type="button" data-action="v4120-open-main" data-index="'+index+'">🍲 <span>Plat principal</span><b>＋</b></button>'+
-  '<button type="button" data-action="v4120-open-side" data-index="'+index+'">🥗 <span>Accompagnement</span><b>＋</b></button>'+
-  '<button type="button" data-action="v4116-open-picker" data-kind="frozen" data-index="'+index+'">❄️ <span>Congélateur</span><b>＋</b></button>'+
-  '<button type="button" data-action="v4116-open-picker" data-kind="products" data-index="'+index+'">🛒 <span>Produits</span><b>＋</b></button></div>';
+ mealRecipeRoleV4120=kind==='side'?'side':'main';
  let body='';
  if(kind==='frozen'){
   const used=new Set(mealFrozenV4117(meal).map(x=>x.lotId));
@@ -2974,35 +2943,73 @@ function openMealPickerV4116(index,kind='recipes'){
    '<input id="v412ProductSearch" type="search" placeholder="Ex. cordons-bleus…" autocomplete="off"></div>'+
    '<div class="v4117-composer-list" id="v412ProductResults" data-index="'+index+'">'+mealProductPickerResultsV412(index)+'</div>';
  }else{
-  body='<div class="v4120-role-picker"><span>Ajouter comme</span>'+
-   '<div class="v4120-role-options"><button type="button" class="'+(mealRecipeRoleV4120==='main'?'active':'')+
-   '" data-action="v4120-recipe-role" data-role="main" data-index="'+index+'">🍲 Plat principal</button>'+
-   '<button type="button" class="'+(mealRecipeRoleV4120==='side'?'active':'')+
-   '" data-action="v4120-recipe-role" data-role="side" data-index="'+index+'">🥗 Accompagnement</button></div>'+
-   '<small>Le plat est ajouté pour '+mealComposerGuestsV4119(index,meal)+
-   ' personne(s). Tu peux ensuite préparer plus de portions directement sur sa carte pour conserver des restes.</small></div>'+
-   '<div class="meal-picker-filters"><div class="field"><label for="mealRecipeSearch">Rechercher un plat</label>'+
+  body='<p class="v4121-help">'+(kind==='side'?
+    'Choisis une recette ou un produit pour accompagner ton plat.':'Choisis ton plat. Les portions correspondent aux personnes à table.')+
+   '</p><div class="meal-picker-filters"><div class="field"><label for="mealRecipeSearch">Rechercher un plat</label>'+
    '<input id="mealRecipeSearch" type="search" placeholder="Ex. poulet…" autocomplete="off"></div>'+
    '<div class="field"><label for="mealRecipeType">Catégorie</label><select id="mealRecipeType">'+
    '<option value="all">Toutes</option>'+recipeTypes.map(t=>'<option value="'+html(t)+'">'+html(t)+'</option>').join('')+
    (state.recipes.some(r=>normalRecipeType(r.category)==='legacy')?'<option value="legacy">Autres (anciens)</option>':'')+
    '</select></div></div><div id="mealRecipeCount" class="meal-picker-count">'+state.recipes.length+' plats</div>'+
-   '<div class="v4117-composer-list"><div id="mealRecipeResults" data-index="'+index+'">'+mealRecipePickerResults(index)+'</div></div>';
+   '<div class="v4117-composer-list">'+(kind==='side'?'<div class="v4121-list-label">🥗 Recettes</div>':'')+
+   '<div id="mealRecipeResults" data-index="'+index+'">'+mealRecipePickerResults(index)+'</div>'+
+   (kind==='side'?'<div class="v4121-list-label">🥬 Produits existants</div>'+
+    '<div id="v4121SideProductResults" data-index="'+index+'">'+mealProductPickerResultsV412(index)+'</div>':'')+'</div>';
  }
- // V41.17.1 : les choix sans recette sont toujours accessibles, y compris sur une case vide.
- const otherChoices='<div class="v41171-choices"><span class="v41171-choices-caption">Autres possibilités</span>'+
-  '<div class="v41171-choices-actions">'+
-  '<button type="button" class="btn secondary v41171-no-meal" data-action="mark-no-meal" data-index="'+index+'">🍽️ Pas de repas<small>Restaurant, invitation, sortie…</small></button>'+
-  '<button type="button" class="btn secondary v41171-ordered" data-action="v41171-mark-ordered" data-index="'+index+'">🍕 Repas commandé<small>Sans recette ni courses à générer</small></button>'+
-  '</div></div>';
+
+ return body;
+}
+function switchMealComposerSourceV4121(index,kind){
+ const modes=['recipes','side','leftovers','frozen','products'];
+ const selected=modes.includes(kind)?kind:'recipes';
+ const composer=modalRoot.querySelector('.v4119-composer');
+ const panel=composer?.querySelector('#v4121PickerPanel');
+ if(!panel){openMealPickerV4116(index,selected);return}
+ if(isMealDoneV41(getWeek(),index))return;
+ composer.dataset.v4119Kind=selected;
+ panel.innerHTML=mealPickerBodyV4121(index,selected);
+ const bar=composer.querySelector('.v4121-source-nav');
+ bar?.querySelectorAll('[data-action="v4116-open-picker"]').forEach(button=>{
+  const active=button.dataset.kind===selected;
+  button.classList.toggle('active',active);
+  button.setAttribute('aria-pressed',String(active));
+ });
+ // On remonte la barre en haut de la fenêtre, et le résultat est immédiatement visible.
+ const modal=modalRoot.querySelector('.modal');
+ if(modal&&bar){
+  const offset=bar.getBoundingClientRect().top-modal.getBoundingClientRect().top-66;
+  modal.scrollTop+=offset;
+ }
+}
+function openMealPickerV4116(index,kind='recipes'){
+ const meal=getWeek().meals[index];
+ if(!Number.isInteger(index)||index<0||index>13||isMealDoneV41(getWeek(),index))return;
+ if(!mealCanEditV4117(meal)){
+  toast('Retire d’abord « Pas de repas » ou « Repas commandé » pour composer ce repas.');return
+ }
+ const modes=['recipes','side','leftovers','frozen','products'];
+ const selected=modes.includes(kind)?kind:'recipes';
+ const tabs='<nav class="v4121-source-nav v4117-composer-tabs" aria-label="Que veux-tu ajouter ?">'+
+  modes.map((t,i)=>'<button type="button" class="v4117-composer-tab'+(selected===t?' active':'')+
+   '" data-action="v4116-open-picker" data-kind="'+t+'" data-index="'+index+
+   '" aria-pressed="'+(selected===t?'true':'false')+'">'+
+   ['🍲 Plat','🥗 Accompagnement','🍱 Restes','❄️ Congélateur','🛒 Produits'][i]+'</button>').join('')+'</nav>';
+ const otherChoices='<details class="v4121-special-choices"><summary>Autres possibilités : pas de repas ou commandé</summary>'+
+  '<div class="v41171-choices"><div class="v41171-choices-actions">'+
+  '<button type="button" class="btn secondary v41171-no-meal" data-action="mark-no-meal" data-index="'+index+
+  '">🍽️ Pas de repas<small>Restaurant, invitation, sortie…</small></button>'+
+  '<button type="button" class="btn secondary v41171-ordered" data-action="v41171-mark-ordered" data-index="'+index+
+  '">🍕 Repas commandé<small>Sans recette ni courses à générer</small></button></div></div></details>';
  showModal(menuMealLabelV411(index)+' · Composer',
-  '<div class="v4119-composer" data-v4119-kind="'+html(kind)+'">'+
+  '<div class="v4119-composer" data-v4119-kind="'+selected+'">'+
   mealComposerVisualV4119(index,meal)+
-  '<div class="v4119-add-heading"><strong>＋ Compléter mon repas</strong>'+
-  '<small>Choisis ce que tu veux ajouter, les éléments apparaissent au-dessus.</small></div>'+
-  quick+(kind==='recipes'||kind==='products'?mealSideShortcutsV4120(index):'')+
-  tabs+otherChoices+body+
-  '<div class="v4119-footer"><button class="btn wide" data-action="v4119-finish" data-index="'+index+'">✓ Terminer mon repas</button></div></div>');
+  '<section class="v4121-add-area"><div class="v4119-add-heading"><strong>＋ Ajouter au repas</strong>'+
+  '<small>Choisis une catégorie : la sélection apparaît juste en dessous.</small></div>'+
+  tabs+'<div class="v4121-picker-panel" id="v4121PickerPanel">'+
+  mealPickerBodyV4121(index,selected)+'</div></section>'+
+  otherChoices+
+  '<div class="v4119-footer"><button class="btn wide" data-action="v4119-finish" data-index="'+index+
+  '">✓ Terminer mon repas</button></div></div>');
 }
 function pickMeal(index){
  const meal=getWeek().meals[index],dishes=mealDishes(meal),leftovers=mealLeftovers(meal),products=mealProductsV412(meal);

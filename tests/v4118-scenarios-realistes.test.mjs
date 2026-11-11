@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {runInNewContext} from 'node:vm';
 import {emptyStockV41,applyStockTransactionV41,availableStockV41} from '../stock-engine-v41.mjs';
-import {purchasedMovementsV41} from '../stock-week-v41.mjs';
+import {shoppingShortfallsV41,purchasedMovementsV41} from '../stock-week-v41.mjs';
 import {handleStockActionV41} from '../stock-actions-v41.mjs';
 
 const app=readFileSync(new URL('../app.js',import.meta.url),'utf8');
@@ -130,4 +130,55 @@ test('V41.18 : les quatre sources, quantites et nouveau flux achats restent pres
  assert.match(index,/41-18-compose/);
  assert.match(sw,/41-18-compose/);
  assert.doesNotThrow(()=>new Function(app));
+});
+
+test('V41.18 : emballage de 4 articles mais seulement 2 consommes, stock coherent',()=>{
+ const bought=purchasedMovementsV41([{id:'c',name:'Cordons-bleus',productId:'cordons',
+  qty:1,unit:'paquet',checked:true,excluded:false,covered:false}],ingredients,products);
+ assert.equal(bought.movements.length,1);
+ assert.equal(bought.movements[0].unit,'pièce');
+ assert.equal(bought.movements[0].amount,4);
+ const afterPurchase=applyStockTransactionV41(emptyStockV41(),{id:'purchase-pack',movements:bought.movements}).stock;
+ const needs=shoppingShortfallsV41([{name:'Cordons-bleus',productId:'cordons',qty:2,unit:'pièce'}],
+  afterPurchase,ingredients,products);
+ assert.equal(needs[0].gross,2);
+ assert.equal(needs[0].toBuy,0,'ne pas acheter un autre paquet');
+ const consumed=applyStockTransactionV41(afterPurchase,{id:'eat-two',movements:[{
+  type:'inventory',direction:'consume',identity:'product:cordons',name:'Cordons-bleus',
+  amount:2,unit:'pièce'
+ }]}).stock;
+ assert.equal(availableStockV41(consumed,'product:cordons','pièce'),2);
+});
+
+test('V41.18 : le stock maison est deduit des besoins Grand Frais sans faux Carrefour',()=>{
+ const stock=applyStockTransactionV41(emptyStockV41(),{id:'tomates-maison',movements:[{
+  type:'inventory',direction:'add',identity:'ingredient:tomates',name:'Tomates Grand Frais',
+  amount:2,unit:'pièce',store:'grandfrais'
+ }]}).stock;
+ const needs=shoppingShortfallsV41([{name:'Tomates Grand Frais',ingredientId:'tomates',
+  qty:3,unit:'pièce',productId:null}],stock,ingredients,products);
+ assert.equal(needs.length,1);
+ assert.equal(needs[0].identity,'ingredient:tomates');
+ assert.equal(needs[0].gross,3);
+ assert.equal(needs[0].available,2);
+ assert.equal(needs[0].toBuy,1);
+});
+
+test('V41.18 : apercu des menus ne modifie pas les courses deja generees',()=>{
+ const generated=[{name:'Tomates Grand Frais',ingredientId:'tomates',productId:null,qty:2,unit:'pièce'}];
+ const w={generatedIngredients:generated,meals:Array(14).fill(null)};
+ const result=runInNewContext(snippet('function menuShoppingChangesV4118(', 'function courseGenerationBanner(')+
+  ';menuShoppingChangesV4118',{
+    collectRecipeIngredients:()=>[{name:'Tomates Grand Frais',ingredientId:'tomates',
+      productId:null,qty:3,unit:'pièce'}],
+    converted:(qty,unit)=>[qty,unit],
+    ingredientById:byIng,productById:byProd,
+    ingredientStore:x=>x.store,norm
+  })(w);
+ assert.equal(result.length,1);
+ assert.equal(result[0].name,'Tomates Grand Frais');
+ assert.equal(result[0].delta,1);
+ assert.equal(result[0].store,'grandfrais');
+ assert.equal(w.generatedIngredients,generated,'liste originale intacte');
+ assert.equal(w.generatedIngredients[0].qty,2);
 });

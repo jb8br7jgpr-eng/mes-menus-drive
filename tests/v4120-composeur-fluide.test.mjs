@@ -100,7 +100,7 @@ test('recettes directement proposées pour les convives, sans seconde saisie',()
  assert.doesNotMatch(picker,/v4120-quick-sources|v4120-side-shortcuts|v4120-role-picker/);
  assert.match(styles,/\.v4121-source-nav/);
  assert.match(styles,/\.v4121-picker-panel/);
- assert.match(html,/41-20-flow/);
- assert.match(sw,/41-20-flow/);
+ assert.match(html,/41-21-unified/);
+ assert.match(sw,/41-21-unified/);
  assert.doesNotThrow(()=>new Function(app));
 });

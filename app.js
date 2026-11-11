@@ -2944,7 +2944,6 @@ function mealPickerBodyV4121(index,kind){
    '<input id="v412ProductSearch" type="search" placeholder="Ex. cordons-bleus…" autocomplete="off"></div>'+
    '<div class="v4117-composer-list" id="v412ProductResults" data-index="'+index+'">'+mealProductPickerResultsV412(index)+'</div>';
  }else{
-  body='<p class="v4121-help"> }else{
   body='<p class="v4121-help">Les portions sont automatiquement proposées selon les personnes à table.</p>'+
    '<div class="meal-picker-filters"><div class="field"><label for="mealRecipeSearch">Rechercher un plat</label>'+
    '<input id="mealRecipeSearch" type="search" placeholder="Ex. poulet…" autocomplete="off"></div>'+

@@ -147,7 +147,7 @@ export function handleStockActionV41(ctx) {
  const requiresInventory=['v41-add-stock','v41-add-frozen','v41-save-stock','v41-save-frozen',
   'v41-courses-done','v41-eat-recipe','v41-eat-product','v41-confirm-freeze-recipe',
   'v41-adjust-stock','v41-confirm-stock','v41-correct-freezer','v41-confirm-freezer',
-  'v41-stock-quick','v41-freezer-quick'];
+  'v41-stock-quick','v41-freezer-quick','v41-eat-frozen-part','v41-eat-frozen'];
  if(requiresInventory.includes(mode)&&migrationGate(ctx))return true;
   if(mode==='v41-stock-quick'){
   const identity=a.dataset.identity,unit=a.dataset.unit,step=Number(a.dataset.step);

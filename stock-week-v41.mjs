@@ -45,12 +45,48 @@ export function kitchenMovementsV41(recipe,preparedPortions,ingredients=[],produ
 
 // Un même lot ne peut être programmé deux fois si ses portions sont déjà réservées.
 // On inclut les semaines passées/futures pour préserver les portions sur les deux iPhone.
+// V41.17 — les plats congeles sont des composants d'un repas, pas un repas exclusif.
+export function mealFrozenPartsV4117(meal){
+ if(!meal)return [];
+ const current=Array.isArray(meal.frozen)?meal.frozen:[];
+ const legacy=meal.type==='frozen'&&meal.lotId?
+  [{lotId:meal.lotId,recipeId:meal.recipeId,portions:meal.portions,consumed:Boolean(meal.consumed)}]:[];
+ const historic=meal.type==='multi'&&Array.isArray(meal.dishes)?
+  meal.dishes.filter(x=>x?.type==='frozen'):[];
+ return [...legacy,...current,...historic].filter(x=>x?.lotId&&Number.isInteger(Number(x.portions))&&Number(x.portions)>0);
+}
+export function addFrozenToMealV4117(weeks,stock,weekId,index,lotId,portions){
+ if(!/^\d{4}-\d{2}-\d{2}$/.test(weekId)||!Number.isInteger(index)||index<0||index>13)
+  throw Error('Case du calendrier invalide.');
+ if(!Number.isInteger(portions)||portions<1||portions>30)throw Error('Choisis entre 1 et 30 portions.');
+ const lot=normalizeStockV41(stock).freezer[lotId];
+ if(!lot||lot.portions<1)throw Error('Ce plat n’est plus dans le congélateur.');
+ const old=weeks?.[weekId]?.meals?.[index]||null;
+ if(old&&['ordered','no-meal'].includes(old.type))throw Error('Remplace d’abord « Pas de repas » ou « Repas libre ».');
+ const parts=mealFrozenPartsV4117(old);
+ if(parts.some(x=>x.lotId===lotId))throw Error('Ce plat est déjà présent dans le repas. Modifie ou retire ses portions.');
+ if(Object.keys(weeks?.[weekId]?.v41MealActions||{}).some(x=>x.startsWith(index+':')))
+  throw Error('Repas déjà validé : annule la validation avant de modifier ses portions.');
+ if(remainingFreezerPortionsV41(stock,weeks,lotId)<portions)
+  throw Error('Pas assez de portions libres dans le congélateur.');
+ const updated=copy(weeks||{});
+ if(!updated[weekId])updated[weekId]={meals:Array(14).fill(null),extras:[],checked:[],excluded:[]};
+ if(!Array.isArray(updated[weekId].meals))updated[weekId].meals=Array(14).fill(null);
+ const newPart={lotId,recipeId:lot.recipeId,portions};
+ const base=old?.type==='frozen'?{type:'composed',...(old.guests?{guests:old.guests}:{})}:
+  old?copy(old):{type:'composed'};
+ if(base.type==='multi'&&Array.isArray(base.dishes))
+  base.dishes=base.dishes.filter(x=>x?.type!=='frozen');
+ base.frozen=[...parts.map(x=>({lotId:x.lotId,recipeId:x.recipeId,portions:x.portions,...(x.consumed?{consumed:true}:{})})),newPart];
+ updated[weekId].meals[index]=base;
+ return updated;
+}
+
 export function freezerReservationsV41(weeks={}) {
   const reservations={};
   for (const week of Object.values(weeks||{})) {
     for (const meal of week?.meals||[]) {
-      const dishes=meal?.type==='frozen'? [meal] :
-        meal?.type==='multi' ? (meal.dishes||[]).filter(d=>d?.type==='frozen') : [];
+      const dishes=mealFrozenPartsV4117(meal);
       for (const dish of dishes) {
         if (!dish.lotId || !Number.isInteger(dish.portions) || dish.portions<1 || dish.consumed) continue;
         reservations[dish.lotId]=(reservations[dish.lotId]||0)+dish.portions;
@@ -65,8 +101,8 @@ export function remainingFreezerPortionsV41(stock,weeks,lotId,excludedSlot=null)
   const reserved=freezerReservationsV41(weeks);
   if (excludedSlot) {
     const meal=weeks?.[excludedSlot.weekId]?.meals?.[excludedSlot.index];
-    if (meal?.type==='frozen' && meal.lotId===lotId && !meal.consumed)
-      reserved[lotId]=Math.max(0,(reserved[lotId]||0)-meal.portions);
+    const excluded=mealFrozenPartsV4117(meal).filter(x=>x.lotId===lotId&&!x.consumed);
+    for(const part of excluded)reserved[lotId]=Math.max(0,(reserved[lotId]||0)-part.portions);
   }
   return Math.max(0,lot.portions-(reserved[lotId]||0));
 }
@@ -103,6 +139,16 @@ export function repeatWeekMealsV41(weeks,stock,sourceWeekId,targetWeekId) {
   for(let i=0;i<14;i++){
     const meal=weeks[sourceWeekId].meals[i];
     if(!meal)continue;
+    if(Array.isArray(meal.frozen)&&meal.frozen.length){
+      const plain=copy(meal);delete plain.frozen;
+      updated[targetWeekId].meals[i]=plain.type==='composed'&&!plain.products?.length?null:plain;
+      for(const part of mealFrozenPartsV4117(meal)){
+        if(part.consumed){skippedFrozen++;continue}
+        try{updated=addFrozenToMealV4117(updated,stock,targetWeekId,i,part.lotId,part.portions);copiedFrozen++}
+        catch(_){skippedFrozen++}
+      }
+      continue
+    }
     if(meal.type==='frozen'){
       try{
         updated=planFrozenMealV41(updated,stock,targetWeekId,i,meal.lotId,meal.portions);

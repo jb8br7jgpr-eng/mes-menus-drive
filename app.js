@@ -1608,6 +1608,45 @@ function ingredientSimilar(name){
  };
  return (state.ingredientCatalog||[]).filter(i=>{const o=norm(i.name);return o!==n&&(stem(o)===stem(n)||(n.length>=5&&o.length>=5&&distance(n,o)<=(Math.min(n.length,o.length)>=9?2:1)))}).slice(0,4)
 }
+
+function recipeMatchKeyV4116(value){
+ const ignored=new Set(['de','du','des','la','le','les','un','une','produit','produits','article','articles']);
+ return norm(value).normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,' ')
+ .split(/\s+/).filter(w=>w&&!ignored.has(w)).sort().join(' ')
+}
+function recipeSuggestionsV4116(value){
+ const search=norm(value),key=recipeMatchKeyV4116(value);
+ if(search.length<2)return [];
+ const list=[...(state.ingredientCatalog||[]).map(item=>({kind:'ingredient',item})),
+  ...(state.products||[]).map(item=>({kind:'daily',item}))];
+ const words=key.split(' ').filter(Boolean);
+ return list.map(x=>{
+  const name=norm(x.item.name),other=recipeMatchKeyV4116(name),otherWords=other.split(' ');
+  const shared=words.filter(w=>otherWords.some(y=>y===w||(w.length>3&&y.startsWith(w)))).length;
+  const score=name===search?100:other&&other===key?95:name.startsWith(search)?85:name.includes(search)?80:
+   shared>=2?60+shared*4:words.length===1&&shared===1?45:0;
+  return {...x,score};
+ }).filter(x=>x.score>0).sort((a,b)=>b.score-a.score||a.item.name.localeCompare(b.item.name,'fr')).slice(0,8)
+}
+function applyRecipeSuggestionV4116(row,kind,id){
+ const obj=kind==='ingredient'?ingredientById(id):kind==='daily'?productById(id):null;
+ if(!row||!obj)return false;
+ row.dataset.refKind=kind;row.dataset.refId=obj.id;
+ row.querySelector('.ingredient-name').value=obj.name;
+ const unit=row.querySelector('.ingredient-unit');
+ if(unit)unit.value=kind==='ingredient'?preferredIngredientUnit(obj):
+  (Number(obj.packAmount)>0&&units.includes(obj.packUnit)?obj.packUnit:units.includes(obj.unit)?obj.unit:'pièce');
+ const store=row.querySelector('.ingredient-store');
+ if(store)store.value=kind==='ingredient'?ingredientStore(obj):obj.store||'carrefour';
+ row.dataset.unitSelected='true';refreshIngredientEntry(row);return true
+}
+function recipeDailyOptionsV4116(query=''){
+ const search=norm(query);
+ return (state.products||[]).filter(p=>!search||norm(p.name).includes(search))
+  .sort((a,b)=>a.name.localeCompare(b.name,'fr')).slice(0,40)
+  .map(p=>'<button type="button" class="ingredient-suggestion" data-action="v4116-pick-daily" data-id="'+html(p.id)+'">🧻 '+html(p.name)+'</button>').join('')
+  ||'<p class="helper">Aucun produit trouvé.</p>'
+}
 function preferredIngredientUnit(ing){
  if(!ing)return 'g';const counts=new Map();
  state.recipes.forEach(r=>(r.ingredients||[]).forEach(x=>{if(x.ingredientId===ing.id||norm(x.name)===norm(ing.name))counts.set(x.unit,(counts.get(x.unit)||0)+1)}));
@@ -1618,12 +1657,23 @@ function frequentIngredients(){
  return [...counts].sort((a,b)=>b[1]-a[1]).slice(0,6).map(([id])=>ingredientById(id)).filter(Boolean)
 }
 function refreshIngredientEntry(row){
- if(!row)return;const inp=row.querySelector('.ingredient-name'),ing=ingredientByName(inp?.value||'');
+ if(!row)return;
+ const input=row.querySelector('.ingredient-name'),name=input?.value||'';
+ let selected=row.dataset.refKind==='ingredient'?ingredientById(row.dataset.refId):
+  row.dataset.refKind==='daily'?productById(row.dataset.refId):null;
+ if(selected&&norm(selected.name)!==norm(name)){delete row.dataset.refId;delete row.dataset.refKind;selected=null}
+ const daily=row.dataset.refKind==='daily'?selected:null;
+ const ing=row.dataset.refKind==='ingredient'?selected:ingredientByName(name);
  const store=row.querySelector('.ingredient-store'),unit=row.querySelector('.ingredient-unit'),hint=row.querySelector('.ingredient-suggestions');
- if(store){store.disabled=Boolean(ing);if(ing)store.value=ingredientStore(ing)}
+ if(store){store.disabled=Boolean(ing||daily);if(ing)store.value=ingredientStore(ing);if(daily)store.value=daily.store||'carrefour'}
  if(ing&&unit&&!row.dataset.unitSelected)unit.value=preferredIngredientUnit(ing);
- const note=row.querySelector('.ingredient-link-note');if(note){const p=ing?productById(ing.productId):null;note.textContent=ing?(p&&ingredientStore(ing)==='carrefour'?'✓ Produit lié : '+p.name:'✓ Fiche existante · magasin défini dans Produits'):'Nouvel ingrédient créé dans Produits à l’enregistrement.'}
- if(hint){const sim=ing?[]:ingredientSimilar(inp?.value);hint.innerHTML=sim.map(i=>'<button type="button" class="ingredient-suggestion" data-action="reuse-ingredient" data-id="'+html(i.id)+'">✓ Utiliser '+html(i.name)+'</button>').join('')}
+ const note=row.querySelector('.ingredient-link-note');
+ if(note)note.textContent=daily?'✓ Produit du quotidien existant réutilisé.':
+  ing?'✓ Ingrédient existant réutilisé.':'Vérifie les fiches proposées avant la création.';
+ if(hint)hint.innerHTML=recipeSuggestionsV4116(name)
+  .filter(x=>!selected||x.item.id!==selected.id||x.kind!==row.dataset.refKind)
+  .map(x=>'<button type="button" class="ingredient-suggestion" data-action="v4116-reuse-recipe-item" data-kind="'+x.kind+'" data-id="'+html(x.item.id)+'">'+
+  (x.kind==='daily'?'🧻 Produit':'🥕 Ingrédient')+' : '+html(x.item.name)+(x.score>=95?' · correspondance':'')+'</button>').join('')
 }
 
 function ingredientDefaultStore(name,productId){
@@ -1664,6 +1714,7 @@ function normalizeIngredientCatalog(){
  if(distinct.size!==state.ingredientCatalog.length){state.ingredientCatalog=[...distinct.values()];changed=true}
  for(const recipe of state.recipes){
   for(const line of (recipe.ingredients||[])){
+   if(line.sourceKind==='daily'&&line.productId&&productById(line.productId))continue;
    let ing=ingredientById(line.ingredientId);
    if(!ing)ing=ingredientByName(line.name);
    if(!ing){
@@ -1766,6 +1817,7 @@ function frequentCatalogueItems(){
 }
 
 function canonicalIngredient(line){
+ if(line?.sourceKind==='daily'&&line?.productId)return null;
  return ingredientById(line?.ingredientId)||ingredientByName(line?.name)
 }
 function mergeIngredientInRecipe(line,store){
@@ -2324,20 +2376,21 @@ function closeModal(){
 }
 function selectOptions(values,value){return values.map(x=>'<option value="'+html(x)+'" '+(x===value?'selected':'')+'>'+html(x)+'</option>').join('')}
 function ingredientRow(item={name:'',qty:'',unit:'g'}){
- const ing=canonicalIngredient(item);
- const store=ing?ingredientStore(ing):(item.store==='grandfrais'?'grandfrais':ingredientDefaultStore(item.name,item.productId));
- const linked=ing?productById(ing.productId):productById(item.productId);
- return '<div class="ingredient-line">'+
- '<div class="ingredient-edit-row"><input class="ingredient-name" list="ingredientNames" placeholder="Ingrédient de la base" aria-label="Nom de l’ingrédient" value="'+html(ing?.name||item.name)+'">'+
- '<input class="ingredient-qty" type="number" min=".01" step="any" placeholder="Qté" aria-label="Quantité dans cette recette" value="'+html(item.qty)+'">'+
+ const daily=item.sourceKind==='daily'&&item.productId?productById(item.productId):null;
+ const ing=daily?null:canonicalIngredient(item),selected=daily||ing;
+ const store=daily?(daily.store||'carrefour'):ing?ingredientStore(ing):
+  (item.store==='grandfrais'?'grandfrais':ingredientDefaultStore(item.name,item.productId));
+ return '<div class="ingredient-line" data-ref-kind="'+(daily?'daily':ing?'ingredient':'')+'" data-ref-id="'+html(selected?.id||'')+'">'+
+ '<div class="ingredient-edit-row"><input class="ingredient-name" list="ingredientNames" placeholder="Ingrédient ou produit existant" aria-label="Ingrédient de la recette" value="'+html(selected?.name||item.name)+'">'+
+ '<input class="ingredient-qty" type="number" min=".01" step="any" placeholder="Qté" aria-label="Quantité" value="'+html(item.qty)+'">'+
  '<select class="ingredient-unit" aria-label="Unité">'+selectOptions(units,item.unit)+'</select>'+
- '<button type="button" class="icon-btn" aria-label="Retirer cet ingrédient" data-action="remove-ingredient">×</button></div><div class="ingredient-suggestions"></div>'+
- '<div class="ingredient-store-row"><label>Ajouter dans Produits :</label><select class="ingredient-store" aria-label="Magasin habituel de cet ingrédient" '+(ing?'disabled':'')+'>'+
+ '<button type="button" class="icon-btn" aria-label="Retirer cet élément" data-action="remove-ingredient">×</button></div>'+
+ '<div class="ingredient-suggestions"></div>'+
+ '<div class="ingredient-store-row"><label>Magasin habituel :</label><select class="ingredient-store" aria-label="Magasin" '+(selected?'disabled':'')+'>'+
  '<option value="carrefour" '+(store==='carrefour'?'selected':'')+'>🛒 Carrefour</option>'+
  '<option value="grandfrais" '+(store==='grandfrais'?'selected':'')+'>🥬 Grand Frais</option></select></div>'+
- '<p class="ingredient-link-note">'+(store==='grandfrais'?'Grand Frais : aucune fiche produit nécessaire.':
-  linked?'Produit Carrefour : '+html(linked.name)+(linked.packAmount?' · '+html(quantity(linked.packAmount,linked.packUnit))+'/paquet':' · contenu du paquet à préciser'):
-  'Aucun produit Carrefour lié : tu pourras l’associer dans la base.')+'</p></div>'
+ '<p class="ingredient-link-note">'+(daily?'✓ Produit du quotidien existant · aucune nouvelle fiche':
+ ing?'✓ Ingrédient existant réutilisé':'Choisis une suggestion existante pour éviter les doublons.')+'</p></div>'
 }
 // V41.7 — réutiliser les ingrédients d'un autre plat sans lien ni sauvegarde.
 function recipeImportResultsV417(query='',editorId=null){
@@ -2423,12 +2476,15 @@ function recipeEditor(id,draft=null){
  '<div id="v417ImportResults" class="v417-import-options">'+recipeImportResultsV417('',old?.id||'')+'</div>'+
  '<p id="v417ImportFeedback" class="v417-import-feedback" aria-live="polite"></p>'+
  '</div></div>'+
- '<div class="note ingredient-auto-note">✓ Chaque ingrédient sera automatiquement enregistré dans <strong>Produits → Carrefour ou Grand Frais</strong> lorsque tu enregistreras le plat. Si son nom existe déjà, sa fiche sera réutilisée, sans doublon.</div>'+
+ '<div class="note ingredient-auto-note">✓ Réutilise un ingrédient ou un produit du quotidien existant. Une nouvelle fiche n’est créée que si aucun élément correspondant n’existe.</div>'+
  '<datalist id="ingredientNames">'+(state.ingredientCatalog||[]).slice().sort((a,b)=>a.name.localeCompare(b.name,'fr')).map(x=>'<option value="'+html(x.name)+'"></option>').join('')+'</datalist>'+
  '<div class="ingredient-favorites"><span class="helper">Ingrédients fréquents :</span>'+
  frequentIngredients().map(i=>'<button type="button" class="ingredient-favorite" data-action="favorite-ingredient" data-id="'+html(i.id)+'">＋ '+html(i.name)+'</button>').join('')+'</div>'+
  '<div id="ingredientRows">'+ingredients.map(ingredientRow).join('')+'</div>'+
- '<button id="addIngredientBottom" type="button" class="btn secondary wide ingredient-add-bottom" data-action="add-ingredient">＋ Ajouter un ingrédient</button>'+
+ '<button id="addIngredientBottom" type="button" class="btn secondary wide ingredient-add-bottom" data-action="add-ingredient">＋ Ajouter un ingrédient</button>'+ 
+ '<details class="v4116-recipe-daily"><summary>🧻 Ajouter un produit du quotidien à la recette</summary>'+
+ '<input id="v4116DailySearch" type="search" placeholder="Rechercher dans mes produits…">'+
+ '<div id="v4116DailyResults">'+recipeDailyOptionsV4116('')+'</div></details>'+
  '<div class="divider"></div><button class="btn wide" type="submit">✓ Enregistrer le plat</button></form>';
  if(old)body+='<button class="btn danger wide" style="margin-top:10px" data-action="delete-recipe" data-id="'+old.id+'">Supprimer ce plat</button>';
  showModal(title,body)
@@ -3160,39 +3216,47 @@ async function saveRecipe(e){
  const form=e.target,name=$('#recipeName').value.trim(),people=Number($('#recipePeople').value),category=$('#recipeCategory').value;
  const rows=[...$('#ingredientRows').children].map(row=>({
   name:$('.ingredient-name',row).value.trim(),qty:Number($('.ingredient-qty',row).value),
-  unit:$('.ingredient-unit',row).value,store:$('.ingredient-store',row).value
+  unit:$('.ingredient-unit',row).value,store:$('.ingredient-store',row).value,
+  refKind:row.dataset.refKind||'',refId:row.dataset.refId||'',el:row
  }));
  if(!name||!Number.isFinite(people)||people<1||people>30){toast('Vérifie le nom et le nombre de portions.');return}
  if(!rows.length||rows.some(x=>!x.name||!Number.isFinite(x.qty)||x.qty<=0||!units.includes(x.unit)||!['carrefour','grandfrais'].includes(x.store))){
   toast('Chaque ingrédient doit avoir un nom, une quantité et un magasin.');return
  }
  for(const x of rows){
-  if(ingredientByName(x.name))continue;
-  const sim=ingredientSimilar(x.name);
-  if(sim.length&&!confirm('« '+sim[0].name+' » existe déjà. Créer quand même « '+x.name+' » ? Appuie sur Annuler pour réutiliser la fiche existante.')){
-   toast('Réutilise la fiche proposée pour éviter le doublon.');return
+  const selected=x.refKind==='ingredient'?ingredientById(x.refId):x.refKind==='daily'?productById(x.refId):null;
+  if(selected&&norm(selected.name)!==norm(x.name)){toast('La référence choisie a changé. Sélectionne à nouveau '+x.name+'.');return}
+  if(selected||ingredientByName(x.name))continue;
+  const suggestion=recipeSuggestionsV4116(x.name);
+  if(suggestion.some(v=>v.score>=95)){
+   refreshIngredientEntry(x.el);x.el.querySelector('.ingredient-name')?.focus({preventScroll:true});
+   toast('Fiche existante très proche : sélectionne « '+suggestion[0].item.name+' » avant de continuer.');
+   return
+  }
+  if(suggestion.length&&!confirm('Des fiches similaires existent, dont « '+suggestion[0].item.name+' ». Créer un ingrédient distinct « '+x.name+' » ?')){
+   refreshIngredientEntry(x.el);return
   }
  }
  const old=recipeById(form.dataset.id);let image=old?.image||pendingRecipeDraftImage||'';
  try{if($('#recipePhoto').files[0])image=await compressImage($('#recipePhoto').files[0])}catch(err){toast(err.message);return}
- // Ne modifier la base que lorsque toute la recette est validée.
  const ingredients=[],unique=new Map();
  for(const x of rows){
-  let ing=ingredientByName(x.name);
-  if(!ing)ing=makeIngredient(x.name,x.store,null);
-  // La fiche partagée reste maître du magasin : aucune recette ne le change.
-  if(!ing)return;
-  const row={ingredientId:ing.id,name:ing.name,qty:x.qty,unit:x.unit,productId:ing.productId||null};
-  const key=ing.id+'|'+converted(x.qty,x.unit)[1];
+  const direct=x.refKind==='daily'?productById(x.refId):null;
+  if(x.refKind==='daily'&&!direct){toast('Produit du quotidien introuvable : '+x.name);return}
+  let ing=direct?null:(ingredientById(x.refId)||ingredientByName(x.name));
+  if(!direct&&!ing)ing=makeIngredient(x.name,x.store,null);
+  if(!direct&&!ing)return;
+  const line=direct?{sourceKind:'daily',ingredientId:null,productId:direct.id,name:direct.name,qty:x.qty,unit:x.unit}:
+   {ingredientId:ing.id,name:ing.name,qty:x.qty,unit:x.unit,productId:ing.productId||null};
+  const key=(direct?'daily:'+direct.id:'ingredient:'+ing.id)+'|'+converted(x.qty,x.unit)[1];
   const before=unique.get(key);
-  if(before&&before.unit===row.unit){before.qty+=row.qty;continue}
-  // Même ingrédient répété dans une recette : regrouper lorsque les unités coïncident.
-  if(!before)unique.set(key,row);
-  ingredients.push(row)
+  if(before&&before.unit===line.unit){before.qty+=line.qty;continue}
+  if(!before)unique.set(key,line);
+  ingredients.push(line)
  }
  const recipe={id:old?.id||uid(),name,people,category,ingredients,image};
  if(old)state.recipes=state.recipes.map(x=>x.id===old.id?recipe:x);else state.recipes.push(recipe);
- persist();closeModal();pendingRecipeDraftImage='';render(true);toast(old?'Plat modifié !':'Plat ajouté et ingrédients enregistrés !')
+ persist();closeModal();pendingRecipeDraftImage='';render(true);toast(old?'Plat modifié !':'Plat ajouté !')
 }
 function addExtra(e){e.preventDefault();const name=$('#extraName').value.trim(),qty=Number($('#extraQty').value),unit=$('#extraUnit').value;
   if(!name||!Number.isFinite(qty)||qty<=0||!units.includes(unit)){toast('Renseigne un produit et sa quantité.');return}
@@ -3520,6 +3584,19 @@ document.addEventListener('click',e=>{
   }
   else if(mode==='v417-import-recipe'){void importRecipeIngredientsV417(id,a)}
   else if(mode==='remove-ingredient')a.closest('.ingredient-line')?.remove();
+  else if(mode==='v4116-reuse-recipe-item'){
+   const row=a.closest('.ingredient-line');applyRecipeSuggestionV4116(row,a.dataset.kind,id)
+  }
+  else if(mode==='v4116-pick-daily'){
+   const p=productById(id);if(!p)return;
+   const box=$('#ingredientRows');if(!box)return;
+   const existing=[...box.children].find(row=>row.dataset.refKind==='daily'&&row.dataset.refId===p.id);
+   if(existing){toast('Ce produit figure déjà dans la recette.');return}
+   let row=[...box.children].find(x=>!x.querySelector('.ingredient-name')?.value.trim());
+   if(!row){box.insertAdjacentHTML('beforeend',ingredientRow());row=box.lastElementChild}
+   applyRecipeSuggestionV4116(row,'daily',p.id);
+   row.querySelector('.ingredient-qty')?.focus({preventScroll:true})
+  }
   else if(mode==='reuse-ingredient'){
    const ing=ingredientById(id),row=a.closest('.ingredient-line');if(!ing||!row)return;
    row.querySelector('.ingredient-name').value=ing.name;
@@ -3736,6 +3813,7 @@ document.addEventListener('input',e=>{
    return
   }
   if(e.target.id==='v417ImportSearch'){refreshRecipeImportResultsV417();return}
+  if(e.target.id==='v4116DailySearch'){const el=$('#v4116DailyResults');if(el)el.innerHTML=recipeDailyOptionsV4116(e.target.value);return}
   if(e.target.id==='v413StockPickerSearch'){
    const needle=String(e.target.value||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim().toLocaleLowerCase('fr-FR');
    document.querySelectorAll('#v413StockPickerResults [data-v413-stock-choice]').forEach(row=>{

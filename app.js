@@ -2355,15 +2355,32 @@ function renderDrive(){
  out+='<p class="helper drive-v29-footer">La liste des courses reste dans Courses. Ici, seules les références Carrefour prêtes sont transmises à Safari via Userscripts. Vérifie le magasin et le panier avant de poursuivre.</p>';
  return out
 }
+let modalPageLockV4116=null;
 function showModal(title,body,autoFocus=true){
+ if(!modalPageLockV4116){
+  const bodyStyle=document.body.style;
+  modalPageLockV4116={y:window.scrollY,position:bodyStyle.position,top:bodyStyle.top,
+   width:bodyStyle.width,overflow:bodyStyle.overflow};
+  bodyStyle.position='fixed';bodyStyle.top='-'+modalPageLockV4116.y+'px';
+  bodyStyle.width='100%';bodyStyle.overflow='hidden';
+ }
  if(!uxModalPositionV4115)uxModalPositionV4115={tab:currentTab,scrollY:window.scrollY};
  modalRoot.innerHTML='<div class="modal-overlay" data-overlay="true"><div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle"><div class="modal-head"><h2 id="modalTitle">'+title+'</h2><button class="close-btn" aria-label="Fermer" data-action="close-modal">×</button></div>'+body+'</div></div>';
  // Le clavier iOS ne doit jamais s'ouvrir tout seul ; focus de navigation sans défilement.
  // Une recherche peut toujours activer son champ lorsque l'utilisatrice le demande.
+ if(currentTab==='menus')modalRoot.querySelector('.modal')?.classList.add('v4116-menu-modal');
  const first=modalRoot.querySelector('.close-btn');
  if(first)first.focus({preventScroll:true})
 }
 function closeModal(){
+ const modalLock=modalPageLockV4116;
+ if(modalLock){
+  const b=document.body.style;
+  b.position=modalLock.position;b.top=modalLock.top;
+  b.width=modalLock.width;b.overflow=modalLock.overflow;
+  modalPageLockV4116=null;
+  window.scrollTo({top:modalLock.y,behavior:'instant'});
+ }
  const anchored=catalogueModalScrollV413,position=uxModalPositionV4115;
  uxModalPositionV4115=null;
  modalRoot.innerHTML='';pendingIngredientLinkId=null;pendingCarrefourDailyIdV413=null;

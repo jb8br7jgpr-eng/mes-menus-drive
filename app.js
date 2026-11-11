@@ -2192,7 +2192,7 @@ function renderCourses(){
  function section(store,title,icon,rows){
   const isDrive=store==='carrefour',storeCount=items.filter(x=>x.store===store).length;
   let section='<button class="btn tiny secondary wide course-store-clear" data-action="clear-store-courses" data-store="'+store+'" '+(!storeCount?'disabled':'')+'>🗑️ Vider les courses '+title+'</button>'+ 
-   '<section class="course-store '+(isDrive?'drive':'fresh')+'"><div class="course-store-head"><div><div class="eyebrow">À acheter</div><h2>'+icon+' '+title+'</h2></div><span class="pill">'+rows.length+' article'+(rows.length===1?'':'s')+'</span></div>';
+   '<section class="course-store '+(isDrive?'drive':'fresh')+'"><div class="course-store-head"><div><div class="eyebrow">À acheter</div><h2>'+icon+' '+title+'</h2></div><span class="pill">'+purchaseItemCountV4116(rows)+' articles · '+rows.length+' références</span></div>';
   section+='<button class="btn '+(isDrive?'secondary':'')+' wide" data-action="'+(isDrive?'go-drive':'copy-grand-frais')+'" '+(!rows.length?'disabled':'')+'>'+
    (isDrive?'🛒 Préparer mon panier Carrefour':'📋 Copier Grand Frais dans Notes')+'</button>';
   if(rows.length){
@@ -2332,7 +2332,7 @@ function renderDrive(){
  let out=pageHeading('Carrefour École-Valentin','Mon Drive','Vérifie les références puis prépare ton panier Carrefour.');
  out+=weekSwitcher()+courseGenerationBanner(getWeek(),'drive');
  out+='<div class="drive-v29-summary"><div class="drive-v29-head"><div><small>Préparation du panier</small>'+
-  '<h2>🛒 Carrefour Drive</h2></div><span class="pill">'+items.length+' article'+(items.length!==1?'s':'')+'</span></div>'+
+  '<h2>🛒 Carrefour Drive</h2></div><span class="pill">'+purchaseItemCountV4116(items)+' articles · '+items.length+' références</span></div>'+
   '<div class="drive-v29-stats"><div class="drive-stat-ready"><strong>'+purchaseItemCountV4116(ready)+'</strong><span>✓ Prêts</span></div>'+
   '<div class="'+(missing.length?'drive-stat-missing':'drive-stat-clear')+'"><strong>'+purchaseItemCountV4116(missing)+'</strong><span>À compléter</span></div></div>'+
   '<p class="helper">Drive choisi : Carrefour Besançon-Valentin · à vérifier sur Carrefour.fr. Le transfert n’effectue jamais de paiement.</p>'+
@@ -2348,7 +2348,7 @@ function renderDrive(){
  }else if(transfers.length){
   out+='<p class="drive-v29-complete">✓ Toutes les références sélectionnées sont prêtes pour la vérification Carrefour.</p>'
  }
- out+='<details class="drive-v29-details" data-ux-key="articles"><summary>Voir mes '+items.length+' article'+(items.length!==1?'s':'')+' Carrefour</summary>'+
+ out+='<details class="drive-v29-details" data-ux-key="articles"><summary>Voir mes '+purchaseItemCountV4116(items)+' articles · '+items.length+' références Carrefour</summary>'+
   '<div class="drive-v29-details-body">'+
   (items.length?items.map(x=>'<div class="drive-v29-item"><span>'+html(x.name)+'</span><strong>'+html(quantity(x.qty,x.unit))+'</strong></div>').join(''):
    '<p class="helper">Aucun article prévu chez Carrefour pour cette semaine.</p>')+

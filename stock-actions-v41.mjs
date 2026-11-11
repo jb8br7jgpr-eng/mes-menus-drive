@@ -556,7 +556,8 @@ export function handleStockActionV41(ctx) {
   const selection=Array.isArray(ctx.selectedPurchaseIds)?new Set(ctx.selectedPurchaseIds):null;
   const selected=ctx.shopping().filter(x=>!x.excluded&&!x.covered&&
    (selection?selection.has(x.id):x.checked));
-  const result=purchasedMovementsV41(selected,state.ingredientCatalog,state.products);
+  const result=purchasedMovementsV41(selection?selected.map(x=>({...x,checked:true})):selected,
+   state.ingredientCatalog,state.products);
   if(!result.movements.length){ctx.toast(result.warnings.length?'Relie ces achats à une fiche Produit avant de les enregistrer.':'Aucun nouvel achat coché à valider.');return true}
   try {
    if(!confirm(stockConfirmationTextV413(stock,result.movements,'Enregistrer '+result.movements.length+' achat(s) dans le Stock maison ?')))return true;

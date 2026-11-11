@@ -36,10 +36,11 @@ test('Le compositeur ouvert sur un créneau vide expose Pas de repas immédiatem
  assert.ok(r.body.indexOf('data-action="mark-no-meal"')<r.body.indexOf('mealRecipeResults'),
    'Option rapide affichée avant la liste des recettes');
 });
-test('Repas libre / commandé accessible sans passer par un autre écran',()=>{
+test('Repas commandé accessible sans passer par un autre écran',()=>{
  const r=renderChoices();
  assert.match(r.body,/data-action="v41171-mark-ordered" data-index="1"/);
- assert.match(r.body,/Repas libre \/ commandé/);
+ assert.match(r.body,/Repas commandé/);
+ assert.doesNotMatch(r.body,/Repas libre \/ commandé/);
 });
 test('Ces options persistent sur chacun des quatre onglets',()=>{
  for(const kind of ['recipes','leftovers','frozen','products']){
@@ -72,7 +73,7 @@ test('Le sélecteur et les actions de repas historiques restent accessibles',()=
 test('Le cache iPhone reference les nouveaux JS et CSS',()=>{
  for(const file of [index,sw]){
   assert.match(file,/styles\.css\?v=20261111-41-17-1-choice/);
-  assert.match(file,/app\.js\?v=20261111-41-17-1-choice/);
+  assert.match(file,/app\.js\?v=20261111-41-17-2-label/);
  }
- assert.match(sw,/menus-drive-v41-17-1-choice-20261111/);
+ assert.match(sw,/menus-drive-v41-17-2-label-20261111/);
 });

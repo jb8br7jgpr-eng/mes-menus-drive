@@ -1293,3 +1293,19 @@
 /* V41.15.4 — la confirmation de fusion ne doit pas être visible avant accord. */
 .v41154-merge-notice[hidden]{display:none!important}
 .v41154-merge-notice{margin:12px 0;font-weight:600;line-height:1.5}
+
+/* V41.16 — une seule surface défilante et calendrier immobilisé sur iPhone. */
+.modal.v4116-menu-modal{overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
+.modal.v4116-menu-modal .modal-head{position:sticky;top:-19px;z-index:3;background:#fbfaf6;padding:10px 0 13px}
+.modal.v4116-menu-modal .recipe-picker.meal-picker-scroll{max-height:none;overflow:visible}
+.v4116-menu-tabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px;margin:8px 0 15px}
+.v4116-menu-tab{font-size:11px;font-weight:750;min-height:45px;padding:8px 3px;color:#436b51;background:#f2f7ef;border:1px solid #dce8d8;border-radius:12px}
+.v4116-menu-tab.active{background:#dcebdc;border-color:#80ab85;color:#275738}
+.v4116-meal-choices{display:grid;gap:8px;margin:16px 0}
+.v4116-recipe-daily{margin:13px 0;border:1px solid #d8e9db;background:#f4f9f2;border-radius:12px;padding:11px}
+.v4116-recipe-daily summary{cursor:pointer;font-weight:750;font-size:13px}
+.v4116-recipe-daily input{width:100%;font-size:16px;min-height:42px;margin:9px 0;border:1px solid #cfdece;border-radius:9px;padding:8px}
+#v4116DailyResults{display:flex;flex-wrap:wrap;gap:6px;max-height:38dvh;overflow:auto;overscroll-behavior:contain}
+#v4116DailyResults .ingredient-suggestion{max-width:100%;text-align:left}
+.ingredient-suggestions{display:flex;flex-wrap:wrap;gap:6px}
+.ingredient-suggestions .ingredient-suggestion{white-space:normal;text-align:left;min-height:36px}

@@ -82,40 +82,24 @@ test('les recettes accompagnements restent identifiées après modification et r
  assert.equal(w.meals[0].sideRecipeIds,undefined,'ne pas garder un accompagnement supprimé');
 });
 
-test('le catalogue des accompagnements n’ajoute aucun produit fictif',()=>{
- const catalog=[
-  {type:'ingredient',id:'tomates',name:'Tomates',category:'Fruits et légumes',store:'grandfrais',
-   item:{id:'tomates',name:'Tomates',category:'Fruits et légumes',frequent:true}},
-  {type:'daily',id:'riz',name:'Riz',category:'Épicerie',store:'carrefour',
-   item:{id:'riz',name:'Riz',category:'Épicerie',frequent:true}},
-  {type:'daily',id:'savon',name:'Savon',category:'Hygiène',store:'carrefour',
-   item:{id:'savon',name:'Savon',category:'Hygiène'}}
- ];
- const source=segment('function mealSideShortcutsV4120(index){', 'function openMealPickerV4116(');
- const render=runInNewContext(source+';mealSideShortcutsV4120',{
-   getWeek:()=>({meals:[{products:[]},...Array(13).fill(null)]}),mealProductsV412:()=>[],
-   unifiedCatalogueSourceV4114:()=>catalog,norm:x=>String(x||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase(),
-   html:x=>String(x)
- });
- const result=render(0);
- assert.match(result,/Tomates/);
- assert.match(result,/Grand Frais|grandfrais|🥬/);
- assert.match(result,/Riz/);
- assert.doesNotMatch(result,/Savon/);
- assert.equal(catalog.length,3,'catalogue source non modifié');
- assert.match(result,/data-kind="ingredient"/);
+test('le catalogue utilise les fiches existantes sans raccourcis dupliqués',()=>{
+ assert.doesNotMatch(app,/function mealSideShortcutsV4120\(/);
+ assert.doesNotMatch(app,/data-action="v4120-open-side"/);
+ assert.doesNotMatch(app,/data-action="v4120-open-main"/);
+ assert.match(app,/function mealProductPickerResultsV412\(/);
+ assert.match(app,/unifiedCatalogueSourceV4114\(\)/);
+ assert.match(app,/v4121SideProductResults/);
 });
-
-test('ajout du plat sans une seconde demande de portions, puis restes sur la carte',()=>{
- const picker=segment('function openMealPickerV4116(index,kind=', 'function pickMeal(index){');
+test('recettes directement proposées pour les convives, sans seconde saisie',()=>{
+ const picker=segment('function mealPickerBodyV4121(', 'function pickMeal(index){');
  assert.doesNotMatch(picker,/id="mealPeople"/);
- assert.match(picker,/pour '\+mealComposerGuestsV4119\(index,meal\)/);
- assert.match(app,/data-action="v4120-open-side"/);
- assert.match(app,/data-action="v4120-recipe-role"/);
+ assert.match(app,/mealComposerGuestsV4119\(index,w\.meals\[index\]\)/);
  assert.match(app,/data-action="v4120-toggle-side"/);
  assert.match(app,/À préparer/);
- assert.match(styles,/\.v4120-side-chip/);
- assert.match(styles,/\.v4120-role-picker/);
+ assert.match(picker,/v4121-source-nav/);
+ assert.doesNotMatch(picker,/v4120-quick-sources|v4120-side-shortcuts|v4120-role-picker/);
+ assert.match(styles,/\.v4121-source-nav/);
+ assert.match(styles,/\.v4121-picker-panel/);
  assert.match(html,/41-20-flow/);
  assert.match(sw,/41-20-flow/);
  assert.doesNotThrow(()=>new Function(app));

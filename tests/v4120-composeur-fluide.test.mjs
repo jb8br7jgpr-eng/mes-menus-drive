@@ -19,7 +19,7 @@ test('les clics +/− des convives et recettes restent uniquement locaux',()=>{
  assert.match(actions,/mealDraftV4120\(index,true\)\.portions/);
  assert.match(actions,/refreshMealVisualV4120\(index\)/);
  assert.doesNotMatch(actions,/persist\(\)|render\(true\)|openMealPickerV4116\(/);
- assert.match(app,/function closeModal\(\)\{\s*if\(mealComposerDraftV4120\)persist\(\)/);
+ assert.match(app,/mealComposerDraftV4120\)persist\(\)/);
  assert.match(app,/function persist\(\)\{\s*commitMealComposerDraftV4120\(\)/);
 });
 

@@ -2877,8 +2877,8 @@ function openMealPickerV4116(index,kind='recipes'){
    '<input id="v412ProductSearch" type="search" placeholder="Ex. cordons-bleus…" autocomplete="off"></div>'+
    '<div class="v4117-composer-list" id="v412ProductResults" data-index="'+index+'">'+mealProductPickerResultsV412(index)+'</div>';
  }else{
-  body='<div class="field"><label for="mealPeople">Portions à préparer (facultatif)</label>'+
-   '<input id="mealPeople" type="number" min="1" max="30" placeholder="Portions habituelles"></div>'+
+  body='<div class="field"><label for="mealPeople">Portions à préparer pour le plat choisi</label>'+
+   '<input id="mealPeople" type="number" min="1" max="30" value="'+mealComposerGuestsV4119(index,meal)+'"></div>'+
    '<div class="meal-picker-filters"><div class="field"><label for="mealRecipeSearch">Rechercher un plat</label>'+
    '<input id="mealRecipeSearch" type="search" placeholder="Ex. poulet…" autocomplete="off"></div>'+
    '<div class="field"><label for="mealRecipeType">Catégorie</label><select id="mealRecipeType">'+
@@ -2894,9 +2894,12 @@ function openMealPickerV4116(index,kind='recipes'){
   '<button type="button" class="btn secondary v41171-ordered" data-action="v41171-mark-ordered" data-index="'+index+'">🍕 Repas commandé<small>Sans recette ni courses à générer</small></button>'+
   '</div></div>';
  showModal(menuMealLabelV411(index)+' · Composer',
-  (chosen?mealComposerSelectedV4118(index,meal):'<p class="helper v4118-empty-meal">Compose ce repas à partir de tes recettes, restes, plats congelés ou produits.</p>')+
-  tabs+otherChoices+body+
-  (chosen?'<button class="btn secondary wide" data-action="v4118-details" data-index="'+index+'">Autres réglages et actions du repas</button>':''));
+  '<div class="v4119-composer" data-v4119-kind="'+html(kind)+'">'+
+  mealComposerVisualV4119(index,meal)+
+  '<div class="v4119-add-heading"><strong>＋ Compléter mon repas</strong>'+
+  '<small>Choisis ce que tu veux ajouter, les éléments apparaissent au-dessus.</small></div>'+
+  tabs+body+otherChoices+
+  '<div class="v4119-footer"><button class="btn wide" data-action="v4119-finish" data-index="'+index+'">✓ Terminer mon repas</button></div></div>');
 }
 function pickMeal(index){
  const meal=getWeek().meals[index],dishes=mealDishes(meal),leftovers=mealLeftovers(meal),products=mealProductsV412(meal);
@@ -3816,8 +3819,9 @@ document.addEventListener('click',e=>{
   }
   else if(mode==='pick-meal'){
     const meal=w.meals[index];
-    if(!isMealDoneV41(w,index)&&mealCanEditV4117(meal))openMealPickerV4116(index,'recipes');
-    else pickMeal(index);
+    if(isMealDoneV41(w,index))pickMeal(index);
+    else if(!mealCanEditV4117(meal))showSpecialMealV4119(index,meal);
+    else openMealPickerV4116(index,'recipes');
    }
    else if(mode==='v4118-details')pickMeal(index);
   else if(mode==='v4116-open-picker')openMealPickerV4116(index,a.dataset.kind||'recipes');
@@ -3828,6 +3832,7 @@ document.addEventListener('click',e=>{
    const before=weekBeforeUndo();
    try{
     state.weeks=stockModulesV41.week.addFrozenToMealV4117(state.weeks,state.stockV41,currentWeek,index,id,qty);
+    applyMealDraftGuestsV4119(getWeek(),index);
     persist();render(true);openMealPickerV4116(index,'frozen');
     toastWeekUndo('Portions congelées ajoutées au repas.',before,index)
    }catch(error){toast(error.message||'Impossible d’ajouter ces portions.')}
@@ -4047,7 +4052,12 @@ document.addEventListener('click',e=>{
    }
    const ref=ingredient?'ingredient:'+ingredient.id:String(product.id);
    const previous=mealProductsV412(w.meals[index]),next=previous.filter(x=>mealProductRefV4118(x)!==ref);
-   next.push({ingredientId:ingredient?.id||null,productId:product?.id||null,qty,unit});
+   const servings=Number($('#v4119ProductServings')?.value||0);
+   if(!Number.isInteger(servings)||servings<0||servings>30){
+    toast('Choisis entre 0 et 30 portions principales.');return
+   }
+   next.push({ingredientId:ingredient?.id||null,productId:product?.id||null,qty,unit,
+    ...(servings>0?{servings}:{})});
    const before=weekBeforeUndo();
    if(!setMealProductsV412(w,index,next)){toast('Impossible d’ajouter ce produit à ce repas.');return}
    persist();render(true);openMealPickerV4116(index,'products');

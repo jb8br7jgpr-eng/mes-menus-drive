@@ -139,7 +139,12 @@ function commitMealComposerDraftV4120(){
 }
 function refreshMealVisualV4120(index){
  const view=modalRoot.querySelector('.v4119-visual');
- if(view)view.outerHTML=mealComposerVisualV4119(index,getWeek().meals[index]);
+ if(!view)return;
+ // Un clic +/− ne referme jamais le panneau en cours d'utilisation.
+ const wasOpen=!!view.querySelector('.v4122-people-panel')?.open;
+ view.outerHTML=mealComposerVisualV4119(index,getWeek().meals[index]);
+ const panel=modalRoot.querySelector('.v4122-people-panel');
+ if(panel)panel.open=wasOpen;
 }
 function persist(){
  commitMealComposerDraftV4120();
@@ -2665,12 +2670,8 @@ function mealRecipePickerResults(index,searchTerm='',type='all'){
  const filtered=state.recipes.filter(r=>!already.has(r.id)&&
   (!term||norm(r.name).includes(term))&&
   (type==='all'||normalRecipeType(r.category)===type));
- filtered.sort((a,b)=>{
-  const priority=r=>/Accompagnements|Riz & céréales|Légumes|Salades|Crudités|Soupes/i.test(normalRecipeType(r.category))?0:1;
-  return (mealRecipeRoleV4120==='side'?priority(a)-priority(b):0)||
-   a.name.localeCompare(b.name,'fr',{sensitivity:'base'});
- });
- const renderItem=r=>'<button class="picker-item" data-action="choose-recipe" data-role="'+mealRecipeRoleV4120+
+ filtered.sort((a,b)=>a.name.localeCompare(b.name,'fr',{sensitivity:'base'}));
+ const renderItem=r=>'<button class="picker-item" data-action="choose-recipe" data-role="main
   '" data-id="'+html(r.id)+'" data-index="'+index+'">'+
   '<span class="emoji">'+html(icons[normalRecipeType(r.category)]||'🍽️')+'</span><span class="grow"><strong>'+html(r.name)+'</strong>'+
   '<small>'+html(normalRecipeType(r.category)==='legacy'?(r.category||'Autre'):normalRecipeType(r.category))+
@@ -2685,13 +2686,6 @@ function mealRecipePickerResults(index,searchTerm='',type='all'){
   (rest.length?'<div class="meal-picker-section-heading">Tous les autres plats</div>'+rest.map(renderItem).join(''):'')
 }
 function refreshMealRecipePicker(){
- const side=$('#v4121SideResults');
- if(side){
-  const index=Number(side.dataset.index);
-  if(Number.isInteger(index)&&index>=0&&index<=13)
-   side.innerHTML=mealSidePickerResultsV4121(index,$('#mealRecipeSearch')?.value||'');
-  return;
- }
  const results=$('#mealRecipeResults'),count=$('#mealRecipeCount');
  if(!results)return;
  const index=Number(results.dataset.index),term=$('#mealRecipeSearch')?.value||'',type=$('#mealRecipeType')?.value||'all';
@@ -2829,21 +2823,15 @@ function mealComposerVisualV4119(index,meal){
  const preview=mealComposerPreviewV4120(index,meal);
  const guests=mealComposerGuestsV4119(index,meal),coverage=mealPortionCoverageV4119(preview,guests);
  const dishes=mealDishes(preview),leftovers=mealLeftovers(preview),frozen=mealFrozenV4117(preview),
-  products=mealProductsV412(preview),sideIds=new Set(preview?.sideRecipeIds||[]);
+  products=mealProductsV412(preview);
  const count=dishes.length+leftovers.length+frozen.length+products.length;
- const visible=Math.min(guests,8),tiles=Array.from({length:visible},(_,n)=>
-  '<div class="v4119-portion'+(n<coverage.filled?' is-filled':'')+'" aria-label="Portion '+(n+1)+(n<coverage.filled?' prévue':' à compléter')+'">'+
-  '<span class="v4119-portion-symbol">'+(n<coverage.filled?'✓':'＋')+'</span>'+
-  '<small>Portion '+(n+1)+'</small></div>').join('');
- const rows=[];
+ const rows=[]; const rows=[];
  dishes.forEach((d,n)=>{
   const name=recipeById(d.recipeId)?.name||'Recette supprimée',here=portionsEatenHere(d,dishes,guests),
-   remaining=Math.max(0,Number(d.people)-here),isSide=sideIds.has(d.recipeId);
-  rows.push('<article class="v4119-card'+(isSide?' v4120-side-card':'')+'"><div class="v4119-card-title"><span class="v4119-icon">'+(isSide?'🥗':'🍲')+'</span>'+
-   '<div class="grow"><strong>'+html(name)+'</strong><small>'+(isSide?'Accompagnement':'Plat principal')+' · '+here+' portion'+(here>1?'s':'')+
-   ' prévues ici'+(remaining?' · '+remaining+' reste'+(remaining>1?'s':'')+' possible'+(remaining>1?'s':''):'')+'</small>'+
-   '<button class="v4120-role-link" type="button" data-action="v4120-toggle-side" data-index="'+index+
-   '" data-id="'+html(d.recipeId)+'">'+(isSide?'↗ Passer en plat principal':'🥗 Définir comme accompagnement')+'</button></div>'+
+   remaining=Math.max(0,Number(d.people)-here);
+  rows.push('<article class="v4119-card"><div class="v4119-card-title"><span class="v4119-icon">🍲</span>'+
+   '<div class="grow"><strong>'+html(name)+'</strong><small>Recette · '+here+' portion'+(here>1?'s':'')+
+   ' à table'+(remaining?' · '+remaining+' portion'+(remaining>1?'s':'')+' pour les restes':'')+'</small></div>'+
    '<button class="btn tiny ghost" data-action="remove-dish" data-index="'+index+'" data-dish="'+n+'" aria-label="Retirer '+html(name)+'">Retirer</button></div>'+
    '<div class="v4119-quantity"><span>À préparer <small>(+ pour garder des restes)</small></span><div class="v4119-stepper">'+
    '<button type="button" data-action="v4119-dish-step" data-index="'+index+'" data-dish="'+n+'" data-delta="-1" '+(d.people<=1?'disabled':'')+' aria-label="Diminuer les portions de '+html(name)+'">−</button>'+
@@ -2876,28 +2864,34 @@ function mealComposerVisualV4119(index,meal){
   rows.push('<article class="v4119-card v4119-product-card"><div class="v4119-card-title">'+
    '<span class="v4119-icon">'+(info.store==='grandfrais'?'🥬':'🛒')+'</span>'+
    '<div class="grow"><strong>'+html(info.name)+'</strong><small>'+html(info.store==='grandfrais'?'Grand Frais':'Carrefour')+
-   ' · '+html(quantity(p.qty,p.unit))+(p.servings?' · '+p.servings+' portion'+(p.servings>1?'s':'')+' principale'+(p.servings>1?'s':''):' · complément')+'</small></div>'+
+   ' · '+html(quantity(p.qty,p.unit))+(p.servings?' · '+p.servings+' portion'+(p.servings>1?'s':'')+' au repas':' · quantité ajoutée')+'</small></div>'+
    '<button class="btn tiny ghost" data-action="v412-remove-meal-product" data-index="'+index+
    '" data-id="'+html(ref)+'">Retirer</button></div>'+
-   '<div class="v4119-quantity"><span>'+(p.servings?'Aliment principal':'Produit en complément')+'</span>'+
+   '<div class="v4119-quantity"><span>'+(p.servings?'Portions au repas':'Quantité du produit')+'</span>'+
    '<button class="btn tiny secondary" data-action="v412-edit-meal-product" data-index="'+index+
    '" data-kind="'+(p.ingredientId?'ingredient':'daily')+'" data-id="'+html(p.ingredientId||p.productId)+'">Modifier</button></div></article>');
  });
- const status=coverage.missing?'<strong>'+coverage.missing+' couvert'+(coverage.missing>1?'s':'')+' à compléter</strong>':
-  '<strong>✓ '+guests+' portion'+(guests>1?'s':'')+' prévue'+(guests>1?'s':'')+'</strong>';
- const note=coverage.planned>guests?'Plusieurs plats peuvent être servis aux mêmes convives. Les cases restent indicatives.':
-  'Les accompagnements ne remplissent pas les cases, sauf si tu les déclares comme plat principal.';
+ const coverageLabel=count===0?'Ajoute tes recettes, restes ou produits pour ce repas.':
+  coverage.missing?coverage.missing+' couvert'+(coverage.missing>1?'s':'')+' à compléter (indicatif)':
+  '✓ Repas prévu pour '+guests+' personne'+(guests>1?'s':'');
+ const percent=Math.round(100*coverage.filled/guests);
  return '<div class="v4119-visual">'+
-  '<section class="v4119-people"><div class="v4119-section-top"><div><strong>👥 Personnes à table</strong><small>Le nombre de couverts pour ce repas</small></div>'+
-  '<div class="v4119-stepper"><button type="button" data-action="v4119-guests-step" data-index="'+index+'" data-delta="-1" '+(guests<=1?'disabled':'')+' aria-label="Une personne en moins">−</button>'+
-  '<strong class="v4119-people-count">'+guests+'</strong>'+
-  '<button type="button" data-action="v4119-guests-step" data-index="'+index+'" data-delta="1" '+(guests>=30?'disabled':'')+' aria-label="Une personne en plus">＋</button></div></div></section>'+
-  '<section class="v4119-coverage"><div class="v4119-section-top"><strong>🍽️ Couverture du repas</strong>'+
-  '<span>'+coverage.filled+' / '+guests+' portions</span></div>'+
-  '<div class="v4119-portion-grid">'+tiles+'</div>'+
-  (guests>8?'<small>Et '+(guests-8)+' autres couverts pris en compte.</small>':'')+
-  '<p class="v4119-coverage-state'+(coverage.missing?' needs-more':'')+'">'+status+'</p>'+
-  '<small class="v4119-coverage-note">'+note+'</small></section>'+
+  '<details class="v4122-people-panel"><summary>'+
+   '<span class="v4122-people-title"><strong>👥 Convives et portions</strong>'+
+   '<small>Régler les personnes et vérifier le repas</small></span>'+
+   '<span class="v4122-people-pill">'+guests+' pers. · '+coverage.filled+'/'+guests+'</span>'+
+   '</summary>'+
+   '<div class="v4122-people-body">'+
+   '<div class="v4122-people-controls"><span>Personnes à table</span>'+
+   '<div class="v4119-stepper"><button type="button" data-action="v4119-guests-step" data-index="'+index+'" data-delta="-1" '+(guests<=1?'disabled':'')+' aria-label="Une personne en moins">−</button>'+
+   '<strong class="v4119-people-count">'+guests+'</strong>'+
+   '<button type="button" data-action="v4119-guests-step" data-index="'+index+'" data-delta="1" '+(guests>=30?'disabled':'')+' aria-label="Une personne en plus">＋</button></div></div>'+
+   '<div class="v4122-progress-row"><strong>Couverture indicative</strong><span>'+coverage.filled+' / '+guests+'</span></div>'+
+   '<div class="v4122-progress" role="progressbar" aria-label="Couverture indicative du repas" aria-valuemin="0" aria-valuemax="'+guests+'" aria-valuenow="'+coverage.filled+'">'+
+   '<span style="width:'+percent+'%"></span></div>'+
+   '<p class="v4122-coverage-state'+(coverage.missing?' needs-more':'')+'">'+coverageLabel+'</p>'+
+   '<small class="v4122-coverage-note">Deux recettes de 2 portions peuvent être servies aux mêmes 2 personnes. Cet indicateur ne modifie ni le stock ni les courses.</small>'+
+   '</div></details>'+
   '<section class="v4119-my-meal"><div class="v4119-section-top"><strong>Mon assiette</strong><span>'+
   count+' élément'+(count>1?'s':'')+'</span></div>'+
   (rows.length?'<div class="v4119-card-list">'+rows.join('')+'</div>':
@@ -2916,45 +2910,10 @@ function showSpecialMealV4119(index,meal){
   '<button class="btn wide" data-action="v4119-replace-special" data-index="'+index+'">＋ Composer un repas à la place</button>'+
   '<button class="btn secondary wide" data-action="v4119-finish" data-index="'+index+'">✓ Terminer</button></div>');
 }
-// V41.21 — une seule catégorie sélectionnée, avec son contenu juste dessous.
-// V41.21 : une seule liste mélangeant recettes et produits existants, sans écran à rallonge.
-function mealSidePickerResultsV4121(index,term=''){
- const meal=getWeek().meals[index],needle=norm(term);
- const selectedRecipes=new Set(mealDishes(meal).map(d=>d.recipeId));
- const selectedProducts=new Set(mealProductsV412(meal).map(p=>
-  p.productId?'product:'+p.productId:'ingredient:'+p.ingredientId));
- const entries=state.recipes.filter(r=>!selectedRecipes.has(r.id)).map(r=>({
-  kind:'recipe',id:r.id,name:r.name,category:normalRecipeType(r.category),
-  render:()=>'<button class="picker-item v4121-choice" data-action="choose-recipe" data-role="side" data-index="'+index+
-   '" data-id="'+html(r.id)+'"><span class="emoji">'+html(icons[normalRecipeType(r.category)]||'🥗')+
-   '</span><span class="grow"><strong>'+html(r.name)+'</strong><small>Recette · '+html(normalRecipeType(r.category))+
-   '</small></span><span class="end">＋</span></button>'
- }));
- const seen=new Set();
- for(const entry of unifiedCatalogueSourceV4114()){
-  const ing=entry.type==='ingredient'?entry.item:null,
-   product=ing?productById(ing.productId):entry.item;
-  const physical=product?'product:'+product.id:'ingredient:'+ing?.id;
-  if(!physical||selectedProducts.has(physical)||seen.has(physical))continue;
-  seen.add(physical);
-  entries.push({kind:'product',id:entry.id,name:entry.name,category:entry.category,
-   render:()=>'<button class="picker-item v4121-choice" data-action="v412-select-product" data-kind="'+entry.type+
-    '" data-index="'+index+'" data-id="'+html(entry.id)+'"><span class="emoji">'+
-    (entry.store==='grandfrais'?'🥬':'🛒')+'</span><span class="grow"><strong>'+html(entry.name)+
-    '</strong><small>Produit · '+html(entry.store==='grandfrais'?'Grand Frais':'Carrefour')+
-    '</small></span><span class="end">＋</span></button>'});
- }
- const found=entries.filter(x=>!needle||norm(x.name).includes(needle))
-  .sort((a,b)=>a.name.localeCompare(b.name,'fr',{sensitivity:'base'}));
- const visible=found.slice(0,40);
- return (visible.length?visible.map(x=>x.render()).join(''):
-  '<div class="meal-picker-empty">Aucun accompagnement correspondant.</div>')+
-  (found.length>visible.length?'<p class="v4121-more-hint">'+(found.length-visible.length)+
-   ' autres résultats. Utilise la recherche pour les afficher.</p>':'');
-}
+// V41.22 — quatre sources libres : aucune recette n’est imposée comme accompagnement.
 function mealPickerBodyV4121(index,kind){
  const meal=getWeek().meals[index];
- mealRecipeRoleV4120=kind==='side'?'side':'main';
+ mealRecipeRoleV4120='main';
  let body='';
  if(kind==='frozen'){
   const used=new Set(mealFrozenV4117(meal).map(x=>x.lotId));
@@ -2984,12 +2943,8 @@ function mealPickerBodyV4121(index,kind){
    '<div class="field"><label for="v412ProductSearch">Rechercher un produit</label>'+
    '<input id="v412ProductSearch" type="search" placeholder="Ex. cordons-bleus…" autocomplete="off"></div>'+
    '<div class="v4117-composer-list" id="v412ProductResults" data-index="'+index+'">'+mealProductPickerResultsV412(index)+'</div>';
- }else if(kind==='side'){
-  body='<div class="field"><label for="mealRecipeSearch">Rechercher un accompagnement</label>'+
-   '<input id="mealRecipeSearch" type="search" placeholder="Ex. riz, tomates, salade…" autocomplete="off"></div>'+
-   '<div class="v4121-side-list" id="v4121SideResults" data-index="'+index+'">'+
-   mealSidePickerResultsV4121(index)+'</div>';
  }else{
+  body='<p class="v4121-help"> }else{
   body='<p class="v4121-help">Les portions sont automatiquement proposées selon les personnes à table.</p>'+
    '<div class="meal-picker-filters"><div class="field"><label for="mealRecipeSearch">Rechercher un plat</label>'+
    '<input id="mealRecipeSearch" type="search" placeholder="Ex. poulet…" autocomplete="off"></div>'+
@@ -3004,7 +2959,7 @@ function mealPickerBodyV4121(index,kind){
  return body;
 }
 function switchMealComposerSourceV4121(index,kind){
- const modes=['recipes','side','leftovers','frozen','products'];
+ const modes=['recipes','leftovers','frozen','products'];
  const selected=modes.includes(kind)?kind:'recipes';
  const composer=modalRoot.querySelector('.v4119-composer');
  const panel=composer?.querySelector('#v4121PickerPanel');
@@ -3031,13 +2986,13 @@ function openMealPickerV4116(index,kind='recipes'){
  if(!mealCanEditV4117(meal)){
   toast('Retire d’abord « Pas de repas » ou « Repas commandé » pour composer ce repas.');return
  }
- const modes=['recipes','side','leftovers','frozen','products'];
+ const modes=['recipes','leftovers','frozen','products'];
  const selected=modes.includes(kind)?kind:'recipes';
  const tabs='<nav class="v4121-source-nav v4117-composer-tabs" aria-label="Que veux-tu ajouter ?">'+
   modes.map((t,i)=>'<button type="button" class="v4117-composer-tab'+(selected===t?' active':'')+
    '" data-action="v4116-open-picker" data-kind="'+t+'" data-index="'+index+
    '" aria-pressed="'+(selected===t?'true':'false')+'">'+
-   ['🍲 Plat','🥗 Accompagnement','🍱 Restes','❄️ Congélateur','🛒 Produits'][i]+'</button>').join('')+'</nav>';
+   ['🍲 Plat','🍱 Restes','❄️ Congélateur','🛒 Produit'][i]+'</button>').join('')+'</nav>';
  const otherChoices='<details class="v4121-special-choices"><summary>Autres possibilités : pas de repas ou commandé</summary>'+
   '<div class="v41171-choices"><div class="v41171-choices-actions">'+
   '<button type="button" class="btn secondary v41171-no-meal" data-action="mark-no-meal" data-index="'+index+
@@ -3210,8 +3165,7 @@ function editMealProductV412(index,id,kind='daily'){
   '. Speedrive calculera les achats selon le stock et le conditionnement connu.</p>'+
   '<button class="btn wide" data-action="v412-save-meal-product" data-index="'+index+'" data-kind="'+(ingredient?'ingredient':'daily')+
   '" data-id="'+html(id)+'">✓ '+(existing?'Mettre à jour':'Ajouter au repas')+'</button>'+
-  '<button class="btn secondary wide" data-action="v4116-open-picker" data-kind="'+(typeof mealProductReturnKindV4121!=='undefined'&&mealProductReturnKindV4121==='side'?'side':'products')+
-  '" data-index="'+index+'">← Retour '+(typeof mealProductReturnKindV4121!=='undefined'&&mealProductReturnKindV4121==='side'?'aux accompagnements':'aux produits')+'</button>');
+  '<button class="btn secondary wide" data-action="v4116-open-picker" data-kind="products" data-index="'+index+'">← Retour aux produits</button>');
 }
 function extraSearchItems(term=''){
  const needle=norm(term),linked=new Set((state.ingredientCatalog||[]).map(i=>i.productId).filter(Boolean));
@@ -3542,9 +3496,12 @@ function applyMealDraftGuestsV4119(w,index){
   w.meals[index].guests=n;
 }
 function mealPortionCoverageV4119(meal,guests){
- // Repere visuel : ne modifie jamais le nombre de portions cuisinees ni le stock.
- const sides=new Set(meal?.sideRecipeIds||[]);
- const recipes=mealDishes(meal).reduce((n,d)=>n+(sides.has(d.recipeId)?0:Math.min(Number(d.people)||0,guests)),0);
+ // Repère indicatif uniquement. Plusieurs recettes d'un même repas peuvent
+ // être mangées par les mêmes convives : ne pas additionner leurs portions.
+ // Les portions individuelles de restes, congélateur et produits comptés
+ // comme couverts peuvent, elles, compléter le repas.
+ const recipes=mealDishes(meal).reduce((max,d)=>
+  Math.max(max,Math.min(Math.max(0,Number(d.people)||0),guests)),0);
  const frozen=mealFrozenV4117(meal).reduce((n,d)=>n+(Number(d.portions)||0),0);
  const leftovers=mealLeftovers(meal).reduce((n,d)=>n+(Number(d.people)||0),0);
  const products=mealProductsV412(meal).reduce((n,d)=>n+(Number(d.servings)||0),0);
@@ -3990,16 +3947,7 @@ document.addEventListener('click',e=>{
    else if(mode==='v4119-finish'){
    closeModal();renderMealContext(index)
   }
-  else if(mode==='v4120-toggle-side'){
-   if(isMealDoneV41(w,index))return;
-   const current=mealComposerPreviewV4120(index,w.meals[index]),
-    exists=mealDishes(current).some(d=>d.recipeId===id);
-   if(!exists)return;
-   const side=(current.sideRecipeIds||[]).includes(id);
-   mealDraftV4120(index,true).roles[id]=!side;
-   refreshMealVisualV4120(index);
-  }
-  else if(mode==='v4119-guests-step'){
+  else if(mode==='v4119-guests-step'){  else if(mode==='v4119-guests-step'){
    if(isMealDoneV41(w,index))return;
    const delta=Number(a.dataset.delta),people=mealComposerGuestsV4119(index,w.meals[index]),next=people+delta;
    if(![-1,1].includes(delta)||next<1||next>30)return;
@@ -4321,20 +4269,16 @@ document.addEventListener('click',e=>{
   else if(mode==='choose-recipe'){
    if(isMealDoneV41(w,index)){toast('Ce repas a déjà été validé.');return}
    const portions=mealComposerGuestsV4119(index,w.meals[index]);
-   const role=a.dataset.role==='side'?'side':'main';
    if(!Number.isInteger(portions)||portions<1||portions>30)return;
    if(!addRecipeToMeal(w,index,id,portions)){
     toast('Ce plat est déjà présent : ajuste ses portions directement sur sa carte.');return
    }
-   if(role==='side'&&w.meals[index]){
-    w.meals[index].sideRecipeIds=[...new Set([...(w.meals[index].sideRecipeIds||[]),id])];
-   }
-   persist();render(true);openMealPickerV4116(index,role==='side'?'side':'recipes')
+   // Les recettes sont toutes libres : un même repas peut combiner riz, ratatouille, etc.
+   persist();render(true);openMealPickerV4116(index,'recipes')
   }
   else if(mode==='v412-pick-product')openMealProductPickerV412(index);
   else if(mode==='v412-select-product'||mode==='v412-edit-meal-product'){
-   mealProductReturnKindV4121=mode==='v412-select-product'&&a.closest('.v4119-composer')?.dataset.v4119Kind==='side'?
-    'side':'products';
+   mealProductReturnKindV4121='products';
    editMealProductV412(index,id,a.dataset.kind||'daily');
   }
   else if(mode==='v412-save-meal-product'){

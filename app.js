@@ -3590,6 +3590,8 @@ function moveCopyMeal(w,source,target,mode){
   storeMealParts(w,target,dishes.map(x=>({...x})));
   setMealProductsV412(w,target,mealProductsV412(original));
   if(w.meals[target]&&original.guests)w.meals[target].guests=original.guests;
+  if(w.meals[target]&&Array.isArray(original.sideRecipeIds))
+   w.meals[target].sideRecipeIds=original.sideRecipeIds.filter(id=>dishes.some(d=>d.recipeId===id));
   return true
  }
  if(mode!=='move')return false;
@@ -3936,23 +3938,44 @@ document.addEventListener('click',e=>{
    else if(mode==='v4119-finish'){
    closeModal();renderMealContext(index)
   }
+  else if(mode==='v4120-open-main'){
+   mealRecipeRoleV4120='main';openMealPickerV4116(index,'recipes');
+  }
+  else if(mode==='v4120-open-side'){
+   mealRecipeRoleV4120='side';openMealPickerV4116(index,'recipes');
+  }
+  else if(mode==='v4120-recipe-role'){
+   mealRecipeRoleV4120=a.dataset.role==='side'?'side':'main';
+   const box=modalRoot.querySelector('.v4120-role-options');
+   box?.querySelectorAll('[data-action="v4120-recipe-role"]').forEach(button=>
+    button.classList.toggle('active',button.dataset.role===mealRecipeRoleV4120));
+   refreshMealRecipePicker(); // ni serveur ni réouverture de fenêtre
+  }
+  else if(mode==='v4120-toggle-side'){
+   if(isMealDoneV41(w,index))return;
+   const current=mealComposerPreviewV4120(index,w.meals[index]),
+    exists=mealDishes(current).some(d=>d.recipeId===id);
+   if(!exists)return;
+   const side=(current.sideRecipeIds||[]).includes(id);
+   mealDraftV4120(index,true).roles[id]=!side;
+   refreshMealVisualV4120(index);
+  }
   else if(mode==='v4119-guests-step'){
    if(isMealDoneV41(w,index))return;
    const delta=Number(a.dataset.delta),people=mealComposerGuestsV4119(index,w.meals[index]),next=people+delta;
-   if(![-1,1].includes(delta)||next<1||next>30||!setMealGuestsV412(w,index,next))return;
-   const kind=a.closest('[data-v4119-kind]')?.dataset.v4119Kind||'recipes';
-   persist();render(true);openMealPickerV4116(index,kind);
+   if(![-1,1].includes(delta)||next<1||next>30)return;
+   mealDraftV4120(index,true).guests=next;
+   refreshMealVisualV4120(index); // aucun rendu du calendrier et aucune requête cloud par clic
   }
   else if(mode==='v4119-dish-step'){
    if(isMealDoneV41(w,index))return;
-   const pos=Number(a.dataset.dish),delta=Number(a.dataset.delta),dishes=mealDishes(w.meals[index]);
+   const pos=Number(a.dataset.dish),delta=Number(a.dataset.delta),
+    dishes=mealDishes(mealComposerPreviewV4120(index,w.meals[index]));
    if(!Number.isInteger(pos)||![-1,1].includes(delta)||!dishes[pos])return;
    const next=dishes[pos].people+delta;
    if(next<1||next>30)return;
-   const before=weekBeforeUndo();
-   dishes[pos].people=next;setMealDishes(w,index,dishes);
-   persist();render(true);openMealPickerV4116(index,'recipes');
-   toastWeekUndo('Portions préparées actualisées.',before,index)
+   mealDraftV4120(index,true).portions[dishes[pos].recipeId]=next;
+   refreshMealVisualV4120(index); // cumul des gestes jusqu'à Terminer ou prochaine action enregistrée
   }
   else if(mode==='v4119-edit-leftover'){
    if(isMealDoneV41(w,index))return;
@@ -4256,7 +4279,19 @@ document.addEventListener('click',e=>{
    row.querySelector('.ingredient-unit').value=preferredIngredientUnit(ing);
    refreshIngredientEntry(row);row.querySelector('.ingredient-qty')?.focus()
   }
-  else if(mode==='choose-recipe'){if(isMealDoneV41(w,index)){toast('Ce repas a déjà été validé.');return}const portions=peopleInput(id);if(portions===null){toast('Choisis entre 1 et 30 portions.');return}if(!addRecipeToMeal(w,index,id,portions)){toast('Ce plat est déjà présent dans ce repas. Modifie plutôt ses portions.');return}persist();render(true);openMealPickerV4116(index,'recipes')}
+  else if(mode==='choose-recipe'){
+   if(isMealDoneV41(w,index)){toast('Ce repas a déjà été validé.');return}
+   const portions=mealComposerGuestsV4119(index,w.meals[index]);
+   const role=a.dataset.role==='side'?'side':'main';
+   if(!Number.isInteger(portions)||portions<1||portions>30)return;
+   if(!addRecipeToMeal(w,index,id,portions)){
+    toast('Ce plat est déjà présent : ajuste ses portions directement sur sa carte.');return
+   }
+   if(role==='side'&&w.meals[index]){
+    w.meals[index].sideRecipeIds=[...new Set([...(w.meals[index].sideRecipeIds||[]),id])];
+   }
+   persist();render(true);openMealPickerV4116(index,'recipes')
+  }
   else if(mode==='v412-pick-product')openMealProductPickerV412(index);
   else if(mode==='v412-select-product'||mode==='v412-edit-meal-product')editMealProductV412(index,id,a.dataset.kind||'daily');
   else if(mode==='v412-save-meal-product'){

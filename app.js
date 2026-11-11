@@ -2791,7 +2791,10 @@ function mealComposerVisualV4119(index,meal){
   rows.push('<article class="v4119-card"><div class="v4119-card-title"><span class="v4119-icon">🍱</span>'+
    '<div class="grow"><strong>'+html(name)+'</strong><small>Restes · '+p.people+' portion'+(p.people>1?'s':'')+
    ' · pas de nouvelles courses</small></div>'+
-   '<button class="btn tiny ghost" data-action="remove-leftover" data-index="'+index+'" data-leftover="'+n+'">Retirer</button></div></article>');
+   '<button class="btn tiny ghost" data-action="remove-leftover" data-index="'+index+'" data-leftover="'+n+'">Retirer</button></div>'+
+   '<div class="v4119-quantity"><span>Portions de restes</span>'+
+   '<button class="btn tiny secondary" data-action="v4119-edit-leftover" data-index="'+index+
+   '" data-leftover="'+n+'">Modifier · '+p.people+'</button></div></article>');
  });
  products.forEach(p=>{
   const info=mealProductInfoV4118(p),ref=mealProductRefV4118(p);
@@ -3846,6 +3849,44 @@ document.addEventListener('click',e=>{
    dishes[pos].people=next;setMealDishes(w,index,dishes);
    persist();render(true);openMealPickerV4116(index,'recipes');
    toastWeekUndo('Portions préparées actualisées.',before,index)
+  }
+  else if(mode==='v4119-edit-leftover'){
+   if(isMealDoneV41(w,index))return;
+   const n=Number(a.dataset.leftover),left=mealLeftovers(w.meals[index])[n];
+   if(!left||!Number.isInteger(n))return;
+   const source=availableLeftoverSources(w,index).find(x=>
+    x.sourceIndex===left.fromIndex&&x.recipeId===left.recipeId);
+   const max=Math.min(30,left.people+(source?.available||0));
+   showModal('🍱 Modifier les restes',
+    '<p class="helper">Ces restes ont déjà été préparés. Leur planification n’ajoute aucune course supplémentaire.</p>'+
+    '<div class="field"><label for="v4119LeftoverAdjust">Portions à utiliser dans ce repas</label>'+
+    '<input id="v4119LeftoverAdjust" type="number" inputmode="numeric" step="1" min="1" max="'+max+'" value="'+left.people+'"></div>'+
+    '<small>'+max+' portions au maximum, en tenant compte des autres repas.</small>'+
+    '<button class="btn wide" data-action="v4119-save-leftover" data-index="'+index+
+    '" data-leftover="'+n+'">✓ Enregistrer</button>'+
+    '<button class="btn secondary wide" data-action="v4116-open-picker" data-kind="leftovers" data-index="'+index+'">← Retour au repas</button>');
+  }
+  else if(mode==='v4119-save-leftover'){
+   if(isMealDoneV41(w,index))return;
+   const n=Number(a.dataset.leftover),left=mealLeftovers(w.meals[index])[n];
+   const amount=Number($('#v4119LeftoverAdjust')?.value);
+   if(!left||!Number.isInteger(n)||!Number.isInteger(amount)||amount<1||amount>30){
+    toast('Choisis entre 1 et 30 portions de restes.');return
+   }
+   const source=availableLeftoverSources(w,index).find(x=>
+    x.sourceIndex===left.fromIndex&&x.recipeId===left.recipeId);
+   if(amount>left.people+(source?.available||0)){
+    toast('Il ne reste plus assez de portions disponibles.');return
+   }
+   if(amount===left.people){openMealPickerV4116(index,'leftovers');return}
+   const parts=mealParts(w.meals[index]);
+   const pos=parts.findIndex(x=>x.type==='leftovers'&&x.fromIndex===left.fromIndex&&x.recipeId===left.recipeId);
+   if(pos<0)return;
+   const before=weekBeforeUndo();
+   parts[pos]={...parts[pos],people:amount};
+   storeMealParts(w,index,parts);
+   persist();render(true);openMealPickerV4116(index,'leftovers');
+   toastWeekUndo('Portions de restes modifiées.',before,index)
   }
   else if(mode==='v4119-edit-frozen'){
    if(isMealDoneV41(w,index)){toast('Repas déjà validé : annule sa validation avant de modifier le congélateur.');return}

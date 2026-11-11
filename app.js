@@ -2593,7 +2593,7 @@ function undoMealValidationControlsV41(index,meal){
   recognizedKeys.add(index+':frozen');
   make('frozen',null,null,'Congélateur')
  }
- if(meal?.type!=='frozen')for(const item of mealFrozenV4117(meal)){
+ if(meal?.type!=='frozen')for(const item of (typeof mealFrozenV4117==='function'?mealFrozenV4117(meal):[])){
   const key=index+':frozen:'+item.lotId;
   if(actions[key]){recognizedKeys.add(key);make('frozen-part',item.lotId,null,state.stockV41?.freezer?.[item.lotId]?.name||'Congélateur')}
  }
@@ -2633,7 +2633,7 @@ function quickMealActionsV413(index,meal){
  const button=(action,label,attrs='',secondary=false)=>'<button class="btn '+(secondary?'secondary ':'')+'v413-meal-action" data-action="'+action+'" data-index="'+index+'"'+attrs+'>'+label+'</button>';
  if(meal?.type==='frozen'&&!done[index+':frozen'])
   out.push(button('v41-eat-frozen','✓ C’est mangé'));
- if(meal?.type!=='frozen')for(const part of mealFrozenV4117(meal)){
+ if(meal?.type!=='frozen')for(const part of (typeof mealFrozenV4117==='function'?mealFrozenV4117(meal):[])){
   if(part.consumed||done[index+':frozen:'+part.lotId])continue;
   const label=state.stockV41?.freezer?.[part.lotId]?.name||'Plat congelé';
   out.push(button('v41-eat-frozen-part','✓ C’est mangé · '+html(label),' data-id="'+html(part.lotId)+'"'));
@@ -2791,8 +2791,8 @@ function pickMeal(index){
  out+='<div class="v4116-meal-choices">'+
   '<button class="btn wide" data-action="v4116-open-picker" data-kind="recipes" data-index="'+index+'">🍽️ Ajouter un plat de mes recettes</button>'+
   '<button class="btn secondary wide" data-action="v4116-open-picker" data-kind="frozen" data-index="'+index+'">❄️ Choisir dans mon congélateur</button>'+
-  '<button class="btn secondary wide" data-action="v4116-open-picker" data-kind="products" data-index="'+index+'">🛒 Ajouter un produit du catalogue</button>'+
-  '<button class="btn secondary wide" data-action="v4116-open-picker" data-kind="leftovers" data-index="'+index+'">🍱 Placer des restes'+(availableRestes?' · '+availableRestes+' portions':'')+'</button></div>';
+  '<button class="btn secondary wide" data-action="v412-pick-product" data-index="'+index+'">🛒 Ajouter un produit du catalogue</button>'+
+  '<button class="btn secondary wide" data-action="choose-leftovers" data-index="'+index+'">🍱 Placer des restes'+(availableRestes?' · '+availableRestes+' portions':'')+'</button></div>';
  if(meal)out+='<div class="meal-transfer-actions">'+
  '<button class="btn secondary" data-action="move-copy-meal" data-mode="copy" data-index="'+index+'" '+(!dishes.length&&!products.length||mealFrozenV4117(meal).length?'disabled':'')+'>⧉ Copier</button>'+
  '<button class="btn secondary" data-action="move-copy-meal" data-mode="move" data-index="'+index+'">↔ Déplacer</button></div>';
@@ -3119,7 +3119,8 @@ function mealLeftovers(meal){
 }
 function mealParts(meal){return [...mealDishes(meal),...mealLeftovers(meal)]}
 function storeMealParts(w,index,parts){
- const old=w.meals[index],attached=mealProductsV412(old),guests=old?.guests,frozen=mealFrozenV4117(old);
+ const old=w.meals[index],attached=mealProductsV412(old),guests=old?.guests,
+ frozen=typeof mealFrozenV4117==='function'?mealFrozenV4117(old):[];
  const valid=parts.filter(p=>p&&Number.isInteger(Number(p.people))&&Number(p.people)>=1&&Number(p.people)<=30);
  if(!valid.length){w.meals[index]=attached.length?{type:'products',products:attached}:frozen.length?{type:'composed'}:null;
   if(w.meals[index]&&frozen.length)w.meals[index].frozen=frozen;
@@ -3144,7 +3145,8 @@ function setMealProductsV412(w,index,items){
  if(!previous)return true;
  if(['ordered','no-meal'].includes(previous.type))return false;
  if(previous.type==='frozen'){w.meals[index]={type:'composed',frozen:mealFrozenV4117(previous)};return setMealProductsV412(w,index,items)}
- if(previous.type==='products'&&!cleaned.length){w.meals[index]=mealFrozenV4117(previous).length?{type:'composed',frozen:mealFrozenV4117(previous)}:null;return true}
+ if(previous.type==='products'&&!cleaned.length){const remainingFrozen=typeof mealFrozenV4117==='function'?mealFrozenV4117(previous):[];
+ w.meals[index]=remainingFrozen.length?{type:'composed',frozen:remainingFrozen}:null;return true}
  const next={...previous};
  if(cleaned.length)next.products=cleaned;else delete next.products;
  w.meals[index]=next;return true
@@ -3804,7 +3806,7 @@ document.addEventListener('click',e=>{
    persist();closeModal();renderMealContext(index);
    toastWeekUndo('Nombre de convives enregistré.',before,index)
   }
-  else if(mode==='choose-leftovers')pickLeftoverSource(index);
+  else if(mode==='choose-leftovers')openMealPickerV4116(index,'leftovers');
   else if(mode==='apply-leftovers'){
    if(isMealDoneV41(w,index)){toast('Ce repas a déjà été validé.');return}
    const source=Number(a.dataset.source),qty=Number($('#leftoverPeople')?.value);

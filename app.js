@@ -2939,10 +2939,19 @@ function editMealProductV412(index,id,kind='daily'){
  const identity=ingredient?'ingredient:'+ingredient.id:String(product.id);
  const existing=mealProductsV412(getWeek().meals[index]).find(x=>mealProductRefV4118(x)===identity);
  const proposed=ingredient?preferredIngredientUnit(ingredient):
-  product.packUnit==='pièce'?'pièce':product.unit;
+  Number(product.packAmount)>0&&units.includes(product.packUnit)?product.packUnit:product.unit;
  const preferred=existing?.unit||(units.includes(proposed)?proposed:'pièce');
- const qty=existing?.qty??(preferred==='pièce'?Math.max(1,Math.min(30,Number(state.settings?.people)||2)):
-  ingredient&&Number(ingredient.qty)>0?Number(ingredient.qty):1);
+ // Proposer une quantite alimentaire coherente, pas 1 gramme ou 1 millilitre.
+ const people=Math.max(1,Math.min(30,Number(state.settings?.people)||2));
+ const fromRecipe=(state.recipes||[]).flatMap(r=>(r.ingredients||[])
+  .filter(line=>line.unit===preferred&&
+   (ingredient?line.ingredientId===ingredient.id:(product&&line.productId===product.id)))
+  .map(line=>Number(line.qty)*people/Math.max(1,Number(r.people)||people)))
+  .find(x=>Number.isFinite(x)&&x>0);
+ const sensible={g:100,kg:0.2,ml:100,cl:10,l:0.2,'pièce':people};
+ const suggested=Number(ingredient?.qty)>0&&(!ingredient?.unit||ingredient.unit===preferred)?
+  Number(ingredient.qty):(fromRecipe||sensible[preferred]||1);
+ const qty=existing?.qty??Math.round(suggested*1000)/1000;
  const name=ingredient?.name||product.name,store=ingredient?ingredientStore(ingredient):(product?.store||'carrefour');
  showModal((existing?'Modifier':'Ajouter')+' · '+html(name),
   '<p class="helper">Quantité consommée au repas, et non nombre de paquets à acheter.</p>'+

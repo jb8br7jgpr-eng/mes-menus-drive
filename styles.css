@@ -1318,3 +1318,15 @@
 .v4116-finish-item{display:flex;align-items:center;gap:10px;background:#fff;border:1px solid #dfe9dc;border-radius:11px;padding:10px;font-size:13px}
 .v4116-finish-item input{width:20px;height:20px;flex:0 0 20px;accent-color:#39724a}
 @media(max-width:400px){.v4116-stock-stepper{gap:3px}.v4116-step{flex-basis:29px;height:32px}.v4116-stock-stepper .v41-stock-qty{font-size:12px}}
+
+/* V41.17 — compositeur unique : quatre sources, une seule zone de defilement sur iPhone. */
+.v4117-composer-tabs{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:5px;margin:7px 0 10px}
+.v4117-composer-tab{min-width:0;min-height:49px;border:1px solid #dce8d8;border-radius:11px;padding:6px 3px;
+ background:#f2f7ef;color:#42634a;font-size:11px;line-height:1.2;font-weight:750;white-space:normal}
+.v4117-composer-tab.active{background:#dcebdc;border-color:#80ab85;color:#275738}
+.v4117-composer-count{margin:0 0 14px;color:#68816e;font-size:12px;font-weight:650}
+.modal.v4116-menu-modal .v4117-composer-list{display:grid;gap:7px;min-width:0;max-height:none;
+ overflow:visible;overscroll-behavior:contain}
+.modal.v4116-menu-modal .v4117-composer-list .picker-item{min-height:56px}
+.modal.v4116-menu-modal .v4117-composer-tabs{position:sticky;top:48px;z-index:2;background:#fbfaf6;padding:6px 0}
+@media(max-width:390px){.v4117-composer-tab{font-size:10px;min-height:52px;padding:6px 2px}}

@@ -261,7 +261,8 @@ function mealDishes(meal){
 function mealProductsV412(meal){
  if(!Array.isArray(meal?.products))return [];
  return meal.products.filter(x=>x&&(x.productId||x.ingredientId)&&Number(x.qty)>0&&units.includes(x.unit))
-  .map(x=>({productId:x.productId||null,ingredientId:x.ingredientId||null,qty:Number(x.qty),unit:x.unit}));
+  .map(x=>({productId:x.productId||null,ingredientId:x.ingredientId||null,qty:Number(x.qty),unit:x.unit,
+   ...(Number.isInteger(Number(x.servings))&&Number(x.servings)>0&&Number(x.servings)<=30?{servings:Number(x.servings)}:{})}));
 }
 // V41.18 : conserver l'identifiant des ingrédients sans fiche commerciale.
 function mealProductRefV4118(item){
@@ -3243,7 +3244,7 @@ function mealLeftovers(meal){
 }
 function mealParts(meal){return [...mealDishes(meal),...mealLeftovers(meal)]}
 function storeMealParts(w,index,parts){
- const old=w.meals[index],attached=mealProductsV412(old),guests=old?.guests,
+ const old=w.meals[index],attached=mealProductsV412(old),guests=old?.guests||w.v4119GuestChoices?.[index],
  frozen=typeof mealFrozenV4117==='function'?mealFrozenV4117(old):[];
  const valid=parts.filter(p=>p&&Number.isInteger(Number(p.people))&&Number(p.people)>=1&&Number(p.people)<=30);
  if(!valid.length){w.meals[index]=attached.length?{type:'products',products:attached}:frozen.length?{type:'composed'}:null;
@@ -3261,13 +3262,17 @@ function storeMealParts(w,index,parts){
 function setMealProductsV412(w,index,items){
  if(!Number.isInteger(index)||index<0||index>13)return false;
  const cleaned=items.filter(x=>x&&(x.ingredientId?ingredientById(x.ingredientId):productById(x.productId))&&
-  Number.isFinite(Number(x.qty))&&Number(x.qty)>0&&Number(x.qty)<=100000&&units.includes(x.unit))
-  .map(x=>({productId:x.productId||null,ingredientId:x.ingredientId||null,qty:Number(x.qty),unit:x.unit}));
+  Number.isFinite(Number(x.qty))&&Number(x.qty)>0&&Number(x.qty)<=100000&&units.includes(x.unit)&&
+  (x.servings===undefined||x.servings===null||
+   (Number.isInteger(Number(x.servings))&&Number(x.servings)>=0&&Number(x.servings)<=30)))
+  .map(x=>({productId:x.productId||null,ingredientId:x.ingredientId||null,qty:Number(x.qty),unit:x.unit,
+   ...(Number(x.servings)>0?{servings:Number(x.servings)}:{})}));
  if(cleaned.length!==items.length||new Set(cleaned.map(mealProductRefV4118)).size!==cleaned.length)return false;
  const physical=cleaned.map(x=>x.productId?'product:'+x.productId:'ingredient:'+x.ingredientId);
  if(new Set(physical).size!==cleaned.length)return false;
  const previous=w.meals[index];
- if(!previous&&cleaned.length){w.meals[index]={type:'products',products:cleaned};return true}
+ if(!previous&&cleaned.length){w.meals[index]={type:'products',products:cleaned};
+  applyMealDraftGuestsV4119(w,index);return true}
  if(!previous)return true;
  if(['ordered','no-meal'].includes(previous.type))return false;
  if(previous.type==='frozen'){w.meals[index]={type:'composed',frozen:(typeof mealFrozenV4117==='function'?mealFrozenV4117(previous):[])};return setMealProductsV412(w,index,items)}
@@ -3277,11 +3282,35 @@ function setMealProductsV412(w,index,items){
  if(cleaned.length)next.products=cleaned;else delete next.products;
  w.meals[index]=next;return true
 }
+// V41.19 : choix des couverts conservé même si la case du calendrier est encore vide.
+function mealComposerGuestsV4119(index,meal){
+ const choice=Number(meal?.guests??getWeek().v4119GuestChoices?.[index]);
+ return Number.isInteger(choice)&&choice>=1&&choice<=30?choice:mealGuestsV412(meal);
+}
+function applyMealDraftGuestsV4119(w,index){
+ const n=Number(w.v4119GuestChoices?.[index]);
+ if(w.meals[index]&&Number.isInteger(n)&&n>=1&&n<=30&&!w.meals[index].guests)
+  w.meals[index].guests=n;
+}
+function mealPortionCoverageV4119(meal,guests){
+ // Repere visuel : ne modifie jamais le nombre de portions cuisinees ni le stock.
+ const recipes=mealDishes(meal).reduce((n,d)=>n+Math.min(Number(d.people)||0,guests),0);
+ const frozen=mealFrozenV4117(meal).reduce((n,d)=>n+(Number(d.portions)||0),0);
+ const leftovers=mealLeftovers(meal).reduce((n,d)=>n+(Number(d.people)||0),0);
+ const products=mealProductsV412(meal).reduce((n,d)=>n+(Number(d.servings)||0),0);
+ const planned=recipes+frozen+leftovers+products;
+ return {planned,filled:Math.min(guests,planned),missing:Math.max(0,guests-planned)};
+}
 function setMealGuestsV412(w,index,guests){
- if(!Number.isInteger(guests)||guests<1||guests>30||!w.meals[index]||
+ if(!Number.isInteger(index)||index<0||index>13||!Number.isInteger(guests)||guests<1||guests>30||
   isMealDoneV41(w,index))return false;
- w.meals[index]={...w.meals[index],guests};
- reconcileLeftovers(w,index);return true
+ w.v4119GuestChoices=w.v4119GuestChoices||{};
+ w.v4119GuestChoices[index]=guests;
+ if(w.meals[index]){
+  w.meals[index]={...w.meals[index],guests};
+  reconcileLeftovers(w,index);
+ }
+ return true
 }
 // « Préparées » = quantités cuisinées et achetées ; « ici » = portions mangées.
 // Pour un plat de 4 personnes : 2 ici, 2 portions de restes à placer librement.

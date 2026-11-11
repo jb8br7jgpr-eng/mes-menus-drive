@@ -124,7 +124,7 @@ test('Seules les fiches visibles du catalogue sont suggérées, aucun doublon Bl
 
 test('UI : quatre catégories unifiées, produit non redirigé, actions et scroll',()=>{
  assert.doesNotThrow(()=>new Function(app));
- assert.match(app,/const modes=\['recipes','side','leftovers','frozen','products'\]/);
+ assert.match(app,/const modes=\['recipes','leftovers','frozen','products'\]/);
  const a=app.indexOf("function mealPickerBodyV4121("),b=app.indexOf('function pickMeal(',a);
  const picker=app.slice(a,b);
  assert.doesNotMatch(picker,/if\(kind==='products'\)\{openMealProductPickerV412/);

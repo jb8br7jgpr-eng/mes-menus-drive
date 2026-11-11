@@ -231,11 +231,11 @@ test('V41.15.1 : la fiche Produit conserve son nom et montre la saisie manuelle'
 });
 
 test('V41.15.1 : iPhone, cache, Userscript et Firebase restent séparés',()=>{
- assert.match(index,/styles\.css\?v=20261111-41-21-unified/);
- assert.match(index,/app\.js\?v=20261111-41-21-unified/);
- assert.match(sw,/CACHE='menus-drive-v41-21-unified-20261111'/);
- assert.match(sw,/styles\.css\?v=20261111-41-21-unified/);
- assert.match(sw,/app\.js\?v=20261111-41-21-unified/);
+ assert.match(index,/styles\.css\?v=20261111-41-22-four-sources/);
+ assert.match(index,/app\.js\?v=20261111-41-22-four-sources/);
+ assert.match(sw,/CACHE='menus-drive-v41-22-four-sources-20261111'/);
+ assert.match(sw,/styles\.css\?v=20261111-41-22-four-sources/);
+ assert.match(sw,/app\.js\?v=20261111-41-22-four-sources/);
  assert.match(index,/firebase\/v34-ui\.js\?v=20261104-41-12-2-release/);
  assert.match(styles,/#carrefourPaste,#v413ReferencePaste\{font-size:16px/);
  assert.match(script,/@version\s+0\.10\.0/);

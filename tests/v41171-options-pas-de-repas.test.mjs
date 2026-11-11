@@ -44,12 +44,12 @@ test('Repas commandé accessible sans passer par un autre écran',()=>{
  assert.match(r.body,/Repas commandé/);
  assert.doesNotMatch(r.body,/Repas libre \/ commandé/);
 });
-test('Ces options persistent sur chacune des cinq catégories',()=>{
- for(const kind of ['recipes','side','leftovers','frozen','products']){
+test('Ces options persistent sur chacune des quatre catégories',()=>{
+ for(const kind of ['recipes','leftovers','frozen','products']){
   const r=renderChoices(kind);
   assert.ok(r?.body.includes('data-action="mark-no-meal"'),kind);
   assert.ok(r?.body.includes('data-action="v41171-mark-ordered"'),kind);
-  for(const tab of ['recipes','side','leftovers','frozen','products'])
+  for(const tab of ['recipes','leftovers','frozen','products'])
    assert.ok(r.body.includes('data-kind="'+tab+'"'),tab+' visible dans '+kind);
  }
 });
@@ -74,8 +74,8 @@ test('Le sélecteur et les actions de repas historiques restent accessibles',()=
 });
 test('Le cache iPhone reference les nouveaux JS et CSS',()=>{
  for(const file of [index,sw]){
-  assert.match(file,/styles\.css\?v=20261111-41-21-unified/);
-  assert.match(file,/app\.js\?v=20261111-41-21-unified/);
+  assert.match(file,/styles\.css\?v=20261111-41-22-four-sources/);
+  assert.match(file,/app\.js\?v=20261111-41-22-four-sources/);
  }
- assert.match(sw,/menus-drive-v41-21-unified-20261111/);
+ assert.match(sw,/menus-drive-v41-22-four-sources-20261111/);
 });

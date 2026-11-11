@@ -1,0 +1,22 @@
+name: "Speedrive V41.22 — composition libre et non-régression (sans déploiement)"
+on:
+  pull_request:
+    branches:
+      - developpement-v1
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Syntaxe du composeur
+        run: |
+          node --check app.js
+          node --check tests/v4122-quatre-sources-convives.test.mjs
+      - name: Tous les tests Speedrive
+        run: node --test tests/*.test.mjs

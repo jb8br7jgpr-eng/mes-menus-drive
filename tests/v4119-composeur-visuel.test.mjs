@@ -106,10 +106,10 @@ test('calendrier → composeur visuel et etats speciaux accessibles',()=>{
  assert.match(app,/source\?\.available\|\|0/);
  assert.match(app,/id="v4119ProductServings"/);
  assert.match(app,/v4119-main-product-field/);
- assert.match(css,/\.v4119-portion\.is-filled/);
+ assert.match(css,/\.v4122-progress/);
  assert.match(css,/\.v4119-footer/);
- assert.match(index,/41-21-unified/);
- assert.match(worker,/41-21-unified/);
+ assert.match(index,/41-22-four-sources/);
+ assert.match(worker,/41-22-four-sources/);
  assert.doesNotThrow(()=>new Function(app),'syntaxe app.js valide');
 });
 test('les cases visuelles correspondent aux convives et restent lisibles',()=>{
@@ -123,9 +123,11 @@ test('les cases visuelles correspondent aux convives et restent lisibles',()=>{
    html:x=>String(x).replaceAll('<','&lt;'),quantity:(n,u)=>n+' '+u,quickMealActionsV413:()=>''
  });
  const view=visual(0,meal);
- assert.equal((view.match(/class="v4119-portion(?: is-filled)?"/g)||[]).length,3);
- assert.equal((view.match(/class="v4119-portion is-filled"/g)||[]).length,1);
- assert.match(view,/2 couverts à compléter/);
+ assert.match(view,/class="v4122-people-panel"/);
+ assert.match(view,/3 pers\. · 1\/3/);
+ assert.match(view,/role="progressbar"/);
+ assert.match(view,/2 couverts à compléter \(indicatif\)/);
+ assert.doesNotMatch(view,/v4119-portion-grid/);
  assert.match(view,/À préparer/);
  assert.match(view,/data-action="v4119-dish-step"/);
 });

@@ -2010,7 +2010,11 @@ function shopping(){
 // Retire uniquement les achats de ce magasin pour la semaine affichée.
  // Les lignes générées sont suivies individuellement, même si plusieurs recettes
  // ou ajouts manuels ont été regroupés sur une seule ligne de courses.
- function clearWeekShopping(w,store,items){
+ function purchaseItemCountV4116(items){
+ return (items||[]).reduce((n,x)=>n+
+ (Number.isInteger(Number(x.qty))&&Number(x.qty)>0&&['pièce','paquet','boîte','rouleau','bouteille','pot','sachet'].includes(x.unit)?Number(x.qty):1),0)
+}
+function clearWeekShopping(w,store,items){
   if(!['carrefour','grandfrais','all'].includes(store))return 0;
   const selected=items.filter(x=>store==='all'||x.store===store);
   if(!selected.length)return 0;
@@ -2167,15 +2171,17 @@ function renderCourses(){
  const order=['Fruits et légumes','Viandes et poissons','Produits frais','Épicerie et divers','Hygiène et maison'];
  let out=pageHeading('Achats de la semaine','Mes courses','À acheter : tes articles prévus. Coche « Acheté » seulement une fois l’achat effectué. Pour enlever un article sans l’acheter, utilise « Modifier » puis « Retirer ».');
  out+=weekSwitcher()+courseGenerationBanner(w,'courses');
- const progressTotal=active.length+checked.length,progressPct=progressTotal?Math.round(checked.length/progressTotal*100):0;
+ const progressTotal=purchaseItemCountV4116([...active,...checked]),progressBought=purchaseItemCountV4116(checked),
+ progressPct=progressTotal?Math.round(progressBought/progressTotal*100):0;
  out+='<div class="course-v33-progress" role="group" aria-label="Progression des courses"><div class="course-v33-progress-head"><strong>Avancement des courses</strong><span>'+
-  checked.length+' / '+progressTotal+' acheté'+(checked.length>1?'s':'')+'</span></div>'+
-  '<div class="course-v33-progress-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="'+progressPct+'" aria-valuetext="'+checked.length+' articles sur '+progressTotal+'" aria-label="Articles achetés"><span style="width:'+progressPct+'%"></span></div>'+
+  progressBought+' / '+progressTotal+' acheté'+(checked.length>1?'s':'')+'</span></div>'+
+  '<div class="course-v33-progress-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="'+progressPct+'" aria-valuetext="'+progressBought+' articles sur '+progressTotal+'" aria-label="Articles achetés"><span style="width:'+progressPct+'%"></span></div>'+
   '<p>'+(progressTotal===0?'Aucun article à acheter pour le moment.':progressPct===100?'✓ Tous les achats prévus sont achetés.':
-   active.length+' article'+(active.length>1?'s':'')+' restant'+(active.length>1?'s':'')+' à acheter.')+'</p></div>';
- out+='<button class="btn wide v41-courses-faites" data-action="v41-courses-done" '+(!checked.length?'disabled':'')+'>✓ Courses faites · Enregistrer les achats au stock</button>';
- out+='<div class="course-summary"><div class="course-shop-count carrefour"><strong>'+carrefour.length+'</strong><span>🛒 Carrefour Drive</span></div>'+
- '<div class="course-shop-count grand"><strong>'+grand.length+'</strong><span>🥬 Grand Frais</span></div></div>';
+   purchaseItemCountV4116(active)+' articles à acheter.')+'</p></div>';
+ out+='<button class="btn wide v41-courses-faites" data-action="v4116-finish-courses" '+(!active.length&&!checked.length?'disabled':'')+'>✓ Terminer mes courses · Ajouter au stock</button>'+
+ (checked.length?'<button class="btn secondary wide" data-action="v41-courses-done">Enregistrer uniquement les articles cochés</button>':'');
+ out+='<div class="course-summary"><div class="course-shop-count carrefour"><strong>'+purchaseItemCountV4116(carrefour)+'</strong><span>🛒 Carrefour Drive</span></div>'+
+ '<div class="course-shop-count grand"><strong>'+purchaseItemCountV4116(grand)+'</strong><span>🥬 Grand Frais</span></div></div>';
  out+='<button class="btn wide course-add-btn v37-bulk-main" data-action="v37-open-bulk">☑ Ajouter plusieurs articles aux courses</button>'+ '<p class="helper v37-bulk-intro">Tous tes ingrédients et achats du quotidien · quantités réglables · ajout en une fois.</p>';
  const favorites=frequentCatalogueItems();
  if(favorites.length){
@@ -2327,8 +2333,8 @@ function renderDrive(){
  out+=weekSwitcher()+courseGenerationBanner(getWeek(),'drive');
  out+='<div class="drive-v29-summary"><div class="drive-v29-head"><div><small>Préparation du panier</small>'+
   '<h2>🛒 Carrefour Drive</h2></div><span class="pill">'+items.length+' article'+(items.length!==1?'s':'')+'</span></div>'+
-  '<div class="drive-v29-stats"><div class="drive-stat-ready"><strong>'+ready.length+'</strong><span>✓ Prêts</span></div>'+
-  '<div class="'+(missing.length?'drive-stat-missing':'drive-stat-clear')+'"><strong>'+missing.length+'</strong><span>À compléter</span></div></div>'+
+  '<div class="drive-v29-stats"><div class="drive-stat-ready"><strong>'+purchaseItemCountV4116(ready)+'</strong><span>✓ Prêts</span></div>'+
+  '<div class="'+(missing.length?'drive-stat-missing':'drive-stat-clear')+'"><strong>'+purchaseItemCountV4116(missing)+'</strong><span>À compléter</span></div></div>'+
   '<p class="helper">Drive choisi : Carrefour Besançon-Valentin · à vérifier sur Carrefour.fr. Le transfert n’effectue jamais de paiement.</p>'+
   '<button class="btn wide drive-v29-primary" data-action="open-drive-in-safari" '+(!url?'disabled':'')+'>🛒 Constituer mon panier Carrefour</button>'+
   (items.length&&!url?'<p class="helper">Le transfert direct nécessite au moins une référence prête et une liste compatible avec Safari.</p>':'')+
@@ -2357,6 +2363,7 @@ function renderDrive(){
 }
 let modalPageLockV4116=null;
 function showModal(title,body,autoFocus=true){
+ if(!uxModalPositionV4115)uxModalPositionV4115={tab:currentTab,scrollY:window.scrollY};
  if(!modalPageLockV4116){
   const bodyStyle=document.body.style;
   modalPageLockV4116={y:window.scrollY,position:bodyStyle.position,top:bodyStyle.top,
@@ -2364,7 +2371,6 @@ function showModal(title,body,autoFocus=true){
   bodyStyle.position='fixed';bodyStyle.top='-'+modalPageLockV4116.y+'px';
   bodyStyle.width='100%';bodyStyle.overflow='hidden';
  }
- if(!uxModalPositionV4115)uxModalPositionV4115={tab:currentTab,scrollY:window.scrollY};
  modalRoot.innerHTML='<div class="modal-overlay" data-overlay="true"><div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle"><div class="modal-head"><h2 id="modalTitle">'+title+'</h2><button class="close-btn" aria-label="Fermer" data-action="close-modal">×</button></div>'+body+'</div></div>';
  // Le clavier iOS ne doit jamais s'ouvrir tout seul ; focus de navigation sans défilement.
  // Une recherche peut toujours activer son champ lorsque l'utilisatrice le demande.
@@ -3420,6 +3426,29 @@ document.addEventListener('click',e=>{
    const before=weekBeforeUndo(),count=clearWeekShopping(w,target,rows);
    if(!count)return;
    persist();render(true);toastWeekUndo(count+' article'+(count>1?'s':'')+' retiré'+(count>1?'s':'')+' des courses.',before)
+  }
+  else if(mode==='v4116-finish-courses'){
+   const items=shopping().filter(x=>!x.excluded&&!x.covered);
+   if(!items.length){toast('Aucun achat à enregistrer.');return}
+   showModal('✓ Terminer mes courses','<p class="helper">Décoche les produits non achetés. Le stock ne changera qu’après confirmation.</p>'+
+    '<div class="v4116-finish-list">'+items.map(x=>'<label class="v4116-finish-item">'+
+    '<input type="checkbox" data-v4116-bought="'+html(x.id)+'" checked>'+
+    '<span><strong>'+html(x.name)+'</strong> · '+html(quantity(x.qty,x.unit))+'</span></label>').join('')+'</div>'+
+    '<button class="btn wide" data-action="v4116-confirm-courses">✓ Enregistrer les achats au stock</button>');return
+  }
+  else if(mode==='v4116-confirm-courses'){
+   const selected=new Set([...modalRoot.querySelectorAll('[data-v4116-bought]:checked')].map(x=>x.dataset.v4116Bought));
+   if(!selected.size){toast('Sélectionne au moins un produit.');return}
+   const eligible=new Set(shopping().filter(x=>!x.excluded&&!x.covered).map(x=>x.id));
+   w.checked=[...new Set([...w.checked.filter(x=>!eligible.has(x)),...selected])];
+   persist();
+   stockModulesV41?.actions.handleStockActionV41({
+    mode:'v41-courses-done',a,id,index,state,currentWeek,uid,units,toast,persist,render,renderMealContext,
+    closeModal,showModal,getWeek,recipeById,mealDishes,mealLeftovers,mealProductsV412,shopping,
+    reconcileLeftovers,clearMealWithPair,selectRecipeForMeal,generateWeekCourses,
+    freezerReservationsV41:stockModulesV41.week.freezerReservationsV41,
+    openStockBulkV414:()=>openBulkCatalogueV37(false,true),readBulkStockV414
+   });return
   }
   else if(mode==='generate-week-courses'){
    const w=getWeek(),status=coursesStatus(w);

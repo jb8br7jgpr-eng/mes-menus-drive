@@ -74,8 +74,8 @@ test('Le sélecteur et les actions de repas historiques restent accessibles',()=
 });
 test('Le cache iPhone reference les nouveaux JS et CSS',()=>{
  for(const file of [index,sw]){
-  assert.match(file,/styles\.css\?v=20261111-41-19-visual/);
-  assert.match(file,/app\.js\?v=20261111-41-19-visual/);
+  assert.match(file,/styles\.css\?v=20261111-41-20-flow/);
+  assert.match(file,/app\.js\?v=20261111-41-20-flow/);
  }
- assert.match(sw,/menus-drive-v41-19-visual-20261111/);
+ assert.match(sw,/menus-drive-v41-20-flow-20261111/);
 });

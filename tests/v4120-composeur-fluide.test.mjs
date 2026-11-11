@@ -52,7 +52,7 @@ test('brouillon convives, portions et rôle ne change pas la donnée avant la sa
  assert.equal(api.commitMealComposerDraftV4120(),false);
 });
 
-test('accompagnement ne remplit pas un couvert, sans modifier les ingrédients',()=>{
+test('deux recettes pour les mêmes personnes ne doublent pas la couverture',()=>{
  const coverage=runInNewContext(segment('function mealPortionCoverageV4119(', 'function setMealGuestsV412(')+
  ';mealPortionCoverageV4119',{
   mealDishes:m=>m?.dishes||[],
@@ -61,7 +61,7 @@ test('accompagnement ne remplit pas un couvert, sans modifier les ingrédients',
  const meal={dishes:[{recipeId:'riz',people:2},{recipeId:'poulet',people:2}],sideRecipeIds:['riz']};
  const frozen=JSON.stringify(meal);
  assert.equal(coverage(meal,2).planned,2);
- assert.equal(coverage({...meal,sideRecipeIds:[]},2).planned,4);
+ assert.equal(coverage({...meal,sideRecipeIds:[]},2).planned,2);
  assert.equal(JSON.stringify(meal),frozen,'aucune mutation du planning');
 });
 
@@ -88,19 +88,19 @@ test('le catalogue utilise les fiches existantes sans raccourcis dupliqués',()=
  assert.doesNotMatch(app,/data-action="v4120-open-main"/);
  assert.match(app,/function mealProductPickerResultsV412\(/);
  assert.match(app,/unifiedCatalogueSourceV4114\(\)/);
- assert.match(app,/mealSidePickerResultsV4121/);
+ assert.doesNotMatch(app,/function mealSidePickerResultsV4121\(/);
 });
 test('recettes directement proposées pour les convives, sans seconde saisie',()=>{
  const picker=segment('function mealPickerBodyV4121(', 'function pickMeal(index){');
  assert.doesNotMatch(picker,/id="mealPeople"/);
  assert.match(app,/mealComposerGuestsV4119\(index,w\.meals\[index\]\)/);
- assert.match(app,/data-action="v4120-toggle-side"/);
+ assert.doesNotMatch(app,/data-action="v4120-toggle-side"/);
  assert.match(app,/À préparer/);
  assert.match(picker,/v4121-source-nav/);
  assert.doesNotMatch(picker,/v4120-quick-sources|v4120-side-shortcuts|v4120-role-picker/);
  assert.match(styles,/\.v4121-source-nav/);
  assert.match(styles,/\.v4121-picker-panel/);
- assert.match(html,/41-21-unified/);
- assert.match(sw,/41-21-unified/);
+ assert.match(html,/41-22-four-sources/);
+ assert.match(sw,/41-22-four-sources/);
  assert.doesNotThrow(()=>new Function(app));
 });

@@ -2681,7 +2681,7 @@ function mealComposerSelectedV4118(index,meal){
    '<button class="btn tiny secondary" data-action="save-dish-portions" data-index="'+index+'" data-dish="'+n+'">✓</button>'+
    '<button class="btn tiny ghost" data-action="remove-dish" data-index="'+index+'" data-dish="'+n+'">Retirer</button></div>');
  });
- leftovers.forEach((left,n=>{
+ leftovers.forEach((left,n)=>{
   const name=recipeById(left.recipeId)?.name||'Restes';
   rows.push('<div class="v4118-meal-line"><div class="grow"><strong>🍱 '+html(name)+'</strong>'+
    '<small>'+left.people+' portion'+(left.people>1?'s':'')+' de restes · sans courses</small></div>'+

@@ -2685,13 +2685,18 @@ function mealRecipePickerResults(index,searchTerm='',type='all'){
   (rest.length?'<div class="meal-picker-section-heading">Tous les autres plats</div>'+rest.map(renderItem).join(''):'')
 }
 function refreshMealRecipePicker(){
+ const side=$('#v4121SideResults');
+ if(side){
+  const index=Number(side.dataset.index);
+  if(Number.isInteger(index)&&index>=0&&index<=13)
+   side.innerHTML=mealSidePickerResultsV4121(index,$('#mealRecipeSearch')?.value||'');
+  return;
+ }
  const results=$('#mealRecipeResults'),count=$('#mealRecipeCount');
  if(!results)return;
  const index=Number(results.dataset.index),term=$('#mealRecipeSearch')?.value||'',type=$('#mealRecipeType')?.value||'all';
  if(!Number.isInteger(index)||index<0||index>13)return;
  results.innerHTML=mealRecipePickerResults(index,term,type);
- const sideResults=$('#v4121SideProductResults');
- if(sideResults)sideResults.innerHTML=mealProductPickerResultsV412(index,term);
  const used=new Set(mealDishes(getWeek().meals[index]).map(d=>d.recipeId));
  const n=state.recipes.filter(r=>!used.has(r.id)&&norm(r.name).includes(norm(term))&&(type==='all'||normalRecipeType(r.category)===type)).length;
  if(count)count.textContent=n+' plat'+(n>1?'s':'')+' disponible'+(n>1?'s':'')
@@ -2912,6 +2917,41 @@ function showSpecialMealV4119(index,meal){
   '<button class="btn secondary wide" data-action="v4119-finish" data-index="'+index+'">✓ Terminer</button></div>');
 }
 // V41.21 — une seule catégorie sélectionnée, avec son contenu juste dessous.
+// V41.21 : une seule liste mélangeant recettes et produits existants, sans écran à rallonge.
+function mealSidePickerResultsV4121(index,term=''){
+ const meal=getWeek().meals[index],needle=norm(term);
+ const selectedRecipes=new Set(mealDishes(meal).map(d=>d.recipeId));
+ const selectedProducts=new Set(mealProductsV412(meal).map(p=>
+  p.productId?'product:'+p.productId:'ingredient:'+p.ingredientId));
+ const entries=state.recipes.filter(r=>!selectedRecipes.has(r.id)).map(r=>({
+  kind:'recipe',id:r.id,name:r.name,category:normalRecipeType(r.category),
+  render:()=>'<button class="picker-item v4121-choice" data-action="choose-recipe" data-role="side" data-index="'+index+
+   '" data-id="'+html(r.id)+'"><span class="emoji">'+html(icons[normalRecipeType(r.category)]||'🥗')+
+   '</span><span class="grow"><strong>'+html(r.name)+'</strong><small>Recette · '+html(normalRecipeType(r.category))+
+   '</small></span><span class="end">＋</span></button>'
+ }));
+ const seen=new Set();
+ for(const entry of unifiedCatalogueSourceV4114()){
+  const ing=entry.type==='ingredient'?entry.item:null,
+   product=ing?productById(ing.productId):entry.item;
+  const physical=product?'product:'+product.id:'ingredient:'+ing?.id;
+  if(!physical||selectedProducts.has(physical)||seen.has(physical))continue;
+  seen.add(physical);
+  entries.push({kind:'product',id:entry.id,name:entry.name,category:entry.category,
+   render:()=>'<button class="picker-item v4121-choice" data-action="v412-select-product" data-kind="'+entry.type+
+    '" data-index="'+index+'" data-id="'+html(entry.id)+'"><span class="emoji">'+
+    (entry.store==='grandfrais'?'🥬':'🛒')+'</span><span class="grow"><strong>'+html(entry.name)+
+    '</strong><small>Produit · '+html(entry.store==='grandfrais'?'Grand Frais':'Carrefour')+
+    '</small></span><span class="end">＋</span></button>'});
+ }
+ const found=entries.filter(x=>!needle||norm(x.name).includes(needle))
+  .sort((a,b)=>a.name.localeCompare(b.name,'fr',{sensitivity:'base'}));
+ const visible=found.slice(0,40);
+ return (visible.length?visible.map(x=>x.render()).join(''):
+  '<div class="meal-picker-empty">Aucun accompagnement correspondant.</div>')+
+  (found.length>visible.length?'<p class="v4121-more-hint">'+(found.length-visible.length)+
+   ' autres résultats. Utilise la recherche pour les afficher.</p>':'');
+}
 function mealPickerBodyV4121(index,kind){
  const meal=getWeek().meals[index];
  mealRecipeRoleV4120=kind==='side'?'side':'main';
@@ -2944,20 +2984,21 @@ function mealPickerBodyV4121(index,kind){
    '<div class="field"><label for="v412ProductSearch">Rechercher un produit</label>'+
    '<input id="v412ProductSearch" type="search" placeholder="Ex. cordons-bleus…" autocomplete="off"></div>'+
    '<div class="v4117-composer-list" id="v412ProductResults" data-index="'+index+'">'+mealProductPickerResultsV412(index)+'</div>';
+ }else if(kind==='side'){
+  body='<div class="field"><label for="mealRecipeSearch">Rechercher un accompagnement</label>'+
+   '<input id="mealRecipeSearch" type="search" placeholder="Ex. riz, tomates, salade…" autocomplete="off"></div>'+
+   '<div class="v4121-side-list" id="v4121SideResults" data-index="'+index+'">'+
+   mealSidePickerResultsV4121(index)+'</div>';
  }else{
-  body='<p class="v4121-help">'+(kind==='side'?
-    'Une recette ou un produit de ton catalogue : tu choisis la quantité après.':'Les portions sont automatiquement proposées selon les personnes à table.')+
-   '</p><div class="meal-picker-filters"><div class="field"><label for="mealRecipeSearch">'+
-   (kind==='side'?'Rechercher un accompagnement':'Rechercher un plat')+'</label>'+
-   '<input id="mealRecipeSearch" type="search" placeholder="'+(kind==='side'?'Ex. riz, tomates, salade…':'Ex. poulet…')+'" autocomplete="off"></div>'+
-   (kind==='side'?'':'<div class="field"><label for="mealRecipeType">Catégorie</label><select id="mealRecipeType">'+
+  body='<p class="v4121-help">Les portions sont automatiquement proposées selon les personnes à table.</p>'+
+   '<div class="meal-picker-filters"><div class="field"><label for="mealRecipeSearch">Rechercher un plat</label>'+
+   '<input id="mealRecipeSearch" type="search" placeholder="Ex. poulet…" autocomplete="off"></div>'+
+   '<div class="field"><label for="mealRecipeType">Catégorie</label><select id="mealRecipeType">'+
     '<option value="all">Toutes</option>'+recipeTypes.map(t=>'<option value="'+html(t)+'">'+html(t)+'</option>').join('')+
     (state.recipes.some(r=>normalRecipeType(r.category)==='legacy')?'<option value="legacy">Autres (anciens)</option>':'')+
-    '</select></div>')+'</div><div id="mealRecipeCount" class="meal-picker-count">'+state.recipes.length+' plats</div>'+
-   '<div class="v4117-composer-list">'+(kind==='side'?'<div class="v4121-list-label">🥗 Recettes</div>':'')+
-   '<div id="mealRecipeResults" data-index="'+index+'">'+mealRecipePickerResults(index)+'</div>'+
-   (kind==='side'?'<div class="v4121-list-label">🥬 Produits existants</div>'+
-    '<div id="v4121SideProductResults" data-index="'+index+'">'+mealProductPickerResultsV412(index)+'</div>':'')+'</div>';
+    '</select></div></div><div id="mealRecipeCount" class="meal-picker-count">'+state.recipes.length+' plats</div>'+
+   '<div class="v4117-composer-list"><div id="mealRecipeResults" data-index="'+index+'">'+
+   mealRecipePickerResults(index)+'</div></div>';
  }
 
  return body;

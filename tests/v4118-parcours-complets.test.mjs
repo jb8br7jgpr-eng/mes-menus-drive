@@ -4,6 +4,8 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {runInNewContext} from 'node:vm';
 import {resolveStockArticleV41} from '../stock-week-v41.mjs';
+import {emptyStockV41,applyStockTransactionV41,availableStockV41,stockIdentityV41} from '../stock-engine-v41.mjs';
+import {handleStockActionV41} from '../stock-actions-v41.mjs';
 
 const app=readFileSync(new URL('../app.js',import.meta.url),'utf8');
 const css=readFileSync(new URL('../styles.css',import.meta.url),'utf8');
@@ -98,4 +100,36 @@ test('Un seul acces pour enregistrer les achats et cache Safari actualise',()=>{
  assert.match(sw,/menus-drive-v41-18-compose-20261111/);
  assert.match(stockUI,/ingredient\?\.name\|\|p\?\.name/);
  assert.match(stockActions,/resolveStockArticleV41\(item,ctx\.state\.ingredientCatalog,ctx\.state\.products\)/);
+});
+
+test('Grand Frais : consommation reelle puis annulation retablit le stock sans doublon',()=>{
+ const ing={id:'tomates',name:'Tomates',store:'grandfrais',category:'Légumes',unit:'pièce'};
+ const identity=stockIdentityV41({ingredientId:ing.id},[ing]);
+ const initial=applyStockTransactionV41(emptyStockV41(),{
+  id:'inventaire-initial',movements:[{type:'inventory',direction:'add',identity,name:'Tomates',store:'grandfrais',
+   category:'Légumes',amount:4,unit:'pièce'}]
+ }).stock;
+ const weekId='2026-11-14',product={ingredientId:ing.id,qty:2,unit:'pièce'};
+ const w={meals:[{type:'products',products:[product]},...Array(13).fill(null)],v41MealActions:{}};
+ const state={stockV41:initial,ingredientCatalog:[ing],products:[],weeks:{[weekId]:w}};
+ let writes=0,uid=0,last='';
+ const ctx={mode:'v41-eat-product',a:{dataset:{}},id:'ingredient:tomates',index:0,
+  state,currentWeek:weekId,uid:()=>String(++uid),units:['pièce'],
+  toast:x=>{last=String(x)},persist:()=>writes++,render:()=>{},renderMealContext:()=>{},
+  closeModal:()=>{},showModal:()=>{},getWeek:()=>w,
+  mealProductsV412:m=>m?.products||[],mealDishes:()=>[],mealLeftovers:()=>[],
+  recipeById:()=>null,shopping:()=>[],generateWeekCourses:()=>{}
+ };
+ const oldConfirm=globalThis.confirm;globalThis.confirm=()=>true;
+ try{
+  assert.equal(availableStockV41(state.stockV41,identity,'pièce'),4);
+  assert.equal(handleStockActionV41(ctx),true);
+  assert.equal(availableStockV41(state.stockV41,identity,'pièce'),2,last);
+  assert.ok(w.v41MealActions['0:product:ingredient:tomates']);
+  ctx.mode='v41-undo-validation';ctx.a={dataset:{kind:'product'}};
+  assert.equal(handleStockActionV41(ctx),true);
+  assert.equal(availableStockV41(state.stockV41,identity,'pièce'),4,last);
+  assert.equal(w.v41MealActions['0:product:ingredient:tomates'],undefined);
+  assert.equal(writes,2);
+ }finally{if(oldConfirm===undefined)delete globalThis.confirm;else globalThis.confirm=oldConfirm}
 });

@@ -2898,7 +2898,7 @@ function openMealPickerV4116(index,kind='recipes'){
   mealComposerVisualV4119(index,meal)+
   '<div class="v4119-add-heading"><strong>＋ Compléter mon repas</strong>'+
   '<small>Choisis ce que tu veux ajouter, les éléments apparaissent au-dessus.</small></div>'+
-  tabs+body+otherChoices+
+  tabs+otherChoices+body+
   '<div class="v4119-footer"><button class="btn wide" data-action="v4119-finish" data-index="'+index+'">✓ Terminer mon repas</button></div></div>');
 }
 function pickMeal(index){

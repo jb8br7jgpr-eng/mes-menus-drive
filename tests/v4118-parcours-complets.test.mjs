@@ -74,11 +74,11 @@ test('Les quantites proposees pour un produit a la piece sont celles des convive
 });
 test('Le compositeur affiche ses quatre sources et le repas courant',()=>{
  assert.match(app,/function mealComposerSelectedV4118\(/);
- assert.match(app,/chosen\?mealComposerSelectedV4118\(index,meal\)/);
+ assert.match(app,/mealComposerVisualV4119\(index,meal\)/);
  assert.match(app,/const modes=\['recipes','leftovers','frozen','products'\]/);
  assert.match(app,/data-action="v4119-finish"/);
  assert.match(app,/data-action="save-dish-portions"/);
- assert.match(css,/\.v4118-current-meal/);
+ assert.match(css,/\.v4119-card/);
 });
 test('Le diff des besoins ne touche pas les achats et distingue les magasins',()=>{
  const code=slice('function menuShoppingChangesV4118(w){','function courseGenerationBanner(w=getWeek()');

@@ -2248,8 +2248,7 @@ function renderCourses(){
   '<div class="course-v33-progress-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="'+progressPct+'" aria-valuetext="'+progressBought+' articles sur '+progressTotal+'" aria-label="Articles achetés"><span style="width:'+progressPct+'%"></span></div>'+
   '<p>'+(progressTotal===0?'Aucun article à acheter pour le moment.':progressPct===100?'✓ Tous les achats prévus sont achetés.':
    purchaseItemCountV4116(active)+' articles à acheter.')+'</p></div>';
- out+='<button class="btn wide v41-courses-faites" data-action="v4116-finish-courses" '+(!active.length&&!checked.length?'disabled':'')+'>✓ Terminer mes courses · Ajouter au stock</button>'+
- (checked.length?'<button class="btn secondary wide" data-action="v41-courses-done">Enregistrer uniquement les articles cochés</button>':'');
+ out+='<button class="btn wide v41-courses-faites" data-action="v4116-finish-courses" '+(!active.length&&!checked.length?'disabled':'')+'>✓ Enregistrer mes achats</button>';
  out+='<div class="course-summary"><div class="course-shop-count carrefour"><strong>'+purchaseItemCountV4116(carrefour)+'</strong><span>🛒 Carrefour Drive</span></div>'+
  '<div class="course-shop-count grand"><strong>'+purchaseItemCountV4116(grand)+'</strong><span>🥬 Grand Frais</span></div></div>';
  out+='<button class="btn wide course-add-btn v37-bulk-main" data-action="v37-open-bulk">☑ Ajouter plusieurs articles aux courses</button>'+ '<p class="helper v37-bulk-intro">Tous tes ingrédients et achats du quotidien · quantités réglables · ajout en une fois.</p>';
@@ -3638,12 +3637,12 @@ document.addEventListener('click',e=>{
   else if(mode==='v4116-finish-courses'){
    const items=shopping().filter(x=>!x.excluded&&!x.covered);
    if(!items.length){toast('Aucun achat à enregistrer.');return}
-   showModal('✓ Terminer mes courses','<p class="helper">Décoche les produits non achetés. Le stock ne changera qu’après confirmation.</p>'+
+   showModal('✓ Enregistrer mes achats','<p class="helper">Coche uniquement les produits réellement achetés. Le stock ne changera qu’après confirmation.</p>'+
     '<div class="v4116-finish-list">'+items.map(x=>'<label class="v4116-finish-item">'+
     '<input type="checkbox" data-v4116-bought="'+html(x.id)+'" '+(x.checked?'checked':'')+'>'+ 
     '<span><strong>'+html(x.name)+'</strong> · '+html(quantity(x.qty,x.unit))+'</span></label>').join('')+'</div>'+
     '<button class="btn secondary wide" data-action="v4116-select-all-bought">✓ Tout cocher</button>'+ 
-    '<button class="btn wide" data-action="v4116-confirm-courses">✓ Enregistrer les achats au stock</button>');return
+    '<button class="btn wide" data-action="v4116-confirm-courses">✓ Confirmer l’entrée dans mon stock</button>');return
   }
   else if(mode==='v4116-select-all-bought'){
    modalRoot.querySelectorAll('[data-v4116-bought]').forEach(el=>{el.checked=true});return

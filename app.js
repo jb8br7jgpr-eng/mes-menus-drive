@@ -3432,7 +3432,7 @@ document.addEventListener('click',e=>{
    if(!items.length){toast('Aucun achat à enregistrer.');return}
    showModal('✓ Terminer mes courses','<p class="helper">Décoche les produits non achetés. Le stock ne changera qu’après confirmation.</p>'+
     '<div class="v4116-finish-list">'+items.map(x=>'<label class="v4116-finish-item">'+
-    '<input type="checkbox" data-v4116-bought="'+html(x.id)+'" '+(x.checked?'checked':'')+'>'
+    '<input type="checkbox" data-v4116-bought="'+html(x.id)+'" '+(x.checked?'checked':'')+'>'+ 
     '<span><strong>'+html(x.name)+'</strong> · '+html(quantity(x.qty,x.unit))+'</span></label>').join('')+'</div>'+
     '<button class="btn secondary wide" data-action="v4116-select-all-bought">✓ Tout cocher</button>'+ 
     '<button class="btn wide" data-action="v4116-confirm-courses">✓ Enregistrer les achats au stock</button>');return

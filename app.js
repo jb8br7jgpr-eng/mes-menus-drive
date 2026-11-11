@@ -3934,13 +3934,13 @@ document.addEventListener('click',e=>{
    if(isMealDoneV41(w,index)){toast('Annule la validation avant de retirer le produit.');return}
    const before=weekBeforeUndo(),remaining=mealProductsV412(w.meals[index]).filter(x=>mealProductRefV4118(x)!==id);
    if(!setMealProductsV412(w,index,remaining))return;
-   persist();closeModal();renderMealContext(index);
+   persist();render(true);openMealPickerV4116(index,'products');
    toastWeekUndo('Produit retiré du repas.',before,index)
   }
   else if(mode==='v412-save-guests'){
    const guests=Number($('#v412MealGuests')?.value),before=weekBeforeUndo();
    if(!setMealGuestsV412(w,index,guests)){toast('Choisis entre 1 et 30 personnes.');return}
-   persist();closeModal();renderMealContext(index);
+   persist();render(true);openMealPickerV4116(index,'recipes');
    toastWeekUndo('Nombre de convives enregistré.',before,index)
   }
   else if(mode==='choose-leftovers')openMealPickerV4116(index,'leftovers');
@@ -3958,26 +3958,26 @@ document.addEventListener('click',e=>{
    const removed=left[li];
    const at=parts.findIndex(p=>p.type==='leftovers'&&p.recipeId===removed.recipeId&&p.fromIndex===removed.fromIndex);
    if(at>=0)parts.splice(at,1);
-   const before=weekBeforeUndo();storeMealParts(w,index,parts);persist();closeModal();renderMealContext(index);
+   const before=weekBeforeUndo();storeMealParts(w,index,parts);persist();render(true);openMealPickerV4116(index,'leftovers');
    toastWeekUndo('Restes retirés.',before,index)
   }
   else if(mode==='save-dish-portions'){
    const dishIndex=Number(a.dataset.dish),dishes=mealDishes(w.meals[index]),portions=portionInputForDish(dishIndex);
    if(isMealDoneV41(w,index)){toast('Repas déjà validé dans le stock.');return}
    if(!Number.isInteger(dishIndex)||!dishes[dishIndex]||portions===null){toast('Choisis entre 1 et 30 portions.');return}
-   dishes[dishIndex].people=portions;setMealDishes(w,index,dishes);persist();closeModal();renderMealContext(index);toast('Portions du plat enregistrées !')
+   dishes[dishIndex].people=portions;setMealDishes(w,index,dishes);persist();render(true);openMealPickerV4116(index,'recipes');toast('Portions du plat enregistrées !')
   }
   else if(mode==='remove-dish'){
    const dishIndex=Number(a.dataset.dish),dishes=mealDishes(w.meals[index]);
    if(isMealDoneV41(w,index)){toast('Repas déjà validé dans le stock.');return}
    if(!Number.isInteger(dishIndex)||!dishes[dishIndex])return;
-   const before=weekBeforeUndo();dishes.splice(dishIndex,1);setMealDishes(w,index,dishes);persist();closeModal();renderMealContext(index);
+   const before=weekBeforeUndo();dishes.splice(dishIndex,1);setMealDishes(w,index,dishes);persist();render(true);openMealPickerV4116(index,'recipes');
    toastWeekUndo('Plat retiré.',before,index)
   }
   else if(mode==='remove-meal'){
    if(!w.meals[index])return;
    if(isMealDoneV41(w,index)){toast('Ce repas a déjà été validé dans le stock.');return}
-   const before=weekBeforeUndo();clearMealWithPair(w,index);persist();closeModal();renderMealContext(index);
+   const before=weekBeforeUndo();clearMealWithPair(w,index);persist();render(true);openMealPickerV4116(index,'recipes');
    toastWeekUndo('Repas retiré.',before,index)
   }
   else if(mode==='complete-week')populate();

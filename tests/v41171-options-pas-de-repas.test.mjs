@@ -18,7 +18,7 @@ function renderChoices(kind='recipes',meal=null){
   getWeek:()=>w,isMealDoneV41:()=>false,mealCanEditV4117:()=>true,
   mealDishes:()=>[],mealLeftovers:()=>[],mealFrozenV4117:()=>[],mealProductsV412:()=>[],
   mealComposerGuestsV4119:()=>2,mealComposerVisualV4119:()=>'<div>Composeur visuel</div>',
-  mealRecipeRoleV4120:'main',mealSideShortcutsV4120:()=>'',
+  mealRecipeRoleV4120:'main',mealPickerBodyV4121:()=>'<div id="mealRecipeResults">Recettes</div>',
   state:{recipes:[],stockV41:{freezer:{}},weeks:{}},
   recipeTypes:[],normalRecipeType:()=>'',menuMealLabelV411:()=> 'Samedi midi',
   mealRecipePickerResults:()=>'<div>Aucun plat</div>',recipeById:()=>null,
@@ -35,8 +35,8 @@ test('Le compositeur ouvert sur un créneau vide expose Pas de repas immédiatem
  assert.match(r.body,/data-action="mark-no-meal" data-index="1"/);
  assert.match(r.body,/Pas de repas/);
  assert.match(r.body,/Restaurant, invitation, sortie/);
- assert.ok(r.body.indexOf('data-action="mark-no-meal"')<r.body.indexOf('mealRecipeResults'),
-   'Option rapide affichée avant la liste des recettes');
+ assert.ok(r.body.indexOf('data-action="mark-no-meal"')>r.body.indexOf('mealRecipeResults'),
+   'Les états spéciaux sont accessibles après le sélecteur unique');
 });
 test('Repas commandé accessible sans passer par un autre écran',()=>{
  const r=renderChoices();
@@ -44,12 +44,12 @@ test('Repas commandé accessible sans passer par un autre écran',()=>{
  assert.match(r.body,/Repas commandé/);
  assert.doesNotMatch(r.body,/Repas libre \/ commandé/);
 });
-test('Ces options persistent sur chacun des quatre onglets',()=>{
- for(const kind of ['recipes','leftovers','frozen','products']){
+test('Ces options persistent sur chacune des cinq catégories',()=>{
+ for(const kind of ['recipes','side','leftovers','frozen','products']){
   const r=renderChoices(kind);
   assert.ok(r?.body.includes('data-action="mark-no-meal"'),kind);
   assert.ok(r?.body.includes('data-action="v41171-mark-ordered"'),kind);
-  for(const tab of ['recipes','leftovers','frozen','products'])
+  for(const tab of ['recipes','side','leftovers','frozen','products'])
    assert.ok(r.body.includes('data-kind="'+tab+'"'),tab+' visible dans '+kind);
  }
 });

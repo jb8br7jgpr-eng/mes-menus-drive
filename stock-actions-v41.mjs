@@ -102,6 +102,7 @@ function orphanValidationKeys(ctx,week,index) {
  if(!Number.isInteger(index)||index<0||index>13)return [];
  const meal=week.meals[index],known=new Set();
  if(meal?.type==='frozen')known.add(index+':frozen');
+ for(const part of (Array.isArray(meal?.frozen)?meal.frozen:[]))known.add(index+':frozen:'+part.lotId);
  for(const d of ctx.mealDishes(meal))known.add(index+':'+d.recipeId);
  for(const product of (ctx.mealProductsV412?.(meal)||[]))known.add(index+':product:'+product.productId);
  for(const d of ctx.mealLeftovers(meal))
@@ -367,6 +368,21 @@ export function handleStockActionV41(ctx) {
     meal.consumed=true;
   });return true
  }
+ if(mode==='v41-eat-frozen-part'){
+  const meal=w.meals[index],part=(Array.isArray(meal?.frozen)?meal.frozen:[]).find(x=>x.lotId===id);
+  const key=index+':frozen:'+id;
+  if(!part||part.consumed||w.v41MealActions?.[key])return true;
+  const lot=stock.freezer?.[id];
+  if(!lot||lot.recipeId!==part.recipeId){ctx.toast('Lot congelé introuvable.');return true}
+  if(!confirm('Confirmer la consommation de '+part.portions+' portion'+(part.portions>1?'s':'')+
+    ' de « '+lot.name+' » ?'))return true;
+  const movement={type:'freezer',direction:'consume',lotId:id,recipeId:part.recipeId,portions:part.portions};
+  commit(ctx,tx('Portions du congélateur mangées · '+lot.name,[movement]),()=>{
+   w.v41MealActions=w.v41MealActions||{};
+   w.v41MealActions[key]={status:'eaten',at:new Date().toISOString(),movements:[movement]};
+   part.consumed=true;
+  });return true
+ }
  // Plan B explicite lorsque les données historiques ne permettent plus de
  // reconstruire exactement les ingrédients : déverrouiller SANS remboursement.
  // L'utilisateur doit alors corriger les quantités dans Stock → Maison.
@@ -427,6 +443,7 @@ export function handleStockActionV41(ctx) {
   const kind=a.dataset.kind;
   const sourceIndex=Number(a.dataset.source);
   const key=kind==='frozen'?index+':frozen':
+   kind==='frozen-part'?index+':frozen:'+id:
    kind==='leftovers'?index+':leftovers:'+sourceIndex+':'+id:
    kind==='product'?index+':product:'+id:index+':'+id;
   const action=w.v41MealActions?.[key];
@@ -438,6 +455,20 @@ export function handleStockActionV41(ctx) {
    delete w.v41MealActions[key];
    ctx.persist();ctx.closeModal();ctx.render(true);
    ctx.toast('Validation des restes annulée.');return true
+  }
+  if(kind==='frozen-part'){
+   const part=(Array.isArray(w.meals[index]?.frozen)?w.meals[index].frozen:[]).find(x=>x.lotId===id);
+   if(!part?.consumed){ctx.toast('Cette portion congelée n’est pas validée.');return true}
+   const lot=stock.freezer?.[id],original=action.movements?.find(x=>x.type==='freezer'&&x.direction==='consume');
+   if(!lot||lot.recipeId!==part.recipeId||!original||original.lotId!==id||original.portions!==part.portions){
+    ctx.toast('Lot ou mouvement d’origine incohérent : annulation automatique refusée.');return true
+   }
+   if(!confirm('Restituer '+part.portions+' portion'+(part.portions>1?'s':'')+' de « '+lot.name+
+    ' » au congélateur ?'))return true;
+   commit(ctx,tx('Annulation des portions congelées · '+lot.name,[{
+    type:'freezer',direction:'add',lotId:id,recipeId:part.recipeId,name:lot.name,portions:part.portions
+   }]),()=>{delete w.v41MealActions[key];delete part.consumed});
+   return true
   }
   if(kind==='frozen'){
    const meal=w.meals[index];

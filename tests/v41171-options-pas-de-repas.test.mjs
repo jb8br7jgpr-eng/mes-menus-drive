@@ -16,7 +16,9 @@ function renderChoices(kind='recipes',meal=null){
  let modal=null;const w={meals:Array(14).fill(null)};w.meals[1]=meal;
  const ctx={
   getWeek:()=>w,isMealDoneV41:()=>false,mealCanEditV4117:()=>true,
+  mealComposerGuestsV4119:()=>2,mealComposerVisualV4119:()=>'<div class="v4119-visual">Repas visuel</div>',
   mealDishes:()=>[],mealLeftovers:()=>[],mealFrozenV4117:()=>[],mealProductsV412:()=>[],
+  mealComposerGuestsV4119:()=>2,mealComposerVisualV4119:()=>'<div>Composeur visuel</div>',
   state:{recipes:[],stockV41:{freezer:{}},weeks:{}},
   recipeTypes:[],normalRecipeType:()=>'',menuMealLabelV411:()=> 'Samedi midi',
   mealRecipePickerResults:()=>'<div>Aucun plat</div>',recipeById:()=>null,
@@ -72,8 +74,8 @@ test('Le sélecteur et les actions de repas historiques restent accessibles',()=
 });
 test('Le cache iPhone reference les nouveaux JS et CSS',()=>{
  for(const file of [index,sw]){
-  assert.match(file,/styles\.css\?v=20261111-41-18-compose/);
-  assert.match(file,/app\.js\?v=20261111-41-18-compose/);
+  assert.match(file,/styles\.css\?v=20261111-41-19-visual/);
+  assert.match(file,/app\.js\?v=20261111-41-19-visual/);
  }
- assert.match(sw,/menus-drive-v41-18-compose-20261111/);
+ assert.match(sw,/menus-drive-v41-19-visual-20261111/);
 });

@@ -61,6 +61,7 @@ test('Les quantites proposees pour un produit a la piece sont celles des convive
   productById:()=>({id:'c',name:'Cordons-bleus',store:'carrefour',unit:'paquet',packAmount:4,packUnit:'pièce'}),
   ingredientById:()=>null,getWeek:()=>({meals:Array(14).fill(null)}),mealProductsV412:()=>[],
   mealProductRefV4118:x=>x.productId,isMealDoneV41:()=>false,
+  mealComposerGuestsV4119:()=>2,
   units:['pièce','paquet','g'],state:{settings:{people:2}},
   preferredIngredientUnit:()=> 'pièce',ingredientStore:()=> 'carrefour',
   selectOptions:()=>'<option>pièce</option>',quantity:(n,u)=>n+' '+u,
@@ -73,11 +74,11 @@ test('Les quantites proposees pour un produit a la piece sont celles des convive
 });
 test('Le compositeur affiche ses quatre sources et le repas courant',()=>{
  assert.match(app,/function mealComposerSelectedV4118\(/);
- assert.match(app,/chosen\?mealComposerSelectedV4118\(index,meal\)/);
+ assert.match(app,/mealComposerVisualV4119\(index,meal\)/);
  assert.match(app,/const modes=\['recipes','leftovers','frozen','products'\]/);
- assert.match(app,/data-action="v4118-details"/);
+ assert.match(app,/data-action="v4119-finish"/);
  assert.match(app,/data-action="save-dish-portions"/);
- assert.match(css,/\.v4118-current-meal/);
+ assert.match(css,/\.v4119-card/);
 });
 test('Le diff des besoins ne touche pas les achats et distingue les magasins',()=>{
  const code=slice('function menuShoppingChangesV4118(w){','function courseGenerationBanner(w=getWeek()');
@@ -96,8 +97,8 @@ test('Un seul acces pour enregistrer les achats et cache Safari actualise',()=>{
  assert.match(courses,/data-action="v4116-finish-courses"/);
  assert.doesNotMatch(courses,/data-action="v41-courses-done"/);
  assert.match(app,/Coche uniquement les produits réellement achetés/);
- assert.match(index,/app\.js\?v=20261111-41-18-compose/);
- assert.match(sw,/menus-drive-v41-18-compose-20261111/);
+ assert.match(index,/app\.js\?v=20261111-41-19-visual/);
+ assert.match(sw,/menus-drive-v41-19-visual-20261111/);
  assert.match(stockUI,/ingredient\?\.name\|\|p\?\.name/);
  assert.match(stockActions,/resolveStockArticleV41\(item,ctx\.state\.ingredientCatalog,ctx\.state\.products\)/);
 });

@@ -1359,3 +1359,83 @@
 .v4118-course-preview>div{display:flex;justify-content:space-between;gap:8px;padding:5px 0;border-top:1px solid #eef0ed;font-size:12px}
 .v4118-course-preview small{color:#58715e;white-space:nowrap}
 @media(max-width:390px){.v4118-meal-line{gap:5px;padding:7px}.v4118-meal-line .btn{font-size:11px;padding:6px 7px}}
+
+/* V41.19 — composeur de repas visuel, une seule surface scrollable iPhone. */
+.v4119-composer{display:grid;gap:11px;min-width:0}
+.v4119-visual{display:grid;gap:12px;min-width:0}
+.v4119-people,.v4119-coverage,.v4119-my-meal{
+  border:1px solid #dce9da;border-radius:15px;padding:12px;background:#fff;min-width:0
+}
+.v4119-people{background:#f4f8f2}
+.v4119-section-top{display:flex;align-items:center;justify-content:space-between;gap:10px;min-width:0}
+.v4119-section-top strong{font-size:14px;color:#264f35}
+.v4119-section-top>div{min-width:0}
+.v4119-section-top small{display:block;margin-top:3px;color:#617668;font-size:11px}
+.v4119-section-top>span{font-size:12px;font-weight:800;color:#53715c;white-space:nowrap}
+.v4119-stepper{display:flex;align-items:center;gap:7px;flex-shrink:0}
+.v4119-stepper button{
+  border:1px solid #bbd6c0;background:#edf6eb;color:#24573c;display:grid;
+  place-items:center;min-width:36px;height:37px;border-radius:11px;
+  font-weight:850;font-size:21px;touch-action:manipulation
+}
+.v4119-stepper button:disabled{opacity:.35}
+.v4119-stepper strong{min-width:25px;text-align:center;font-size:15px;font-variant-numeric:tabular-nums}
+.v4119-people-count{font-size:20px!important}
+.v4119-coverage{background:#fafdf8}
+.v4119-portion-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;margin:10px 0 8px}
+.v4119-portion{display:flex;flex-direction:column;justify-content:center;align-items:center;gap:4px;
+  min-height:66px;background:#f4f5f0;color:#7d8b7e;border:1px dashed #cad5c9;
+  border-radius:12px;text-align:center;transition:background .15s,border-color .15s}
+.v4119-portion.is-filled{background:#e3f2e4;color:#266944;border:1px solid #9fcdac}
+.v4119-portion-symbol{font-weight:850;font-size:20px;line-height:1}
+.v4119-portion small{font-size:10px;font-weight:750}
+.v4119-coverage>small{display:block;color:#67786b;font-size:10px}
+.v4119-coverage-state{margin:8px 0 4px;color:#297043;font-size:12px}
+.v4119-coverage-state.needs-more{color:#846126}
+.v4119-coverage-note{font-size:11px;color:#607064;line-height:1.45}
+.v4119-card-list{display:grid;gap:8px;margin-top:10px}
+.v4119-card{padding:10px;border:1px solid #e0e9dc;border-radius:12px;background:#f9fcf7;min-width:0}
+.v4119-card-title{display:flex;gap:9px;align-items:start;min-width:0}
+.v4119-card-title .grow{min-width:0;flex:1}
+.v4119-card-title strong{font-size:13px;display:block;overflow-wrap:anywhere}
+.v4119-card-title small{display:block;color:#62776a;font-size:11px;line-height:1.4;margin-top:3px}
+.v4119-card-title .btn{padding:5px 7px;min-height:30px;font-size:11px;flex:0 0 auto}
+.v4119-icon{display:grid;place-items:center;border-radius:11px;background:#e9f4e6;
+  min-width:35px;height:35px;font-size:20px}
+.v4119-quantity{border-top:1px solid #e7eee4;margin-top:10px;padding-top:9px;
+  display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:11px;color:#536a5d}
+.v4119-quantity .v4119-stepper button{height:32px;min-width:33px}
+.v4119-quantity .v4119-stepper strong{font-size:13px}
+.v4119-quantity .btn{font-size:11px;min-height:34px}
+.v4119-empty{min-height:111px;display:grid;place-items:center;gap:5px;text-align:center;
+  margin-top:10px;padding:14px;border:1px dashed #d1dfd0;border-radius:12px;background:#f8fbf6}
+.v4119-empty>span{font-size:25px}
+.v4119-empty strong{font-size:13px}
+.v4119-empty small{font-size:11px;color:#62776a}
+.v4119-more{margin:12px 0 0;border-top:1px solid #edf2ea;padding-top:10px}
+.v4119-more>summary{font-size:12px;font-weight:750;color:#44664d;cursor:pointer}
+.v4119-more-actions{display:flex;flex-wrap:wrap;gap:6px;margin:9px 0}
+.v4119-more-actions .btn{font-size:11px;padding:8px}
+.v4119-add-heading{display:grid;gap:4px;padding:3px 2px}
+.v4119-add-heading strong{font-size:15px;color:#294f39}
+.v4119-add-heading small{font-size:11px;color:#617567}
+.v4119-composer .v4117-composer-tabs{position:static!important;margin:0}
+.v4119-composer .v41171-choices{margin-top:7px}
+.v4119-footer{position:sticky;bottom:-22px;z-index:6;padding:11px 0 calc(8px + env(safe-area-inset-bottom));
+  background:linear-gradient(to bottom,#fbfaf600,#fbfaf6 17px,#fbfaf6 100%)}
+.v4119-footer .btn{min-height:52px;font-size:14px}
+.v4119-main-product-field{padding:9px 11px;background:#f3f8f1;border-radius:12px}
+.v4119-main-product-field small{display:block;margin-top:5px;font-size:11px;color:#617567}
+.v4119-special{display:grid;gap:12px;text-align:center;padding:15px 3px 8px}
+.v4119-special-icon{font-size:45px}
+.v4119-special h3{font-size:19px;color:#274b36}
+.v4119-special p{font-size:13px;color:#657366}
+@media(max-width:390px){
+ .v4119-people,.v4119-coverage,.v4119-my-meal{padding:10px}
+ .v4119-portion-grid{gap:4px}
+ .v4119-portion{min-height:59px}
+ .v4119-portion small{font-size:9px}
+ .v4119-card-title{gap:6px}
+ .v4119-card-title .btn{font-size:10px}
+ .v4119-stepper{gap:5px}
+}

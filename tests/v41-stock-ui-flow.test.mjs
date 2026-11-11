@@ -259,7 +259,7 @@ test('Cette semaine affiche aussi les restes et les repas commandés sans nouvel
  assert.match(view,/Restes : Pâtes/);
  assert.match(view,/sans nouvelle déduction d’ingrédients/);
  assert.match(view,/À préparer/);
- assert.match(view,/Repas libre ou commandé/);
+ assert.match(view,/Repas commandé/);
  assert.match(view,/Sans stock/);
 });
 

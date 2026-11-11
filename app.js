@@ -2506,7 +2506,7 @@ function showModal(title,body,autoFocus=true){
  if(first)first.focus({preventScroll:true})
 }
 function closeModal(){
- if(mealComposerDraftV4120)persist();
+ if(typeof mealComposerDraftV4120!=='undefined'&&mealComposerDraftV4120)persist();
  mealRecipeRoleV4120='main';
  const modalLock=typeof modalPageLockV4116==='undefined'?null:modalPageLockV4116;
  if(modalLock){

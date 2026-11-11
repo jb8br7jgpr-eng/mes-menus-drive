@@ -2878,12 +2878,13 @@ function pickMeal(index){
  if(products.length){
   out+='<div class="section-head"><h3>Produits ajoutés à ce repas</h3><span class="pill">'+products.length+'</span></div>';
   products.forEach(x=>{
-   const p=productById(x.productId);
-   out+='<div class="meal-dish v412-product"><div class="grow"><strong>🛒 '+html(p?.name||'Produit supprimé')+
-    '</strong><div class="helper">'+x.qty+' '+html(x.unit)+' · '+html(p?.store==='grandfrais'?'Grand Frais':'Carrefour')+
+   const info=mealProductInfoV4118(x),ref=mealProductRefV4118(x);
+   out+='<div class="meal-dish v412-product"><div class="grow"><strong>🛒 '+html(info.name)+
+    '</strong><div class="helper">'+x.qty+' '+html(x.unit)+' · '+html(info.store==='grandfrais'?'Grand Frais':'Carrefour')+
     '</div></div><div class="meal-dish-actions"><button class="btn tiny secondary" data-action="v412-edit-meal-product" data-index="'+index+
-    '" data-id="'+html(x.productId)+'">Modifier</button><button class="btn tiny ghost" data-action="v412-remove-meal-product" data-index="'+index+
-    '" data-id="'+html(x.productId)+'">Retirer</button></div></div>';
+    '" data-kind="'+(x.ingredientId?'ingredient':'daily')+'" data-id="'+html(x.ingredientId||x.productId)+'">Modifier</button>'+
+    '<button class="btn tiny ghost" data-action="v412-remove-meal-product" data-index="'+index+
+    '" data-id="'+html(ref)+'">Retirer</button></div></div>';
   });
  }
  const availableRestes=availableLeftoverSources(getWeek(),index).reduce((n,x)=>n+x.available,0);

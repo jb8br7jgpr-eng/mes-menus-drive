@@ -145,8 +145,31 @@ export function handleStockActionV41(ctx) {
  const tx=(label,movements)=>({id:'v41:'+ctx.uid(),label,movements});
  const requiresInventory=['v41-add-stock','v41-add-frozen','v41-save-stock','v41-save-frozen',
   'v41-courses-done','v41-eat-recipe','v41-eat-product','v41-confirm-freeze-recipe',
-  'v41-adjust-stock','v41-confirm-stock','v41-correct-freezer','v41-confirm-freezer'];
+  'v41-adjust-stock','v41-confirm-stock','v41-correct-freezer','v41-confirm-freezer',
+  'v41-stock-quick','v41-freezer-quick'];
  if(requiresInventory.includes(mode)&&migrationGate(ctx))return true;
+  if(mode==='v41-stock-quick'){
+  const identity=a.dataset.identity,unit=a.dataset.unit,step=Number(a.dataset.step);
+  if(![-1,1].includes(step)||!identity||!unit)return true;
+  const record=stock.items[identity+'|'+unit];
+  if(!record){ctx.toast('Référence de stock introuvable.');return true}
+  const current=availableStockV41(stock,identity,unit),preferred=['g','ml'].includes(unit)?100:['kg','l'].includes(unit)?0.1:unit==='cl'?10:1;
+  const quantity=step<0?Math.min(current,preferred):preferred;
+  if(quantity<=0){ctx.toast('Plus de stock disponible.');return true}
+  commit(ctx,tx('Ajustement rapide · '+record.name,[{type:'inventory',
+   direction:step>0?'add':'consume',identity,unit,amount:quantity,
+   name:record.name,category:record.category,store:record.store}]));
+  return true
+ }
+ if(mode==='v41-freezer-quick'){
+  const lot=stock.freezer[id],step=Number(a.dataset.step);
+  if(!lot||![-1,1].includes(step))return true;
+  const reserved=ctx.freezerReservationsV41(state.weeks)[id]||0;
+  if(step<0&&lot.portions<=reserved){ctx.toast('Ces portions sont déjà réservées dans les menus.');return true}
+  commit(ctx,tx('Ajustement rapide · '+lot.name,[{type:'freezer',
+   direction:step>0?'add':'consume',lotId:id,recipeId:lot.recipeId,name:lot.name,portions:1}]));
+  return true
+ }
  if(mode==='v41-add-stock'){ctx.openStockBulkV414();return true}
  if(mode==='v41-add-stock-fresh'){
   if(state.stockV41){selection(ctx);return true}

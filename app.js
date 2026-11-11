@@ -2992,7 +2992,10 @@ function openMealPickerV4116(index,kind='recipes'){
   modes.map((t,i)=>'<button type="button" class="v4117-composer-tab'+(selected===t?' active':'')+
    '" data-action="v4116-open-picker" data-kind="'+t+'" data-index="'+index+
    '" aria-pressed="'+(selected===t?'true':'false')+'">'+
-   ['🍲 Plat','🍱 Restes','❄️ Congélateur','🛒 Produit'][i]+'</button>').join('')+'</nav>';
+   ['<span class="v4122-tab-icon">🍲</span><span>Plat</span>',
+    '<span class="v4122-tab-icon">🍱</span><span>Restes</span>',
+    '<span class="v4122-tab-icon">❄️</span><span>Congélateur</span>',
+    '<span class="v4122-tab-icon">🛒</span><span>Produit</span>'][i]+'</button>').join('')+'</nav>';
  const otherChoices='<details class="v4121-special-choices"><summary>Autres possibilités : pas de repas ou commandé</summary>'+
   '<div class="v41171-choices"><div class="v41171-choices-actions">'+
   '<button type="button" class="btn secondary v41171-no-meal" data-action="mark-no-meal" data-index="'+index+

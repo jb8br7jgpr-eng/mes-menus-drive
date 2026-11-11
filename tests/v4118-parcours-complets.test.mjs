@@ -61,6 +61,7 @@ test('Les quantites proposees pour un produit a la piece sont celles des convive
   productById:()=>({id:'c',name:'Cordons-bleus',store:'carrefour',unit:'paquet',packAmount:4,packUnit:'pièce'}),
   ingredientById:()=>null,getWeek:()=>({meals:Array(14).fill(null)}),mealProductsV412:()=>[],
   mealProductRefV4118:x=>x.productId,isMealDoneV41:()=>false,
+  mealComposerGuestsV4119:()=>2,
   units:['pièce','paquet','g'],state:{settings:{people:2}},
   preferredIngredientUnit:()=> 'pièce',ingredientStore:()=> 'carrefour',
   selectOptions:()=>'<option>pièce</option>',quantity:(n,u)=>n+' '+u,
@@ -75,7 +76,7 @@ test('Le compositeur affiche ses quatre sources et le repas courant',()=>{
  assert.match(app,/function mealComposerSelectedV4118\(/);
  assert.match(app,/chosen\?mealComposerSelectedV4118\(index,meal\)/);
  assert.match(app,/const modes=\['recipes','leftovers','frozen','products'\]/);
- assert.match(app,/data-action="v4118-details"/);
+ assert.match(app,/data-action="v4119-finish"/);
  assert.match(app,/data-action="save-dish-portions"/);
  assert.match(css,/\.v4118-current-meal/);
 });

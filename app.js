@@ -1916,8 +1916,9 @@ function menuGenerationSignature(w){
   const r=recipeById(d.recipeId);
   return [d.recipeId,d.people,r?.people||null,w.v41MealActions?.[index+':'+d.recipeId]?.status||null,
    (r?.ingredients||[]).map(i=>[i.ingredientId,i.name,i.qty,i.unit,i.productId])]
- }).concat(mealProductsV412(meal).map(x=>['product',x.productId,x.ingredientId,x.qty,x.unit,
-  w.v41MealActions?.[index+':product:'+mealProductRefV4118(x)]?.status||null]))))
+ }).concat(mealProductsV412(meal).map(x=>x.ingredientId?
+  ['ingredient',x.ingredientId,x.productId,x.qty,x.unit,w.v41MealActions?.[index+':product:'+mealProductRefV4118(x)]?.status||null]:
+  ['product',x.productId,x.qty,x.unit,w.v41MealActions?.[index+':product:'+x.productId]?.status||null]))))
 }
 function hasCookedMeals(w){return (w.meals||[]).some(m=>mealDishes(m).length>0||mealProductsV412(m).length>0)}
 function coursesStatus(w=getWeek()){
@@ -1948,6 +1949,37 @@ function weekSwitcher(){
  '<button class="icon-btn" aria-label="Semaine suivante" data-action="week-next">›</button></div>'+
  (currentWeek!==currentMenuWeekV411(new Date())?'<div class="week-v33-return"><button class="week-v33-return-btn" data-action="week-current">↩ Revenir à la semaine actuelle</button></div>':'')
 }
+// V41.18 : previsualiser les ecarts des menus sans modifier les achats.
+function menuShoppingChangesV4118(w){
+ const previous=Array.isArray(w.generatedIngredients)?w.generatedIngredients:[],current=collectRecipeIngredients(w);
+ const aggregate=lines=>{
+  const map=new Map();
+  for(const item of lines){
+   const [amount,unit]=converted(item.qty,item.unit);
+   if(!Number.isFinite(amount)||amount<=0)continue;
+   const key=(item.ingredientId?'i:'+item.ingredientId:item.productId?'p:'+item.productId:'n:'+norm(item.name))+'|'+unit;
+   const row=map.get(key)||{name:item.name,qty:0,unit,ingredientId:item.ingredientId,productId:item.productId};
+   row.qty+=amount;map.set(key,row);
+  }
+  return map;
+ };
+ const old=aggregate(previous),next=aggregate(current),changes=[];
+ for(const key of new Set([...old.keys(),...next.keys()])){
+  const a=old.get(key),b=next.get(key),delta=Math.round(((b?.qty||0)-(a?.qty||0))*1000)/1000;
+  if(Math.abs(delta)<0.0005)continue;
+  const row=b||a,ingredient=ingredientById(row.ingredientId),product=productById(row.productId||ingredient?.productId);
+  const store=ingredient?ingredientStore(ingredient):(product?.store||'carrefour');
+  changes.push({name:row.name,delta,unit:row.unit,store});
+ }
+ return changes.sort((a,b)=>a.store.localeCompare(b.store)||a.name.localeCompare(b.name,'fr'));
+}
+function menuChangedSlotsV4118(w){
+ try{
+  const before=JSON.parse(w.generatedSignature),after=JSON.parse(menuGenerationSignature(w));
+  if(!Array.isArray(before)||!Array.isArray(after))return null;
+  return after.filter((x,i)=>JSON.stringify(x)!==JSON.stringify(before[i])).length;
+ }catch(_){return null}
+}
 function courseGenerationBanner(w=getWeek(),where='courses'){
  const status=coursesStatus(w),hasMenus=hasCookedMeals(w);
  let title='',description='',button='';
@@ -1957,9 +1989,16 @@ function courseGenerationBanner(w=getWeek(),where='courses'){
   button=hasMenus?'<button class="btn wide" data-action="generate-week-courses">🛒 Générer les courses de cette semaine</button>':
    '<button class="btn secondary wide" data-action="go-menus">🍽️ Préparer mes menus</button>'
  }else if(status==='outdated'){
-  title='Les menus ont été modifiés';
-  description='La liste déjà générée est conservée telle quelle. Actualise-la seulement quand tu le souhaites ; ton stock et tes ajouts manuels resteront enregistrés.';
-  button='<button class="btn secondary wide" data-action="generate-week-courses">↻ Actualiser les courses de cette semaine</button>'
+  const count=menuChangedSlotsV4118(w),deltas=menuShoppingChangesV4118(w);
+  title=count?'🛒 '+count+' repas modifié'+(count>1?'s':'')+' depuis tes dernières courses':'🛒 Tes menus ont changé';
+  description='La liste précédente reste intacte tant que tu ne confirmes pas. Les achats déjà enregistrés, tes ajouts manuels et ton stock sont conservés.';
+  if(deltas.length){
+   description+='<div class="v4118-course-preview"><strong>Évolution des besoins des menus (avant déduction du stock)</strong>'+
+    deltas.slice(0,6).map(x=>'<div><span>'+html(x.delta>0?'＋':'−')+' '+html(quantity(Math.abs(x.delta),x.unit))+
+     ' · '+html(x.name)+'</span><small>'+html(x.store==='grandfrais'?'Grand Frais':'Carrefour')+'</small></div>').join('')+
+    (deltas.length>6?'<small>Et '+(deltas.length-6)+' autre(s) changement(s)</small>':'')+'</div>';
+  }else description+=' Les besoins en produits restent identiques.';
+  button='<button class="btn wide" data-action="generate-week-courses">↻ Mettre à jour ma liste</button>'
  }else{
   title=w.coursesManuallyCleared?'Courses vidées ou ajustées pour cette semaine':'Liste de courses générée pour cette semaine';
   description=w.coursesManuallyCleared?'Tu peux régénérer les ingrédients des recettes quand tu le souhaites. Les menus et les fiches produits sont conservés.':'Les quantités des recettes sont enregistrées. Tu peux modifier tes menus sans changer cette liste tant que tu ne la régénères pas.';

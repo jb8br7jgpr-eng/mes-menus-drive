@@ -2946,13 +2946,14 @@ function mealPickerBodyV4121(index,kind){
    '<div class="v4117-composer-list" id="v412ProductResults" data-index="'+index+'">'+mealProductPickerResultsV412(index)+'</div>';
  }else{
   body='<p class="v4121-help">'+(kind==='side'?
-    'Choisis une recette ou un produit pour accompagner ton plat.':'Choisis ton plat. Les portions correspondent aux personnes à table.')+
-   '</p><div class="meal-picker-filters"><div class="field"><label for="mealRecipeSearch">Rechercher un plat</label>'+
-   '<input id="mealRecipeSearch" type="search" placeholder="Ex. poulet…" autocomplete="off"></div>'+
-   '<div class="field"><label for="mealRecipeType">Catégorie</label><select id="mealRecipeType">'+
-   '<option value="all">Toutes</option>'+recipeTypes.map(t=>'<option value="'+html(t)+'">'+html(t)+'</option>').join('')+
-   (state.recipes.some(r=>normalRecipeType(r.category)==='legacy')?'<option value="legacy">Autres (anciens)</option>':'')+
-   '</select></div></div><div id="mealRecipeCount" class="meal-picker-count">'+state.recipes.length+' plats</div>'+
+    'Une recette ou un produit de ton catalogue : tu choisis la quantité après.':'Les portions sont automatiquement proposées selon les personnes à table.')+
+   '</p><div class="meal-picker-filters"><div class="field"><label for="mealRecipeSearch">'+
+   (kind==='side'?'Rechercher un accompagnement':'Rechercher un plat')+'</label>'+
+   '<input id="mealRecipeSearch" type="search" placeholder="'+(kind==='side'?'Ex. riz, tomates, salade…':'Ex. poulet…')+'" autocomplete="off"></div>'+
+   (kind==='side'?'':'<div class="field"><label for="mealRecipeType">Catégorie</label><select id="mealRecipeType">'+
+    '<option value="all">Toutes</option>'+recipeTypes.map(t=>'<option value="'+html(t)+'">'+html(t)+'</option>').join('')+
+    (state.recipes.some(r=>normalRecipeType(r.category)==='legacy')?'<option value="legacy">Autres (anciens)</option>':'')+
+    '</select></div>')+'</div><div id="mealRecipeCount" class="meal-picker-count">'+state.recipes.length+' plats</div>'+
    '<div class="v4117-composer-list">'+(kind==='side'?'<div class="v4121-list-label">🥗 Recettes</div>':'')+
    '<div id="mealRecipeResults" data-index="'+index+'">'+mealRecipePickerResults(index)+'</div>'+
    (kind==='side'?'<div class="v4121-list-label">🥬 Produits existants</div>'+
@@ -3168,7 +3169,8 @@ function editMealProductV412(index,id,kind='daily'){
   '. Speedrive calculera les achats selon le stock et le conditionnement connu.</p>'+
   '<button class="btn wide" data-action="v412-save-meal-product" data-index="'+index+'" data-kind="'+(ingredient?'ingredient':'daily')+
   '" data-id="'+html(id)+'">✓ '+(existing?'Mettre à jour':'Ajouter au repas')+'</button>'+
-  '<button class="btn secondary wide" data-action="v4116-open-picker" data-kind="products" data-index="'+index+'">← Retour aux produits</button>');
+  '<button class="btn secondary wide" data-action="v4116-open-picker" data-kind="'+(typeof mealProductReturnKindV4121!=='undefined'&&mealProductReturnKindV4121==='side'?'side':'products')+
+  '" data-index="'+index+'">← Retour '+(typeof mealProductReturnKindV4121!=='undefined'&&mealProductReturnKindV4121==='side'?'aux accompagnements':'aux produits')+'</button>');
 }
 function extraSearchItems(term=''){
  const needle=norm(term),linked=new Set((state.ingredientCatalog||[]).map(i=>i.productId).filter(Boolean));
@@ -4324,7 +4326,7 @@ document.addEventListener('click',e=>{
     ...(servings>0?{servings}:{})});
    const before=weekBeforeUndo();
    if(!setMealProductsV412(w,index,next)){toast('Impossible d’ajouter ce produit à ce repas.');return}
-   persist();render(true);openMealPickerV4116(index,'products');
+   persist();render(true);openMealPickerV4116(index,mealProductReturnKindV4121);
    toastWeekUndo('Produit enregistré pour le repas.',before,index)
   }
   else if(mode==='v412-remove-meal-product'){

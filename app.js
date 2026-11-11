@@ -2686,7 +2686,7 @@ function mealComposerSelectedV4118(index,meal){
   rows.push('<div class="v4118-meal-line"><div class="grow"><strong>🍱 '+html(name)+'</strong>'+
    '<small>'+left.people+' portion'+(left.people>1?'s':'')+' de restes · sans courses</small></div>'+
    '<button class="btn tiny ghost" data-action="remove-leftover" data-index="'+index+'" data-leftover="'+n+'">Retirer</button></div>');
- }));
+ });
  frozen.forEach(part=>{
   const name=state.stockV41?.freezer?.[part.lotId]?.name||recipeById(part.recipeId)?.name||'Plat congelé';
   rows.push('<div class="v4118-meal-line"><div class="grow"><strong>❄️ '+html(name)+'</strong>'+

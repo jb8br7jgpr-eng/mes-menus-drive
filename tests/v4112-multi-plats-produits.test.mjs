@@ -120,7 +120,7 @@ test('V41.12 : reprise de semaine et stock restent compatibles avec les nouveaux
 });
 
 test('V41.12 : boutons et validations produits accessibles dans les menus et le stock',()=>{
- assert.match(src,/data-action="v412-pick-product"/);
+ assert.match(src,/data-action="v4116-open-picker" data-kind="products"/);
  assert.match(src,/data-action="v412-save-meal-product"/);
  assert.match(src,/data-action="v412-remove-meal-product"/);
  assert.match(src,/data-action="v412-save-guests"/);

@@ -66,7 +66,8 @@ test('Les restes indiquent le stock disponible et conservent le placement manuel
  assert.match(source,/v36-leftovers-summary/);
  assert.match(source,/v36-leftover-pill/);
  assert.match(source,/availableLeftoverSources\(getWeek\(\),index\)/);
- assert.match(source,/data-action="choose-leftovers"/);
+ assert.match(source,/data-kind="leftovers"/,'les restes restent accessibles dans le compositeur');
+ assert.match(source,/data-action="apply-leftovers"/,'le placement manuel reste possible');
  assert.match(source,/return Math\.min\(prepared,atTable\)/);
 });
 

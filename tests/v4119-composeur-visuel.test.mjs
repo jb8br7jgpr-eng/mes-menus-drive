@@ -108,8 +108,8 @@ test('calendrier → composeur visuel et etats speciaux accessibles',()=>{
  assert.match(app,/v4119-main-product-field/);
  assert.match(css,/\.v4119-portion\.is-filled/);
  assert.match(css,/\.v4119-footer/);
- assert.match(index,/41-20-flow/);
- assert.match(worker,/41-20-flow/);
+ assert.match(index,/41-21-unified/);
+ assert.match(worker,/41-21-unified/);
  assert.doesNotThrow(()=>new Function(app),'syntaxe app.js valide');
 });
 test('les cases visuelles correspondent aux convives et restent lisibles',()=>{

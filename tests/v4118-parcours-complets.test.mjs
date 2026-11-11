@@ -72,10 +72,10 @@ test('Les quantites proposees pour un produit a la piece sont celles des convive
  assert.match(body,/Conditionnement : 4 pièce/);
  assert.match(body,/Quantité prévue pour le repas/);
 });
-test('Le compositeur affiche ses quatre sources et le repas courant',()=>{
+test('Le composeur affiche ses cinq sources sans doublon',()=>{
  assert.match(app,/function mealComposerSelectedV4118\(/);
  assert.match(app,/mealComposerVisualV4119\(index,meal\)/);
- assert.match(app,/const modes=\['recipes','leftovers','frozen','products'\]/);
+ assert.match(app,/const modes=\['recipes','side','leftovers','frozen','products'\]/);
  assert.match(app,/data-action="v4119-finish"/);
  assert.match(app,/data-action="save-dish-portions"/);
  assert.match(css,/\.v4119-card/);
@@ -97,8 +97,8 @@ test('Un seul acces pour enregistrer les achats et cache Safari actualise',()=>{
  assert.match(courses,/data-action="v4116-finish-courses"/);
  assert.doesNotMatch(courses,/data-action="v41-courses-done"/);
  assert.match(app,/Coche uniquement les produits réellement achetés/);
- assert.match(index,/app\.js\?v=20261111-41-20-flow/);
- assert.match(sw,/menus-drive-v41-20-flow-20261111/);
+ assert.match(index,/app\.js\?v=20261111-41-21-unified/);
+ assert.match(sw,/menus-drive-v41-21-unified-20261111/);
  assert.match(stockUI,/ingredient\?\.name\|\|p\?\.name/);
  assert.match(stockActions,/resolveStockArticleV41\(item,ctx\.state\.ingredientCatalog,ctx\.state\.products\)/);
 });

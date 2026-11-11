@@ -3949,7 +3949,7 @@ document.addEventListener('click',e=>{
    else if(mode==='v4119-finish'){
    closeModal();renderMealContext(index)
   }
-  else if(mode==='v4119-guests-step'){  else if(mode==='v4119-guests-step'){
+  else if(mode==='v4119-guests-step'){
    if(isMealDoneV41(w,index))return;
    const delta=Number(a.dataset.delta),people=mealComposerGuestsV4119(index,w.meals[index]),next=people+delta;
    if(![-1,1].includes(delta)||next<1||next>30)return;

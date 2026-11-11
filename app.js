@@ -1916,8 +1916,8 @@ function menuGenerationSignature(w){
   const r=recipeById(d.recipeId);
   return [d.recipeId,d.people,r?.people||null,w.v41MealActions?.[index+':'+d.recipeId]?.status||null,
    (r?.ingredients||[]).map(i=>[i.ingredientId,i.name,i.qty,i.unit,i.productId])]
- }).concat(mealProductsV412(meal).map(x=>['product',x.productId,x.qty,x.unit,
-  w.v41MealActions?.[index+':product:'+x.productId]?.status||null]))))
+ }).concat(mealProductsV412(meal).map(x=>['product',x.productId,x.ingredientId,x.qty,x.unit,
+  w.v41MealActions?.[index+':product:'+mealProductRefV4118(x)]?.status||null]))))
 }
 function hasCookedMeals(w){return (w.meals||[]).some(m=>mealDishes(m).length>0||mealProductsV412(m).length>0)}
 function coursesStatus(w=getWeek()){
@@ -2816,23 +2816,28 @@ function pickMeal(index){
  showModal(menuMealLabelV411(index),out)
 }
 function mealProductPickerResultsV412(index,term=''){
- const already=new Set(mealProductsV412(getWeek().meals[index]).map(x=>x.productId));
- const seenIds=new Set(),seenNames=new Set();
- const products=unifiedCatalogueSourceV4114().map(x=>{
-  const p=x.type==='daily'?x.item:productById(x.item.productId);
-  return p?{...p,displayName:x.name}:null
- }).filter(p=>{
-  if(!p||already.has(p.id)||seenIds.has(p.id))return false;
-  const key=recipeMatchKeyV4116(p.displayName);
-  if(!key||seenNames.has(key))return false;
-  seenIds.add(p.id);seenNames.add(key);return true;
- }).filter(p=>!norm(term)||norm(p.displayName).includes(norm(term))||norm(p.name).includes(norm(term)))
-  .sort((a,b)=>a.displayName.localeCompare(b.displayName,'fr',{sensitivity:'base'}));
- return products.length?products.map(p=>'<button class="picker-item" data-action="v412-select-product" data-index="'+index+
-  '" data-id="'+html(p.id)+'"><span class="emoji">🛒</span><span class="grow"><strong>'+html(p.displayName)+
-  '</strong><small>'+html(p.store==='grandfrais'?'Grand Frais':'Carrefour')+
-  ' · '+html(p.unit||'pièce')+'</small></span><span class="end">＋</span></button>').join(''):
-  '<div class="meal-picker-empty">Aucun produit actuel disponible avec cette recherche.</div>';
+ const already=new Set(mealProductsV412(getWeek().meals[index]).map(x=>x.productId?'product:'+x.productId:'ingredient:'+x.ingredientId));
+ const seen=new Set();
+ // Meme source que Produits : les ingredients sans fiche commerciale restent presents.
+ const choices=unifiedCatalogueSourceV4114().map(entry=>{
+  const ingredient=entry.type==='ingredient'?entry.item:null;
+  const product=ingredient?productById(ingredient.productId):entry.item;
+  const physical=product?'product:'+product.id:'ingredient:'+ingredient?.id;
+  return {...entry,ingredient,product,physical};
+ }).filter(entry=>{
+  if(!entry.physical||already.has(entry.physical)||seen.has(entry.physical))return false;
+  seen.add(entry.physical);return true
+ }).filter(entry=>!norm(term)||norm([entry.name,entry.product?.brand,entry.product?.packaging].filter(Boolean).join(' ')).includes(norm(term)))
+  .sort((a,b)=>a.name.localeCompare(b.name,'fr',{sensitivity:'base'}));
+ return choices.length?choices.map(entry=>
+  '<button class="picker-item" data-action="v412-select-product" data-index="'+index+'" data-kind="'+entry.type+
+  '" data-id="'+html(entry.id)+'"><span class="emoji">'+(entry.store==='grandfrais'?'🥬':'🛒')+'</span>'+
+  '<span class="grow"><strong>'+html(entry.name)+'</strong><small>'+
+  html(entry.store==='grandfrais'?'Grand Frais':'Carrefour')+' · '+
+  html([entry.product?.brand,entry.product?.packaging].filter(Boolean).join(' · ')||
+   (entry.ingredient?.unit||entry.product?.unit||'pièce'))+
+  '</small></span><span class="end">＋</span></button>').join(''):
+  '<div class="meal-picker-empty">Aucun autre produit existant avec cette recherche.</div>';
 }
 function openMealProductPickerV412(index){
  if(!Number.isInteger(index)||index<0||index>13||isMealDoneV41(getWeek(),index))return;
@@ -2844,19 +2849,29 @@ function openMealProductPickerV412(index){
   '<div class="recipe-picker meal-picker-scroll" id="v412ProductResults" data-index="'+index+'">'+
   mealProductPickerResultsV412(index)+'</div>');
 }
-function editMealProductV412(index,productId){
- const p=productById(productId),existing=mealProductsV412(getWeek().meals[index]).find(x=>x.productId===productId);
- if(!p||isMealDoneV41(getWeek(),index))return;
- const preferred=existing?.unit||(p.packUnit==='pièce'?'pièce':(units.includes(p.unit)?p.unit:'pièce'));
- const qty=existing?.qty||(preferred==='pièce'?2:1);
- showModal((existing?'Modifier':'Ajouter')+' · '+p.name,
-  '<p class="helper">Indique la quantité réellement prévue pour ce repas. Par exemple, 2 pièces de cordons-bleus.</p>'+
-  '<div class="field"><label for="v412ProductQty">Quantité consommée</label>'+
-  '<input id="v412ProductQty" type="number" min="0.01" max="100000" step="any" value="'+qty+'"></div>'+
-  '<div class="field"><label for="v412ProductUnit">Unité</label><select id="v412ProductUnit">'+
+function editMealProductV412(index,id,kind='daily'){
+ const ingredient=kind==='ingredient'?ingredientById(id):null;
+ const product=ingredient?productById(ingredient.productId):productById(id);
+ if((!ingredient&&!product)||isMealDoneV41(getWeek(),index))return;
+ const identity=ingredient?'ingredient:'+ingredient.id:String(product.id);
+ const existing=mealProductsV412(getWeek().meals[index]).find(x=>mealProductRefV4118(x)===identity);
+ const proposed=ingredient?preferredIngredientUnit(ingredient):
+  product.packUnit==='pièce'?'pièce':product.unit;
+ const preferred=existing?.unit||(units.includes(proposed)?proposed:'pièce');
+ const qty=existing?.qty??(preferred==='pièce'?Math.max(1,Math.min(30,Number(state.settings?.people)||2)):
+  ingredient&&Number(ingredient.qty)>0?Number(ingredient.qty):1);
+ const name=ingredient?.name||product.name,store=ingredient?ingredientStore(ingredient):(product?.store||'carrefour');
+ showModal((existing?'Modifier':'Ajouter')+' · '+html(name),
+  '<p class="helper">Quantité consommée au repas, et non nombre de paquets à acheter.</p>'+
+  '<div class="field"><label for="v412ProductQty">Quantité prévue pour le repas</label>'+
+  '<input id="v412ProductQty" type="number" inputmode="decimal" min="0.01" max="100000" step="any" value="'+qty+'"></div>'+
+  '<div class="field"><label for="v412ProductUnit">Unité consommée</label><select id="v412ProductUnit">'+
    selectOptions(units,preferred)+'</select></div>'+
-  '<p class="helper">La liste de courses tient compte du conditionnement indiqué dans la fiche Produit. Le stock sera retiré une seule fois après « C’est mangé ».</p>'+
-  '<button class="btn wide" data-action="v412-save-meal-product" data-index="'+index+'" data-id="'+html(productId)+'">✓ Enregistrer dans le repas</button>'+
+  '<p class="helper">'+html(store==='grandfrais'?'🥬 Grand Frais':'🛒 Carrefour')+
+  (product?.packAmount>0?' · Conditionnement : '+html(quantity(product.packAmount,product.packUnit)):'')+
+  '. Speedrive calculera les achats selon le stock et le conditionnement connu.</p>'+
+  '<button class="btn wide" data-action="v412-save-meal-product" data-index="'+index+'" data-kind="'+(ingredient?'ingredient':'daily')+
+  '" data-id="'+html(id)+'">✓ Ajouter au repas</button>'+
   '<button class="btn secondary wide" data-action="v4116-open-picker" data-kind="products" data-index="'+index+'">← Retour aux produits</button>');
 }
 function extraSearchItems(term=''){
@@ -3811,7 +3826,7 @@ document.addEventListener('click',e=>{
   }
   else if(mode==='choose-recipe'){if(isMealDoneV41(w,index)){toast('Ce repas a déjà été validé.');return}const portions=peopleInput(id);if(portions===null){toast('Choisis entre 1 et 30 portions.');return}if(!addRecipeToMeal(w,index,id,portions)){toast('Ce plat est déjà présent dans ce repas. Modifie plutôt ses portions.');return}persist();render(true);openMealPickerV4116(index,'recipes')}
   else if(mode==='v412-pick-product')openMealProductPickerV412(index);
-  else if(mode==='v412-select-product'||mode==='v412-edit-meal-product')editMealProductV412(index,id);
+  else if(mode==='v412-select-product'||mode==='v412-edit-meal-product')editMealProductV412(index,id,a.dataset.kind||'daily');
   else if(mode==='v412-save-meal-product'){
    if(isMealDoneV41(w,index)){toast('Annule la validation du repas avant de le modifier.');return}
    const qty=Number($('#v412ProductQty')?.value),unit=$('#v412ProductUnit')?.value;

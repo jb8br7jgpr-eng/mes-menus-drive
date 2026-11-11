@@ -87,7 +87,7 @@ let v34CloudRuntime = null;
 let saveQueue=Promise.resolve(),saveError=false;
 // V41.20 : gestes instantanés dans le composeur, sauvegarde au départ ou à l'ajout.
 let mealComposerDraftV4120=null;
-let mealRecipeRoleV4120='main';
+let mealRecipeRoleV4120='main',mealProductReturnKindV4121='products';
 function mealDraftV4120(index,create=false){
  if(mealComposerDraftV4120&&(mealComposerDraftV4120.week!==currentWeek||mealComposerDraftV4120.index!==index)){
   if(create)persist();
@@ -2690,6 +2690,8 @@ function refreshMealRecipePicker(){
  const index=Number(results.dataset.index),term=$('#mealRecipeSearch')?.value||'',type=$('#mealRecipeType')?.value||'all';
  if(!Number.isInteger(index)||index<0||index>13)return;
  results.innerHTML=mealRecipePickerResults(index,term,type);
+ const sideResults=$('#v4121SideProductResults');
+ if(sideResults)sideResults.innerHTML=mealProductPickerResultsV412(index,term);
  const used=new Set(mealDishes(getWeek().meals[index]).map(d=>d.recipeId));
  const n=state.recipes.filter(r=>!used.has(r.id)&&norm(r.name).includes(norm(term))&&(type==='all'||normalRecipeType(r.category)===type)).length;
  if(count)count.textContent=n+' plat'+(n>1?'s':'')+' disponible'+(n>1?'s':'')
@@ -4070,7 +4072,7 @@ document.addEventListener('click',e=>{
    toastWeekUndo('Repas prêt à être composé.',before,index)
   }
   else if(mode==='v4118-details')pickMeal(index);
-  else if(mode==='v4116-open-picker')openMealPickerV4116(index,a.dataset.kind||'recipes');
+  else if(mode==='v4116-open-picker')switchMealComposerSourceV4121(index,a.dataset.kind||'recipes');
   else if(mode==='v4117-add-frozen'){
    if(isMealDoneV41(w,index)){toast('Annule la validation du repas avant de le modifier.');return}
    const qty=Number($('#v4117FrozenPortions')?.value);
@@ -4297,10 +4299,14 @@ document.addEventListener('click',e=>{
    if(role==='side'&&w.meals[index]){
     w.meals[index].sideRecipeIds=[...new Set([...(w.meals[index].sideRecipeIds||[]),id])];
    }
-   persist();render(true);openMealPickerV4116(index,'recipes')
+   persist();render(true);openMealPickerV4116(index,role==='side'?'side':'recipes')
   }
   else if(mode==='v412-pick-product')openMealProductPickerV412(index);
-  else if(mode==='v412-select-product'||mode==='v412-edit-meal-product')editMealProductV412(index,id,a.dataset.kind||'daily');
+  else if(mode==='v412-select-product'||mode==='v412-edit-meal-product'){
+   mealProductReturnKindV4121=mode==='v412-select-product'&&a.closest('.v4119-composer')?.dataset.v4119Kind==='side'?
+    'side':'products';
+   editMealProductV412(index,id,a.dataset.kind||'daily');
+  }
   else if(mode==='v412-save-meal-product'){
    if(isMealDoneV41(w,index)){toast('Annule la validation du repas avant de le modifier.');return}
    const qty=Number($('#v412ProductQty')?.value),unit=$('#v412ProductUnit')?.value;

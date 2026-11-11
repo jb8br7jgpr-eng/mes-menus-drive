@@ -3830,11 +3830,13 @@ document.addEventListener('click',e=>{
   else if(mode==='v412-save-meal-product'){
    if(isMealDoneV41(w,index)){toast('Annule la validation du repas avant de le modifier.');return}
    const qty=Number($('#v412ProductQty')?.value),unit=$('#v412ProductUnit')?.value;
-   if(!productById(id)||!Number.isFinite(qty)||qty<=0||qty>100000||!units.includes(unit)){
+   const ingredient=a.dataset.kind==='ingredient'?ingredientById(id):null,product=ingredient?productById(ingredient.productId):productById(id);
+   if((!ingredient&&!product)||!Number.isFinite(qty)||qty<=0||qty>100000||!units.includes(unit)){
     toast('Vérifie la quantité et l’unité du produit.');return
    }
-   const previous=mealProductsV412(w.meals[index]),next=previous.filter(x=>x.productId!==id);
-   next.push({productId:id,qty,unit});
+   const ref=ingredient?'ingredient:'+ingredient.id:String(product.id);
+   const previous=mealProductsV412(w.meals[index]),next=previous.filter(x=>mealProductRefV4118(x)!==ref);
+   next.push({ingredientId:ingredient?.id||null,productId:product?.id||null,qty,unit});
    const before=weekBeforeUndo();
    if(!setMealProductsV412(w,index,next)){toast('Impossible d’ajouter ce produit à ce repas.');return}
    persist();render(true);openMealPickerV4116(index,'products');
@@ -3842,7 +3844,7 @@ document.addEventListener('click',e=>{
   }
   else if(mode==='v412-remove-meal-product'){
    if(isMealDoneV41(w,index)){toast('Annule la validation avant de retirer le produit.');return}
-   const before=weekBeforeUndo(),remaining=mealProductsV412(w.meals[index]).filter(x=>x.productId!==id);
+   const before=weekBeforeUndo(),remaining=mealProductsV412(w.meals[index]).filter(x=>mealProductRefV4118(x)!==id);
    if(!setMealProductsV412(w,index,remaining))return;
    persist();closeModal();renderMealContext(index);
    toastWeekUndo('Produit retiré du repas.',before,index)

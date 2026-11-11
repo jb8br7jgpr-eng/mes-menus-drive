@@ -3031,7 +3031,7 @@ function editMealProductV412(index,id,kind='daily'){
   Number(product.packAmount)>0&&units.includes(product.packUnit)?product.packUnit:product.unit;
  const preferred=existing?.unit||(units.includes(proposed)?proposed:'pièce');
  // Proposer une quantite alimentaire coherente, pas 1 gramme ou 1 millilitre.
- const people=Math.max(1,Math.min(30,Number(state.settings?.people)||2));
+ const people=mealComposerGuestsV4119(index,getWeek().meals[index]);
  const fromRecipe=(state.recipes||[]).flatMap(r=>(r.ingredients||[])
   .filter(line=>line.unit===preferred&&
    (ingredient?line.ingredientId===ingredient.id:(product&&line.productId===product.id)))
@@ -3048,11 +3048,14 @@ function editMealProductV412(index,id,kind='daily'){
   '<input id="v412ProductQty" type="number" inputmode="decimal" min="0.01" max="100000" step="any" value="'+qty+'"></div>'+
   '<div class="field"><label for="v412ProductUnit">Unité consommée</label><select id="v412ProductUnit">'+
    selectOptions(units,preferred)+'</select></div>'+
+  '<div class="field v4119-main-product-field"><label for="v4119ProductServings">Portions principales couvertes par ce produit</label>'+
+  '<input id="v4119ProductServings" type="number" inputmode="numeric" min="0" max="30" step="1" value="'+(existing?.servings||0)+'">'+
+  '<small>0 = accompagnement. Renseigne 1 à 30 seulement si ce produit sert de plat principal ; sa quantité consommée reste indépendante.</small></div>'+
   '<p class="helper">'+html(store==='grandfrais'?'🥬 Grand Frais':'🛒 Carrefour')+
   (product?.packAmount>0?' · Conditionnement : '+html(quantity(product.packAmount,product.packUnit)):'')+
   '. Speedrive calculera les achats selon le stock et le conditionnement connu.</p>'+
   '<button class="btn wide" data-action="v412-save-meal-product" data-index="'+index+'" data-kind="'+(ingredient?'ingredient':'daily')+
-  '" data-id="'+html(id)+'">✓ Ajouter au repas</button>'+
+  '" data-id="'+html(id)+'">✓ '+(existing?'Mettre à jour':'Ajouter au repas')+'</button>'+
   '<button class="btn secondary wide" data-action="v4116-open-picker" data-kind="products" data-index="'+index+'">← Retour aux produits</button>');
 }
 function extraSearchItems(term=''){

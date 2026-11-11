@@ -1631,7 +1631,12 @@ function recipeSuggestionsV4116(value){
  if(search.length<2)return [];
  // N'utiliser que la source unique de l'onglet Produits, jamais les deux catalogues bruts.
  const seen=new Set();
- const list=unifiedCatalogueSourceV4114().map(x=>({kind:x.type,item:x.item}))
+ const source=typeof unifiedCatalogueSourceV4114==='function'?unifiedCatalogueSourceV4114():[
+  ...(state.ingredientCatalog||[]).map(item=>({type:'ingredient',item})),
+  ...(state.products||[]).filter(p=>!(state.ingredientCatalog||[]).some(i=>i.productId===p.id&&!p.showInCatalogue))
+   .map(item=>({type:'daily',item}))
+ ];
+ const list=source.map(x=>({kind:x.type,item:x.item}))
   .filter(x=>{const key=recipeMatchKeyV4116(x.item.name);if(!key||seen.has(key))return false;seen.add(key);return true});
  const words=key.split(' ').filter(Boolean);
  return list.map(x=>{

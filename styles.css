@@ -1485,3 +1485,42 @@
  .v4120-role-options button{font-size:11px}
  .v4119-quantity span small{max-width:120px}
 }
+
+/* V41.21 — un seul sélecteur pour composer, liste juste sous les boutons. */
+.v4121-add-area{display:grid;gap:10px;min-width:0}
+.v4121-add-area .v4119-add-heading{margin:2px 0 0}
+.modal.v4116-menu-modal .v4121-source-nav{
+ display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:6px;
+ position:static!important;margin:0;padding:0;background:transparent;
+ scroll-margin-top:75px;
+}
+.v4121-source-nav .v4117-composer-tab{
+ grid-column:span 2;min-height:49px;min-width:0;
+ border-radius:12px;display:flex;align-items:center;justify-content:center;
+ text-align:center;padding:8px 5px;font-size:11px;
+}
+.v4121-source-nav .v4117-composer-tab:nth-child(n+4){grid-column:span 3}
+.v4121-source-nav .v4117-composer-tab.active{
+ background:#dcebdc;border-color:#80ab85;color:#275738;box-shadow:inset 0 0 0 1px #94c09c;
+}
+.v4121-picker-panel{
+ background:#fff;border:1px solid #dce9dc;border-radius:14px;
+ padding:12px 10px;min-width:0;display:grid;gap:9px;
+}
+.v4121-picker-panel .v4117-composer-list{margin:0;display:grid;gap:7px}
+.v4121-picker-panel .picker-item{min-height:55px}
+.v4121-picker-panel .meal-picker-filters{margin:0}
+.v4121-picker-panel .meal-picker-count{margin:0}
+.v4121-picker-panel .field{margin:0}
+.v4121-help{margin:0;color:#5e7463;font-size:12px;line-height:1.5}
+.v4121-list-label{font-size:12px;font-weight:800;color:#376549;margin:9px 1px 2px}
+.v4121-list-label:first-child{margin-top:0}
+.v4121-special-choices{border-top:1px solid #dfe9dd;padding:10px 2px 0;margin-top:2px}
+.v4121-special-choices summary{cursor:pointer;color:#55725a;font-size:12px;font-weight:750}
+.v4121-special-choices .v41171-choices{border:0;margin:6px 0 0;padding:8px 0 0}
+.v4121-special-choices .v41171-choices-actions{gap:7px}
+.v4121-special-choices .v41171-choices-actions button{min-width:0}
+@media(max-width:390px){
+ .v4121-source-nav .v4117-composer-tab{font-size:10px;padding:7px 3px;min-height:48px}
+ .v4121-picker-panel{padding:10px 8px}
+}

@@ -1608,6 +1608,45 @@ function ingredientSimilar(name){
  };
  return (state.ingredientCatalog||[]).filter(i=>{const o=norm(i.name);return o!==n&&(stem(o)===stem(n)||(n.length>=5&&o.length>=5&&distance(n,o)<=(Math.min(n.length,o.length)>=9?2:1)))}).slice(0,4)
 }
+
+function recipeMatchKeyV4116(value){
+ const ignored=new Set(['de','du','des','la','le','les','un','une','produit','produits','article','articles']);
+ return norm(value).normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,' ')
+ .split(/\s+/).filter(w=>w&&!ignored.has(w)).sort().join(' ')
+}
+function recipeSuggestionsV4116(value){
+ const search=norm(value),key=recipeMatchKeyV4116(value);
+ if(search.length<2)return [];
+ const list=[...(state.ingredientCatalog||[]).map(item=>({kind:'ingredient',item})),
+  ...(state.products||[]).map(item=>({kind:'daily',item}))];
+ const words=key.split(' ').filter(Boolean);
+ return list.map(x=>{
+  const name=norm(x.item.name),other=recipeMatchKeyV4116(name),otherWords=other.split(' ');
+  const shared=words.filter(w=>otherWords.some(y=>y===w||(w.length>3&&y.startsWith(w)))).length;
+  const score=name===search?100:other&&other===key?95:name.startsWith(search)?85:name.includes(search)?80:
+   shared>=2?60+shared*4:words.length===1&&shared===1?45:0;
+  return {...x,score};
+ }).filter(x=>x.score>0).sort((a,b)=>b.score-a.score||a.item.name.localeCompare(b.item.name,'fr')).slice(0,8)
+}
+function applyRecipeSuggestionV4116(row,kind,id){
+ const obj=kind==='ingredient'?ingredientById(id):kind==='daily'?productById(id):null;
+ if(!row||!obj)return false;
+ row.dataset.refKind=kind;row.dataset.refId=obj.id;
+ row.querySelector('.ingredient-name').value=obj.name;
+ const unit=row.querySelector('.ingredient-unit');
+ if(unit)unit.value=kind==='ingredient'?preferredIngredientUnit(obj):
+  (Number(obj.packAmount)>0&&units.includes(obj.packUnit)?obj.packUnit:units.includes(obj.unit)?obj.unit:'pièce');
+ const store=row.querySelector('.ingredient-store');
+ if(store)store.value=kind==='ingredient'?ingredientStore(obj):obj.store||'carrefour';
+ row.dataset.unitSelected='true';refreshIngredientEntry(row);return true
+}
+function recipeDailyOptionsV4116(query=''){
+ const search=norm(query);
+ return (state.products||[]).filter(p=>!search||norm(p.name).includes(search))
+  .sort((a,b)=>a.name.localeCompare(b.name,'fr')).slice(0,40)
+  .map(p=>'<button type="button" class="ingredient-suggestion" data-action="v4116-pick-daily" data-id="'+html(p.id)+'">🧻 '+html(p.name)+'</button>').join('')
+  ||'<p class="helper">Aucun produit trouvé.</p>'
+}
 function preferredIngredientUnit(ing){
  if(!ing)return 'g';const counts=new Map();
  state.recipes.forEach(r=>(r.ingredients||[]).forEach(x=>{if(x.ingredientId===ing.id||norm(x.name)===norm(ing.name))counts.set(x.unit,(counts.get(x.unit)||0)+1)}));
@@ -1618,12 +1657,23 @@ function frequentIngredients(){
  return [...counts].sort((a,b)=>b[1]-a[1]).slice(0,6).map(([id])=>ingredientById(id)).filter(Boolean)
 }
 function refreshIngredientEntry(row){
- if(!row)return;const inp=row.querySelector('.ingredient-name'),ing=ingredientByName(inp?.value||'');
+ if(!row)return;
+ const input=row.querySelector('.ingredient-name'),name=input?.value||'';
+ let selected=row.dataset.refKind==='ingredient'?ingredientById(row.dataset.refId):
+  row.dataset.refKind==='daily'?productById(row.dataset.refId):null;
+ if(selected&&norm(selected.name)!==norm(name)){delete row.dataset.refId;delete row.dataset.refKind;selected=null}
+ const daily=row.dataset.refKind==='daily'?selected:null;
+ const ing=row.dataset.refKind==='ingredient'?selected:ingredientByName(name);
  const store=row.querySelector('.ingredient-store'),unit=row.querySelector('.ingredient-unit'),hint=row.querySelector('.ingredient-suggestions');
- if(store){store.disabled=Boolean(ing);if(ing)store.value=ingredientStore(ing)}
+ if(store){store.disabled=Boolean(ing||daily);if(ing)store.value=ingredientStore(ing);if(daily)store.value=daily.store||'carrefour'}
  if(ing&&unit&&!row.dataset.unitSelected)unit.value=preferredIngredientUnit(ing);
- const note=row.querySelector('.ingredient-link-note');if(note){const p=ing?productById(ing.productId):null;note.textContent=ing?(p&&ingredientStore(ing)==='carrefour'?'✓ Produit lié : '+p.name:'✓ Fiche existante · magasin défini dans Produits'):'Nouvel ingrédient créé dans Produits à l’enregistrement.'}
- if(hint){const sim=ing?[]:ingredientSimilar(inp?.value);hint.innerHTML=sim.map(i=>'<button type="button" class="ingredient-suggestion" data-action="reuse-ingredient" data-id="'+html(i.id)+'">✓ Utiliser '+html(i.name)+'</button>').join('')}
+ const note=row.querySelector('.ingredient-link-note');
+ if(note)note.textContent=daily?'✓ Produit du quotidien existant réutilisé.':
+  ing?'✓ Ingrédient existant réutilisé.':'Vérifie les fiches proposées avant la création.';
+ if(hint)hint.innerHTML=recipeSuggestionsV4116(name)
+  .filter(x=>!selected||x.item.id!==selected.id||x.kind!==row.dataset.refKind)
+  .map(x=>'<button type="button" class="ingredient-suggestion" data-action="v4116-reuse-recipe-item" data-kind="'+x.kind+'" data-id="'+html(x.item.id)+'">'+
+  (x.kind==='daily'?'🧻 Produit':'🥕 Ingrédient')+' : '+html(x.item.name)+(x.score>=95?' · correspondance':'')+'</button>').join('')
 }
 
 function ingredientDefaultStore(name,productId){
@@ -1664,6 +1714,7 @@ function normalizeIngredientCatalog(){
  if(distinct.size!==state.ingredientCatalog.length){state.ingredientCatalog=[...distinct.values()];changed=true}
  for(const recipe of state.recipes){
   for(const line of (recipe.ingredients||[])){
+   if(line.sourceKind==='daily')continue;
    let ing=ingredientById(line.ingredientId);
    if(!ing)ing=ingredientByName(line.name);
    if(!ing){
@@ -1766,6 +1817,7 @@ function frequentCatalogueItems(){
 }
 
 function canonicalIngredient(line){
+ if(line?.sourceKind==='daily'&&line?.productId)return null;
  return ingredientById(line?.ingredientId)||ingredientByName(line?.name)
 }
 function mergeIngredientInRecipe(line,store){
@@ -1958,7 +2010,11 @@ function shopping(){
 // Retire uniquement les achats de ce magasin pour la semaine affichée.
  // Les lignes générées sont suivies individuellement, même si plusieurs recettes
  // ou ajouts manuels ont été regroupés sur une seule ligne de courses.
- function clearWeekShopping(w,store,items){
+ function purchaseItemCountV4116(items){
+ return (items||[]).reduce((n,x)=>n+
+ (Number.isInteger(Number(x.qty))&&Number(x.qty)>0&&['pièce','paquet','boîte','rouleau','bouteille','pot','sachet'].includes(x.unit)?Number(x.qty):1),0)
+}
+function clearWeekShopping(w,store,items){
   if(!['carrefour','grandfrais','all'].includes(store))return 0;
   const selected=items.filter(x=>store==='all'||x.store===store);
   if(!selected.length)return 0;
@@ -2115,15 +2171,17 @@ function renderCourses(){
  const order=['Fruits et légumes','Viandes et poissons','Produits frais','Épicerie et divers','Hygiène et maison'];
  let out=pageHeading('Achats de la semaine','Mes courses','À acheter : tes articles prévus. Coche « Acheté » seulement une fois l’achat effectué. Pour enlever un article sans l’acheter, utilise « Modifier » puis « Retirer ».');
  out+=weekSwitcher()+courseGenerationBanner(w,'courses');
- const progressTotal=active.length+checked.length,progressPct=progressTotal?Math.round(checked.length/progressTotal*100):0;
+ const progressTotal=purchaseItemCountV4116([...active,...checked]),progressBought=purchaseItemCountV4116(checked),
+ progressPct=progressTotal?Math.round(progressBought/progressTotal*100):0;
  out+='<div class="course-v33-progress" role="group" aria-label="Progression des courses"><div class="course-v33-progress-head"><strong>Avancement des courses</strong><span>'+
-  checked.length+' / '+progressTotal+' acheté'+(checked.length>1?'s':'')+'</span></div>'+
-  '<div class="course-v33-progress-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="'+progressPct+'" aria-valuetext="'+checked.length+' articles sur '+progressTotal+'" aria-label="Articles achetés"><span style="width:'+progressPct+'%"></span></div>'+
+  progressBought+' / '+progressTotal+' acheté'+(checked.length>1?'s':'')+'</span></div>'+
+  '<div class="course-v33-progress-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="'+progressPct+'" aria-valuetext="'+progressBought+' articles sur '+progressTotal+'" aria-label="Articles achetés"><span style="width:'+progressPct+'%"></span></div>'+
   '<p>'+(progressTotal===0?'Aucun article à acheter pour le moment.':progressPct===100?'✓ Tous les achats prévus sont achetés.':
-   active.length+' article'+(active.length>1?'s':'')+' restant'+(active.length>1?'s':'')+' à acheter.')+'</p></div>';
- out+='<button class="btn wide v41-courses-faites" data-action="v41-courses-done" '+(!checked.length?'disabled':'')+'>✓ Courses faites · Enregistrer les achats au stock</button>';
- out+='<div class="course-summary"><div class="course-shop-count carrefour"><strong>'+carrefour.length+'</strong><span>🛒 Carrefour Drive</span></div>'+
- '<div class="course-shop-count grand"><strong>'+grand.length+'</strong><span>🥬 Grand Frais</span></div></div>';
+   purchaseItemCountV4116(active)+' articles à acheter.')+'</p></div>';
+ out+='<button class="btn wide v41-courses-faites" data-action="v4116-finish-courses" '+(!active.length&&!checked.length?'disabled':'')+'>✓ Terminer mes courses · Ajouter au stock</button>'+
+ (checked.length?'<button class="btn secondary wide" data-action="v41-courses-done">Enregistrer uniquement les articles cochés</button>':'');
+ out+='<div class="course-summary"><div class="course-shop-count carrefour"><strong>'+purchaseItemCountV4116(carrefour)+'</strong><span>🛒 Carrefour Drive</span></div>'+
+ '<div class="course-shop-count grand"><strong>'+purchaseItemCountV4116(grand)+'</strong><span>🥬 Grand Frais</span></div></div>';
  out+='<button class="btn wide course-add-btn v37-bulk-main" data-action="v37-open-bulk">☑ Ajouter plusieurs articles aux courses</button>'+ '<p class="helper v37-bulk-intro">Tous tes ingrédients et achats du quotidien · quantités réglables · ajout en une fois.</p>';
  const favorites=frequentCatalogueItems();
  if(favorites.length){
@@ -2134,7 +2192,7 @@ function renderCourses(){
  function section(store,title,icon,rows){
   const isDrive=store==='carrefour',storeCount=items.filter(x=>x.store===store).length;
   let section='<button class="btn tiny secondary wide course-store-clear" data-action="clear-store-courses" data-store="'+store+'" '+(!storeCount?'disabled':'')+'>🗑️ Vider les courses '+title+'</button>'+ 
-   '<section class="course-store '+(isDrive?'drive':'fresh')+'"><div class="course-store-head"><div><div class="eyebrow">À acheter</div><h2>'+icon+' '+title+'</h2></div><span class="pill">'+rows.length+' article'+(rows.length===1?'':'s')+'</span></div>';
+   '<section class="course-store '+(isDrive?'drive':'fresh')+'"><div class="course-store-head"><div><div class="eyebrow">À acheter</div><h2>'+icon+' '+title+'</h2></div><span class="pill">'+purchaseItemCountV4116(rows)+' articles · '+rows.length+' références</span></div>';
   section+='<button class="btn '+(isDrive?'secondary':'')+' wide" data-action="'+(isDrive?'go-drive':'copy-grand-frais')+'" '+(!rows.length?'disabled':'')+'>'+
    (isDrive?'🛒 Préparer mon panier Carrefour':'📋 Copier Grand Frais dans Notes')+'</button>';
   if(rows.length){
@@ -2274,9 +2332,9 @@ function renderDrive(){
  let out=pageHeading('Carrefour École-Valentin','Mon Drive','Vérifie les références puis prépare ton panier Carrefour.');
  out+=weekSwitcher()+courseGenerationBanner(getWeek(),'drive');
  out+='<div class="drive-v29-summary"><div class="drive-v29-head"><div><small>Préparation du panier</small>'+
-  '<h2>🛒 Carrefour Drive</h2></div><span class="pill">'+items.length+' article'+(items.length!==1?'s':'')+'</span></div>'+
-  '<div class="drive-v29-stats"><div class="drive-stat-ready"><strong>'+ready.length+'</strong><span>✓ Prêts</span></div>'+
-  '<div class="'+(missing.length?'drive-stat-missing':'drive-stat-clear')+'"><strong>'+missing.length+'</strong><span>À compléter</span></div></div>'+
+  '<h2>🛒 Carrefour Drive</h2></div><span class="pill">'+purchaseItemCountV4116(items)+' articles · '+items.length+' références</span></div>'+
+  '<div class="drive-v29-stats"><div class="drive-stat-ready"><strong>'+purchaseItemCountV4116(ready)+'</strong><span>✓ Prêts</span></div>'+
+  '<div class="'+(missing.length?'drive-stat-missing':'drive-stat-clear')+'"><strong>'+purchaseItemCountV4116(missing)+'</strong><span>À compléter</span></div></div>'+
   '<p class="helper">Drive choisi : Carrefour Besançon-Valentin · à vérifier sur Carrefour.fr. Le transfert n’effectue jamais de paiement.</p>'+
   '<button class="btn wide drive-v29-primary" data-action="open-drive-in-safari" '+(!url?'disabled':'')+'>🛒 Constituer mon panier Carrefour</button>'+
   (items.length&&!url?'<p class="helper">Le transfert direct nécessite au moins une référence prête et une liste compatible avec Safari.</p>':'')+
@@ -2290,7 +2348,7 @@ function renderDrive(){
  }else if(transfers.length){
   out+='<p class="drive-v29-complete">✓ Toutes les références sélectionnées sont prêtes pour la vérification Carrefour.</p>'
  }
- out+='<details class="drive-v29-details" data-ux-key="articles"><summary>Voir mes '+items.length+' article'+(items.length!==1?'s':'')+' Carrefour</summary>'+
+ out+='<details class="drive-v29-details" data-ux-key="articles"><summary>Voir mes '+purchaseItemCountV4116(items)+' articles · '+items.length+' références Carrefour</summary>'+
   '<div class="drive-v29-details-body">'+
   (items.length?items.map(x=>'<div class="drive-v29-item"><span>'+html(x.name)+'</span><strong>'+html(quantity(x.qty,x.unit))+'</strong></div>').join(''):
    '<p class="helper">Aucun article prévu chez Carrefour pour cette semaine.</p>')+
@@ -2303,15 +2361,32 @@ function renderDrive(){
  out+='<p class="helper drive-v29-footer">La liste des courses reste dans Courses. Ici, seules les références Carrefour prêtes sont transmises à Safari via Userscripts. Vérifie le magasin et le panier avant de poursuivre.</p>';
  return out
 }
+let modalPageLockV4116=null;
 function showModal(title,body,autoFocus=true){
  if(!uxModalPositionV4115)uxModalPositionV4115={tab:currentTab,scrollY:window.scrollY};
+ if(!modalPageLockV4116){
+  const bodyStyle=document.body.style;
+  modalPageLockV4116={y:window.scrollY,position:bodyStyle.position,top:bodyStyle.top,
+   width:bodyStyle.width,overflow:bodyStyle.overflow};
+  bodyStyle.position='fixed';bodyStyle.top='-'+modalPageLockV4116.y+'px';
+  bodyStyle.width='100%';bodyStyle.overflow='hidden';
+ }
  modalRoot.innerHTML='<div class="modal-overlay" data-overlay="true"><div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle"><div class="modal-head"><h2 id="modalTitle">'+title+'</h2><button class="close-btn" aria-label="Fermer" data-action="close-modal">×</button></div>'+body+'</div></div>';
  // Le clavier iOS ne doit jamais s'ouvrir tout seul ; focus de navigation sans défilement.
  // Une recherche peut toujours activer son champ lorsque l'utilisatrice le demande.
+ if(currentTab==='menus')modalRoot.querySelector('.modal')?.classList.add('v4116-menu-modal');
  const first=modalRoot.querySelector('.close-btn');
  if(first)first.focus({preventScroll:true})
 }
 function closeModal(){
+ const modalLock=typeof modalPageLockV4116==='undefined'?null:modalPageLockV4116;
+ if(modalLock){
+  const b=document.body.style;
+  b.position=modalLock.position;b.top=modalLock.top;
+  b.width=modalLock.width;b.overflow=modalLock.overflow;
+  modalPageLockV4116=null;
+  window.scrollTo({top:modalLock.y,behavior:'instant'});
+ }
  const anchored=catalogueModalScrollV413,position=uxModalPositionV4115;
  uxModalPositionV4115=null;
  modalRoot.innerHTML='';pendingIngredientLinkId=null;pendingCarrefourDailyIdV413=null;
@@ -2324,20 +2399,21 @@ function closeModal(){
 }
 function selectOptions(values,value){return values.map(x=>'<option value="'+html(x)+'" '+(x===value?'selected':'')+'>'+html(x)+'</option>').join('')}
 function ingredientRow(item={name:'',qty:'',unit:'g'}){
- const ing=canonicalIngredient(item);
- const store=ing?ingredientStore(ing):(item.store==='grandfrais'?'grandfrais':ingredientDefaultStore(item.name,item.productId));
- const linked=ing?productById(ing.productId):productById(item.productId);
- return '<div class="ingredient-line">'+
- '<div class="ingredient-edit-row"><input class="ingredient-name" list="ingredientNames" placeholder="Ingrédient de la base" aria-label="Nom de l’ingrédient" value="'+html(ing?.name||item.name)+'">'+
- '<input class="ingredient-qty" type="number" min=".01" step="any" placeholder="Qté" aria-label="Quantité dans cette recette" value="'+html(item.qty)+'">'+
+ const daily=item.sourceKind==='daily'&&item.productId?productById(item.productId):null;
+ const ing=daily?null:canonicalIngredient(item),selected=daily||ing;
+ const store=daily?(daily.store||'carrefour'):ing?ingredientStore(ing):
+  (item.store==='grandfrais'?'grandfrais':ingredientDefaultStore(item.name,item.productId));
+ return '<div class="ingredient-line" data-ref-kind="'+(daily?'daily':ing?'ingredient':'')+'" data-ref-id="'+html(selected?.id||'')+'">'+
+ '<div class="ingredient-edit-row"><input class="ingredient-name" list="ingredientNames" placeholder="Ingrédient ou produit existant" aria-label="Ingrédient de la recette" value="'+html(selected?.name||item.name)+'">'+
+ '<input class="ingredient-qty" type="number" min=".01" step="any" placeholder="Qté" aria-label="Quantité" value="'+html(item.qty)+'">'+
  '<select class="ingredient-unit" aria-label="Unité">'+selectOptions(units,item.unit)+'</select>'+
- '<button type="button" class="icon-btn" aria-label="Retirer cet ingrédient" data-action="remove-ingredient">×</button></div><div class="ingredient-suggestions"></div>'+
- '<div class="ingredient-store-row"><label>Ajouter dans Produits :</label><select class="ingredient-store" aria-label="Magasin habituel de cet ingrédient" '+(ing?'disabled':'')+'>'+
+ '<button type="button" class="icon-btn" aria-label="Retirer cet élément" data-action="remove-ingredient">×</button></div>'+
+ '<div class="ingredient-suggestions"></div>'+
+ '<div class="ingredient-store-row"><label>Magasin habituel :</label><select class="ingredient-store" aria-label="Magasin" '+(selected?'disabled':'')+'>'+
  '<option value="carrefour" '+(store==='carrefour'?'selected':'')+'>🛒 Carrefour</option>'+
  '<option value="grandfrais" '+(store==='grandfrais'?'selected':'')+'>🥬 Grand Frais</option></select></div>'+
- '<p class="ingredient-link-note">'+(store==='grandfrais'?'Grand Frais : aucune fiche produit nécessaire.':
-  linked?'Produit Carrefour : '+html(linked.name)+(linked.packAmount?' · '+html(quantity(linked.packAmount,linked.packUnit))+'/paquet':' · contenu du paquet à préciser'):
-  'Aucun produit Carrefour lié : tu pourras l’associer dans la base.')+'</p></div>'
+ '<p class="ingredient-link-note">'+(daily?'✓ Produit du quotidien existant · aucune nouvelle fiche':
+ ing?'✓ Ingrédient existant réutilisé':'Choisis une suggestion existante pour éviter les doublons.')+'</p></div>'
 }
 // V41.7 — réutiliser les ingrédients d'un autre plat sans lien ni sauvegarde.
 function recipeImportResultsV417(query='',editorId=null){
@@ -2374,7 +2450,7 @@ async function importRecipeIngredientsV417(id,button){
   if($('#recipeForm')!==form||!$('#ingredientRows'))return;
   const imported=prepareRecipeImportV417(source,portions,{scale:Boolean($('#v417ScaleToPortions')?.checked)})
    .map(line=>{
-    const ing=ingredientById(line.ingredientId)||ingredientByName(line.name);
+    const ing=line.sourceKind==='daily'?null:(ingredientById(line.ingredientId)||ingredientByName(line.name));
     return {...line,name:ing?.name||line.name,
      store:ing?ingredientStore(ing):line.store||ingredientDefaultStore(line.name,line.productId)};
    });
@@ -2383,7 +2459,9 @@ async function importRecipeIngredientsV417(id,button){
    return {name,qty:row.querySelector('.ingredient-qty')?.value||'',
     unit:row.querySelector('.ingredient-unit')?.value||'g',
     store:row.querySelector('.ingredient-store')?.value||'carrefour',
-    ingredientId:ingredientByName(name)?.id||null};
+    ingredientId:row.dataset.refKind==='ingredient'?row.dataset.refId||null:ingredientByName(name)?.id||null,
+    productId:row.dataset.refKind==='daily'?row.dataset.refId||null:null,
+    sourceKind:row.dataset.refKind==='daily'?'daily':null};
   });
   const plan=mergeRecipeIngredientsV417(current,imported);
   // Le changement ne concerne que l'éditeur. Ni persist(), ni menus,
@@ -2423,12 +2501,15 @@ function recipeEditor(id,draft=null){
  '<div id="v417ImportResults" class="v417-import-options">'+recipeImportResultsV417('',old?.id||'')+'</div>'+
  '<p id="v417ImportFeedback" class="v417-import-feedback" aria-live="polite"></p>'+
  '</div></div>'+
- '<div class="note ingredient-auto-note">✓ Chaque ingrédient sera automatiquement enregistré dans <strong>Produits → Carrefour ou Grand Frais</strong> lorsque tu enregistreras le plat. Si son nom existe déjà, sa fiche sera réutilisée, sans doublon.</div>'+
+ '<div class="note ingredient-auto-note">✓ Réutilise un ingrédient ou un produit du quotidien existant. Une nouvelle fiche n’est créée que si aucun élément correspondant n’existe.</div>'+
  '<datalist id="ingredientNames">'+(state.ingredientCatalog||[]).slice().sort((a,b)=>a.name.localeCompare(b.name,'fr')).map(x=>'<option value="'+html(x.name)+'"></option>').join('')+'</datalist>'+
  '<div class="ingredient-favorites"><span class="helper">Ingrédients fréquents :</span>'+
  frequentIngredients().map(i=>'<button type="button" class="ingredient-favorite" data-action="favorite-ingredient" data-id="'+html(i.id)+'">＋ '+html(i.name)+'</button>').join('')+'</div>'+
  '<div id="ingredientRows">'+ingredients.map(ingredientRow).join('')+'</div>'+
- '<button id="addIngredientBottom" type="button" class="btn secondary wide ingredient-add-bottom" data-action="add-ingredient">＋ Ajouter un ingrédient</button>'+
+ '<button id="addIngredientBottom" type="button" class="btn secondary wide ingredient-add-bottom" data-action="add-ingredient">＋ Ajouter un ingrédient</button>'+ 
+ '<details class="v4116-recipe-daily"><summary>🧻 Ajouter un produit du quotidien à la recette</summary>'+
+ '<input id="v4116DailySearch" type="search" placeholder="Rechercher dans mes produits…">'+
+ '<div id="v4116DailyResults">'+recipeDailyOptionsV4116('')+'</div></details>'+
  '<div class="divider"></div><button class="btn wide" type="submit">✓ Enregistrer le plat</button></form>';
  if(old)body+='<button class="btn danger wide" style="margin-top:10px" data-action="delete-recipe" data-id="'+old.id+'">Supprimer ce plat</button>';
  showModal(title,body)
@@ -2550,10 +2631,34 @@ function quickMealActionsV413(index,meal){
  }
  return out.length?'<div class="v413-meal-quick"><strong>Actions du repas</strong><div class="v413-meal-quick-buttons">'+out.join('')+'</div></div>':'';
 }
+function openMealPickerV4116(index,kind='recipes'){
+ if(!Number.isInteger(index)||index<0||index>13||isMealDoneV41(getWeek(),index))return;
+ if(kind==='products'){openMealProductPickerV412(index);return}
+ const tabs='<div class="v4116-menu-tabs">'+
+ ['recipes','frozen','products'].map((t,i)=>'<button class="v4116-menu-tab '+(kind===t?'active':'')+'" data-action="v4116-open-picker" data-kind="'+t+'" data-index="'+index+'">'+['🍽️ Mes plats','❄️ Congélateur','🛒 Produits'][i]+'</button>').join('')+'</div>';
+ let content='';
+ if(kind==='frozen'){
+  const lots=Object.values(state.stockV41?.freezer||{}).map(l=>({...l,
+   remaining:stockModulesV41?.week.remainingFreezerPortionsV41(state.stockV41,state.weeks,l.lotId,{weekId:currentWeek,index})||0})).filter(l=>l.remaining>0);
+  content='<p class="helper">Ces portions seront réservées sans courses supplémentaires.</p>'+
+   '<div class="field"><label for="v41FrozenMealPortions">Portions à utiliser</label><input id="v41FrozenMealPortions" type="number" min="1" max="30" value="'+Math.min(2,Math.max(1,...lots.map(l=>l.remaining)))+'"></div>'+
+   (lots.length?lots.map(l=>'<button class="picker-item" data-action="v41-replace-frozen" data-index="'+index+'" data-id="'+html(l.lotId)+'">'+
+    '<span class="emoji">❄️</span><span class="grow"><strong>'+html(l.name)+'</strong><small>'+l.remaining+' portions disponibles</small></span><span class="end">＋</span></button>').join(''):
+    '<div class="meal-picker-empty">Aucun plat disponible. Ajoute des portions depuis Stock → Congélateur.</div>');
+ }else content='<div class="field"><label for="mealPeople">Portions à préparer (facultatif)</label><input type="number" id="mealPeople" min="1" max="30" placeholder="Portions habituelles"></div>'+
+   '<div class="meal-picker-filters"><div class="field"><label for="mealRecipeSearch">Rechercher</label><input id="mealRecipeSearch" type="search" placeholder="Ex. poulet, salade…" autocomplete="off"></div>'+
+   '<div class="field"><label for="mealRecipeType">Catégorie</label><select id="mealRecipeType"><option value="all">Toutes</option>'+
+   recipeTypes.map(t=>'<option value="'+html(t)+'">'+html(t)+'</option>').join('')+
+   (state.recipes.some(r=>normalRecipeType(r.category)==='legacy')?'<option value="legacy">Autres (anciens)</option>':'')+'</select></div></div>'+
+   '<div id="mealRecipeCount" class="meal-picker-count">'+state.recipes.length+' plats</div>'+
+   '<div class="recipe-picker meal-picker-scroll"><div id="mealRecipeResults" data-index="'+index+'">'+mealRecipePickerResults(index)+'</div></div>';
+ showModal(menuMealLabelV411(index)+' · Choisir',tabs+content);
+}
 function pickMeal(index){
  const meal=getWeek().meals[index],dishes=mealDishes(meal),leftovers=mealLeftovers(meal),products=mealProductsV412(meal);
  const title=menuMealLabelV411(index);
  const validated=isMealDoneV41(getWeek(),index);
+ if(!meal&&!validated){openMealPickerV4116(index,'recipes');return}
  const summary=meal?.type==='frozen'?'❄️ Plat du congélateur':meal?.type==='ordered'?'🍕 Repas libre / commandé':meal?.type==='no-meal'?'🍽️ Pas de repas · sortie, restaurant ou invitation':
   dishes.map(d=>html(recipeById(d.recipeId)?.name||'Plat'))
    .concat(products.map(x=>html(productById(x.productId)?.name||'Produit')))
@@ -2566,7 +2671,9 @@ function pickMeal(index){
   return
  }
  let out='<div class="v413-meal-top">'+
-  '<button class="btn secondary" data-action="v41-replace-meal" data-index="'+index+'">↔ '+(meal?'Remplacer':'Choisir un repas')+'</button>'+
+  '<button class="btn secondary" data-action="v4116-open-picker" data-kind="recipes" data-index="'+index+'">＋ Choisir un plat</button>'+ 
+ '<button class="btn secondary" data-action="v4116-open-picker" data-kind="frozen" data-index="'+index+'">❄️ Congélateur</button>'+
+  '<button class="btn secondary" data-action="v41-replace-meal" data-index="'+index+'">↔ Autres possibilités</button>'+
   (meal?'<button class="btn secondary" data-action="remove-meal" data-index="'+index+'">Vider le repas</button>':'')+'</div>'+quick+
   (meal?.type==='no-meal'?'':'<button type="button" class="btn secondary wide v411-no-meal-button" data-action="mark-no-meal" data-index="'+index+'">🍽️ Pas de repas <small>Restaurant, invitation, sortie…</small></button>');
  if(meal?.type==='frozen'||meal?.type==='ordered'||meal?.type==='no-meal'){
@@ -2607,29 +2714,12 @@ function pickMeal(index){
     '" data-id="'+html(x.productId)+'">Retirer</button></div></div>';
   });
  }
- out+='<div class="field"><label for="mealPeople">'+(dishes.length?'Portions à préparer pour le plat supplémentaire':'Combien de portions veux-tu préparer ?')+'</label>'+
- '<input type="number" id="mealPeople" min="1" max="30" value="" placeholder="Auto : portions de base">'+
- '<div class="helper">Par défaut, Speedrive utilise les portions de base du plat : 1 ou 2 portions = aucun reste. Saisis 4 pour préparer davantage et prévoir des restes.</div></div>';
- out+='<div class="section-head"><h3>'+ (dishes.length?'Ajouter un autre plat':'Choisir un plat')+'</h3></div>';
- out+='<div class="meal-picker-filters">'+
- '<div class="field"><label for="mealRecipeSearch">Rechercher un plat</label>'+
- '<input id="mealRecipeSearch" type="search" placeholder="Ex. poulet, salade…" autocomplete="off"></div>'+
- '<div class="field"><label for="mealRecipeType">Type de plat</label>'+
- '<select id="mealRecipeType" aria-label="Filtrer les plats proposés par type">'+
- '<option value="all">Tous les types</option>'+recipeTypes.map(t=>'<option value="'+html(t)+'">'+html(t)+'</option>').join('')+
- (state.recipes.some(r=>normalRecipeType(r.category)==='legacy')?'<option value="legacy">Autres (anciens plats)</option>':'')+
- '</select></div></div>';
- out+='<div id="mealRecipeCount" class="meal-picker-count">'+
- Math.max(0,state.recipes.length-dishes.length)+' plat(s) disponibles</div>';
  const availableRestes=availableLeftoverSources(getWeek(),index).reduce((n,x)=>n+x.available,0);
-  out+='<div class="recipe-picker meal-picker-scroll">'+
- '<button class="picker-item" data-action="choose-leftovers" data-index="'+index+'"><span class="emoji">🍱</span>'+
- '<span class="grow"><strong>🍱 '+(availableRestes?availableRestes+' portion'+(availableRestes>1?'s':'')+' de restes disponible'+(availableRestes>1?'s':''):'Placer des restes ici')+'</strong><small>'+(availableRestes?'Touche pour choisir un plat et placer ses restes':'Choisis leur plat d’origine et les portions disponibles')+'</small></span>'+
- '<span class="end">＋</span></button>'+
- '<div id="mealRecipeResults" data-index="'+index+'">'+mealRecipePickerResults(index)+'</div></div>';
- if(!state.recipes.length)out+='<div class="note" style="margin-top:10px">Ajoute d’abord tes plats au catalogue, puis retrouve-les ici.</div>';
- out+='<button class="btn secondary wide v412-add-product" data-action="v412-pick-product" data-index="'+index+
-  '">＋ Ajouter un produit du catalogue à ce repas</button>';
+ out+='<div class="v4116-meal-choices">'+
+  '<button class="btn wide" data-action="v4116-open-picker" data-kind="recipes" data-index="'+index+'">🍽️ Ajouter un plat de mes recettes</button>'+
+  '<button class="btn secondary wide" data-action="v4116-open-picker" data-kind="frozen" data-index="'+index+'">❄️ Choisir dans mon congélateur</button>'+
+  '<button class="btn secondary wide" data-action="v412-pick-product" data-index="'+index+'">🛒 Ajouter un produit du catalogue</button>'+
+  '<button class="btn secondary wide" data-action="choose-leftovers" data-index="'+index+'">🍱 Placer des restes'+(availableRestes?' · '+availableRestes+' portions':'')+'</button></div>';
  if(meal)out+='<div class="meal-transfer-actions">'+
  '<button class="btn secondary" data-action="move-copy-meal" data-mode="copy" data-index="'+index+'" '+(!dishes.length&&!products.length?'disabled':'')+'>⧉ Copier</button>'+
  '<button class="btn secondary" data-action="move-copy-meal" data-mode="move" data-index="'+index+'">↔ Déplacer</button></div>';
@@ -3160,39 +3250,47 @@ async function saveRecipe(e){
  const form=e.target,name=$('#recipeName').value.trim(),people=Number($('#recipePeople').value),category=$('#recipeCategory').value;
  const rows=[...$('#ingredientRows').children].map(row=>({
   name:$('.ingredient-name',row).value.trim(),qty:Number($('.ingredient-qty',row).value),
-  unit:$('.ingredient-unit',row).value,store:$('.ingredient-store',row).value
+  unit:$('.ingredient-unit',row).value,store:$('.ingredient-store',row).value,
+  refKind:row.dataset.refKind||'',refId:row.dataset.refId||'',el:row
  }));
  if(!name||!Number.isFinite(people)||people<1||people>30){toast('Vérifie le nom et le nombre de portions.');return}
  if(!rows.length||rows.some(x=>!x.name||!Number.isFinite(x.qty)||x.qty<=0||!units.includes(x.unit)||!['carrefour','grandfrais'].includes(x.store))){
   toast('Chaque ingrédient doit avoir un nom, une quantité et un magasin.');return
  }
  for(const x of rows){
-  if(ingredientByName(x.name))continue;
-  const sim=ingredientSimilar(x.name);
-  if(sim.length&&!confirm('« '+sim[0].name+' » existe déjà. Créer quand même « '+x.name+' » ? Appuie sur Annuler pour réutiliser la fiche existante.')){
-   toast('Réutilise la fiche proposée pour éviter le doublon.');return
+  const selected=x.refKind==='ingredient'?ingredientById(x.refId):x.refKind==='daily'?productById(x.refId):null;
+  if(selected&&norm(selected.name)!==norm(x.name)){toast('La référence choisie a changé. Sélectionne à nouveau '+x.name+'.');return}
+  if(selected||ingredientByName(x.name))continue;
+  const suggestion=recipeSuggestionsV4116(x.name);
+  if(suggestion.some(v=>v.score>=95)){
+   refreshIngredientEntry(x.el);x.el.querySelector('.ingredient-name')?.focus({preventScroll:true});
+   toast('Fiche existante très proche : sélectionne « '+suggestion[0].item.name+' » avant de continuer.');
+   return
+  }
+  if(suggestion.length&&!confirm('Des fiches similaires existent, dont « '+suggestion[0].item.name+' ». Créer un ingrédient distinct « '+x.name+' » ?')){
+   refreshIngredientEntry(x.el);return
   }
  }
  const old=recipeById(form.dataset.id);let image=old?.image||pendingRecipeDraftImage||'';
  try{if($('#recipePhoto').files[0])image=await compressImage($('#recipePhoto').files[0])}catch(err){toast(err.message);return}
- // Ne modifier la base que lorsque toute la recette est validée.
  const ingredients=[],unique=new Map();
  for(const x of rows){
-  let ing=ingredientByName(x.name);
-  if(!ing)ing=makeIngredient(x.name,x.store,null);
-  // La fiche partagée reste maître du magasin : aucune recette ne le change.
-  if(!ing)return;
-  const row={ingredientId:ing.id,name:ing.name,qty:x.qty,unit:x.unit,productId:ing.productId||null};
-  const key=ing.id+'|'+converted(x.qty,x.unit)[1];
+  const direct=x.refKind==='daily'?productById(x.refId):null;
+  if(x.refKind==='daily'&&!direct){toast('Produit du quotidien introuvable : '+x.name);return}
+  let ing=direct?null:(ingredientById(x.refId)||ingredientByName(x.name));
+  if(!direct&&!ing)ing=makeIngredient(x.name,x.store,null);
+  if(!direct&&!ing)return;
+  const line=direct?{sourceKind:'daily',ingredientId:null,productId:direct.id,name:direct.name,qty:x.qty,unit:x.unit}:
+   {ingredientId:ing.id,name:ing.name,qty:x.qty,unit:x.unit,productId:ing.productId||null};
+  const key=(direct?'daily:'+direct.id:'ingredient:'+ing.id)+'|'+converted(x.qty,x.unit)[1];
   const before=unique.get(key);
-  if(before&&before.unit===row.unit){before.qty+=row.qty;continue}
-  // Même ingrédient répété dans une recette : regrouper lorsque les unités coïncident.
-  if(!before)unique.set(key,row);
-  ingredients.push(row)
+  if(before&&before.unit===line.unit){before.qty+=line.qty;continue}
+  if(!before)unique.set(key,line);
+  ingredients.push(line)
  }
  const recipe={id:old?.id||uid(),name,people,category,ingredients,image};
  if(old)state.recipes=state.recipes.map(x=>x.id===old.id?recipe:x);else state.recipes.push(recipe);
- persist();closeModal();pendingRecipeDraftImage='';render(true);toast(old?'Plat modifié !':'Plat ajouté et ingrédients enregistrés !')
+ persist();closeModal();pendingRecipeDraftImage='';render(true);toast(old?'Plat modifié !':'Plat ajouté !')
 }
 function addExtra(e){e.preventDefault();const name=$('#extraName').value.trim(),qty=Number($('#extraQty').value),unit=$('#extraUnit').value;
   if(!name||!Number.isFinite(qty)||qty<=0||!units.includes(unit)){toast('Renseigne un produit et sa quantité.');return}
@@ -3229,6 +3327,8 @@ document.addEventListener('click',e=>{
  if(mode==='v34-audit-local'){void showV34ReadOnlyAudit();return}
  if(mode==='v34-audit-back'){settingsModal();return}
  const index=Number(a.dataset.index),w=getWeek(),id=a.dataset.id;
+ if(mode==='v41-replace-frozen'&&w.meals[index]&&w.meals[index].type!=='frozen'&&
+     !confirm('Remplacer le repas prévu par ce plat du congélateur ?'))return;
  if(mode==='v41-stock-section'){
   stockViewV41=['home','freezer','week'].includes(a.dataset.view)?a.dataset.view:'home';render(true);return
  }
@@ -3329,6 +3429,31 @@ document.addEventListener('click',e=>{
    if(!count)return;
    persist();render(true);toastWeekUndo(count+' article'+(count>1?'s':'')+' retiré'+(count>1?'s':'')+' des courses.',before)
   }
+  else if(mode==='v4116-finish-courses'){
+   const items=shopping().filter(x=>!x.excluded&&!x.covered);
+   if(!items.length){toast('Aucun achat à enregistrer.');return}
+   showModal('✓ Terminer mes courses','<p class="helper">Décoche les produits non achetés. Le stock ne changera qu’après confirmation.</p>'+
+    '<div class="v4116-finish-list">'+items.map(x=>'<label class="v4116-finish-item">'+
+    '<input type="checkbox" data-v4116-bought="'+html(x.id)+'" '+(x.checked?'checked':'')+'>'+ 
+    '<span><strong>'+html(x.name)+'</strong> · '+html(quantity(x.qty,x.unit))+'</span></label>').join('')+'</div>'+
+    '<button class="btn secondary wide" data-action="v4116-select-all-bought">✓ Tout cocher</button>'+ 
+    '<button class="btn wide" data-action="v4116-confirm-courses">✓ Enregistrer les achats au stock</button>');return
+  }
+  else if(mode==='v4116-select-all-bought'){
+   modalRoot.querySelectorAll('[data-v4116-bought]').forEach(el=>{el.checked=true});return
+  }
+  else if(mode==='v4116-confirm-courses'){
+   const selected=new Set([...modalRoot.querySelectorAll('[data-v4116-bought]:checked')].map(x=>x.dataset.v4116Bought));
+   if(!selected.size){toast('Sélectionne au moins un produit.');return}
+   if(!stockModulesV41?.actions){toast('Module de stock indisponible.');return}
+   stockModulesV41.actions.handleStockActionV41({
+    mode:'v41-courses-done',a,id,index,state,currentWeek,uid,units,toast,persist,render,renderMealContext,
+    closeModal,showModal,getWeek,recipeById,mealDishes,mealLeftovers,mealProductsV412,shopping,
+    reconcileLeftovers,clearMealWithPair,selectRecipeForMeal,generateWeekCourses,
+    selectedPurchaseIds:[...selected],freezerReservationsV41:stockModulesV41.week.freezerReservationsV41,
+    openStockBulkV414:()=>openBulkCatalogueV37(false,true),readBulkStockV414
+   });return
+  }
   else if(mode==='generate-week-courses'){
    const w=getWeek(),status=coursesStatus(w);
    if(!hasCookedMeals(w)){toast('Ajoute d’abord un plat aux menus de cette semaine.');return}
@@ -3361,6 +3486,7 @@ document.addEventListener('click',e=>{
    document.querySelector('[data-meal-day="'+day+'"]')?.scrollIntoView({behavior:'smooth',block:'start'});
   }
   else if(mode==='pick-meal')pickMeal(index);
+  else if(mode==='v4116-open-picker')openMealPickerV4116(index,a.dataset.kind||'recipes');
   else if(mode==='mark-no-meal'){
    if(!Number.isInteger(index)||index<0||index>13)return;
    if(isMealDoneV41(w,index)){
@@ -3520,6 +3646,19 @@ document.addEventListener('click',e=>{
   }
   else if(mode==='v417-import-recipe'){void importRecipeIngredientsV417(id,a)}
   else if(mode==='remove-ingredient')a.closest('.ingredient-line')?.remove();
+  else if(mode==='v4116-reuse-recipe-item'){
+   const row=a.closest('.ingredient-line');applyRecipeSuggestionV4116(row,a.dataset.kind,id)
+  }
+  else if(mode==='v4116-pick-daily'){
+   const p=productById(id);if(!p)return;
+   const box=$('#ingredientRows');if(!box)return;
+   const existing=[...box.children].find(row=>row.dataset.refKind==='daily'&&row.dataset.refId===p.id);
+   if(existing){toast('Ce produit figure déjà dans la recette.');return}
+   let row=[...box.children].find(x=>!x.querySelector('.ingredient-name')?.value.trim());
+   if(!row){box.insertAdjacentHTML('beforeend',ingredientRow());row=box.lastElementChild}
+   applyRecipeSuggestionV4116(row,'daily',p.id);
+   row.querySelector('.ingredient-qty')?.focus({preventScroll:true})
+  }
   else if(mode==='reuse-ingredient'){
    const ing=ingredientById(id),row=a.closest('.ingredient-line');if(!ing||!row)return;
    row.querySelector('.ingredient-name').value=ing.name;
@@ -3736,6 +3875,7 @@ document.addEventListener('input',e=>{
    return
   }
   if(e.target.id==='v417ImportSearch'){refreshRecipeImportResultsV417();return}
+  if(e.target.id==='v4116DailySearch'){const el=$('#v4116DailyResults');if(el)el.innerHTML=recipeDailyOptionsV4116(e.target.value);return}
   if(e.target.id==='v413StockPickerSearch'){
    const needle=String(e.target.value||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim().toLocaleLowerCase('fr-FR');
    document.querySelectorAll('#v413StockPickerResults [data-v413-stock-choice]').forEach(row=>{

@@ -20,7 +20,8 @@ export function prepareRecipeImportV417(recipe,targetPortions,{scale=true}={}){
   const qty=rounded(value*factor);
   if(qty<=0||!Number.isFinite(qty))
    throw Error('Quantité trop faible après adaptation des portions.');
-  return {ingredientId:line.ingredientId||null,productId:line.productId||null,
+  return {ingredientId:line.sourceKind==='daily'?null:line.ingredientId||null,productId:line.productId||null,
+   sourceKind:line.sourceKind==='daily'?'daily':null,
    name:String(line.name||'').trim(),qty,unit:line.unit,
    store:line.store||null};
  });

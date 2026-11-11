@@ -26,7 +26,10 @@ export function renderStockV41({state,week,weekId,view='home',recipeById,mealDis
    (!state.stockV41?'<p class="note">Ton nouvel inventaire est vide. Tu peux le remplir manuellement ou examiner la reprise du stock indiqué dans les anciennes courses.</p><button class="btn secondary wide" data-action="v41-preview-migration">Examiner mon ancien stock</button>':'');
   if(!items.length) out+='<div class="v41-empty">🏠 Aucun produit enregistré. Les achats validés pourront remplir ce stock.</div>';
   else out+=search+'<div class="v41-stock-list" id="v41StockResults">'+items.map(x=>row(x.name,(x.category||'Autres')+' · '+(x.store==='grandfrais'?'Grand Frais':'Carrefour / maison'),
-   '<div class="v41-stock-qty">'+q(x.quantity)+' '+escape(x.unit)+'</div><button class="btn tiny secondary" data-action="v41-adjust-stock" data-identity="'+escape(x.identity)+'" data-unit="'+escape(x.unit)+'">Corriger</button>')).join('')+'</div>'
+   '<div class="v4116-stock-stepper"><button class="v4116-step" data-action="v41-stock-quick" data-identity="'+escape(x.identity)+'" data-unit="'+escape(x.unit)+'" data-step="-1" aria-label="Retirer une unité de '+escape(x.name)+'">−</button>'+
+   '<div class="v41-stock-qty">'+q(x.quantity)+' '+escape(x.unit)+'</div>'+
+   '<button class="v4116-step" data-action="v41-stock-quick" data-identity="'+escape(x.identity)+'" data-unit="'+escape(x.unit)+'" data-step="1" aria-label="Ajouter une unité de '+escape(x.name)+'">＋</button></div>'+
+   '<button class="btn tiny secondary" data-action="v41-adjust-stock" data-identity="'+escape(x.identity)+'" data-unit="'+escape(x.unit)+'">Corriger</button>')).join('')+'</div>'
  }else if(view==='freezer'){
   out+='<div class="v41-stock-stat"><strong>'+frozen.reduce((n,x)=>n+x.portions,0)+'</strong><span>portions au congélateur · '+frozen.reduce((n,x)=>n+freePortions(x),0)+' encore libres</span></div>'+
    '<button class="btn wide" data-action="v41-add-frozen">＋ Ajouter un plat déjà congelé</button>';
@@ -35,7 +38,10 @@ export function renderStockV41({state,week,weekId,view='home',recipeById,mealDis
     'Lot de '+(x.preparedAt?new Date(x.preparedAt).toLocaleDateString('fr-FR'):'date non précisée')+
     ' · '+freePortions(x)+' libre'+(freePortions(x)>1?'s':'')+
     (reserved[x.lotId]?' · '+reserved[x.lotId]+' prévue'+(reserved[x.lotId]>1?'s':'')+' dans les menus':''),
-    '<div class="v41-stock-qty">'+x.portions+' portion'+(x.portions>1?'s':'')+'</div><button class="btn tiny secondary" data-action="v41-correct-freezer" data-id="'+escape(x.lotId)+'">Corriger</button>')).join('')+'</div>';
+    '<div class="v4116-stock-stepper"><button class="v4116-step" data-action="v41-freezer-quick" data-id="'+escape(x.lotId)+'" data-step="-1" aria-label="Retirer une portion de '+escape(x.name)+'">−</button>'+
+    '<div class="v41-stock-qty">'+x.portions+' portion'+(x.portions>1?'s':'')+'</div>'+
+    '<button class="v4116-step" data-action="v41-freezer-quick" data-id="'+escape(x.lotId)+'" data-step="1" aria-label="Ajouter une portion de '+escape(x.name)+'">＋</button></div>'+
+    '<button class="btn tiny secondary" data-action="v41-correct-freezer" data-id="'+escape(x.lotId)+'">Corriger</button>')).join('')+'</div>';
  }else{
   const w=week||{meals:[]},actions=w.v41MealActions||{},entries=[];
   const mealLabelFor=i=>typeof mealLabel==='function'?mealLabel(i):

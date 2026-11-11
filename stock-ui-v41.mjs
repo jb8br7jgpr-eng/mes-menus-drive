@@ -100,7 +100,7 @@ export function renderStockV41({state,week,weekId,view='home',recipeById,mealDis
       '<button class="btn tiny" data-action="v41-eat-leftovers" data-index="'+i+
       '" data-source="'+leftover.fromIndex+'" data-id="'+escape(leftover.recipeId)+'">C’est mangé</button></div>'));
    }
-   if(meal?.type==='ordered')entries.push(row('🍕 Repas libre ou commandé',
+   if(meal?.type==='ordered')entries.push(row('🍕 Repas commandé',
     mealLabelFor(i)+' · aucun ingrédient à acheter',
     '<span class="v41-stock-info">Sans stock</span>'));
   });

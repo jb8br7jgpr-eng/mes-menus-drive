@@ -97,8 +97,8 @@ test('Un seul acces pour enregistrer les achats et cache Safari actualise',()=>{
  assert.match(courses,/data-action="v4116-finish-courses"/);
  assert.doesNotMatch(courses,/data-action="v41-courses-done"/);
  assert.match(app,/Coche uniquement les produits réellement achetés/);
- assert.match(index,/app\.js\?v=20261118-41-22-1-carrefour/);
- assert.match(sw,/menus-drive-v41-22-1-carrefour-20261118/);
+ assert.match(index,/app\.js\?v=20261118-41-22-2-conditionnement/);
+ assert.match(sw,/menus-drive-v41-22-2-pack-20261118/);
  assert.match(stockUI,/ingredient\?\.name\|\|p\?\.name/);
  assert.match(stockActions,/resolveStockArticleV41\(item,ctx\.state\.ingredientCatalog,ctx\.state\.products\)/);
 });

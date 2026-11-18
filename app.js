@@ -2463,14 +2463,14 @@ function driveConditioningHelpV41222(item,product){
    (contentOK?'Le contenu enregistré correspond à cette unité : vérifie si un autre ajout de la semaine utilise une unité différente.':
     'Dans « Contenu d’une unité achetée », indique le nombre réel d’articles contenus dans un '+html(purchaseUnit)+
     ', et choisis « '+html(needUnit)+' » comme unité du contenu. Si le paquet contient deux pièces, saisis 2 pièces.')+
-   ' Speedrive pourra alors calculer le nombre entier de '+html(purchaseUnit)+'s à acheter.';
+   ' Speedrive pourra alors calculer le nombre de colis à acheter.';
  }else{
   explanation='La liste demande <strong>'+html(need)+'</strong>, dans la même unité que l’achat Carrefour ('+html(purchaseUnit)+
    '). Le panier exige un nombre entier positif d’unités achetées (maximum 999). '+
    'Si cet achat a été ajouté manuellement, vérifie sa quantité dans Courses. Aucun nombre ne sera arrondi silencieusement.';
  }
  return '<div class="v41222-drive-help" role="status" aria-live="polite">'+
-  '<strong>🛒 Pourquoi « Cordon bleu » ou cet article n’est pas encore transférable ?</strong>'+
+  '<strong>🛒 Pourquoi cet article n’est pas encore transférable ?</strong>'+
   '<p>'+explanation+'</p>'+
   '<small>L’EAN Carrefour est enregistré : il ne faut ni supprimer ni recréer la fiche. Cette aide ne modifie aucune donnée.</small></div>';
 }

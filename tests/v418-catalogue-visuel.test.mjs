@@ -69,7 +69,7 @@ test('V41.8 : ingrédients Carrefour — référence liée ou réellement absent
  const {ui}=makeUI(sample,products);
  const linked=ui.catalogueReferenceV418(sample[3],products[0]);
  assert.equal(linked.kind,'linked');
- assert.equal(linked.label,'Référence Carrefour prête');
+ assert.equal(linked.label,'EAN Carrefour enregistré');
  assert.match(linked.detail,/Beurre doux · 250 g/);
  const absent=ui.catalogueReferenceV418(sample[2],null);
  assert.equal(absent.kind,'missing');
@@ -87,7 +87,7 @@ test('V41.8 : achat quotidien — lien réel et absence de lien ne sont pas conf
  const {ui}=makeUI([linked,unlinked],products);
  assert.deepEqual(
   {kind:ui.catalogueReferenceV418(linked,products[2]).kind,label:ui.catalogueReferenceV418(linked,products[2]).label},
-  {kind:'linked',label:'Référence Carrefour prête'}
+  {kind:'linked',label:'EAN Carrefour enregistré'}
  );
  assert.equal(ui.catalogueReferenceV418(unlinked,products[1]).label,'Référence Carrefour à renseigner');
  const html=ui.unifiedCatalogueRows();

@@ -1227,6 +1227,7 @@ function catalogueEditor(kind,id=null,draft=null,linkedIngredientId=null){
    '<div class="field"><label for="catalogueLinkedProduct">Référence Carrefour associée (facultatif)</label>'+
    '<select id="catalogueLinkedProduct"><option value="">Aucune référence associée</option>'+referenceOptions+'</select></div>'+
    '<p class="helper">La même référence sert à toutes les recettes contenant cet ingrédient. Son nom ne remplacera jamais celui de ton ingrédient.</p>'+
+   (id&&store==='carrefour'?carrefourIngredientDiagnosisV41221(record,linked):'')+
    (linked?'<button type="button" class="btn secondary wide v413-clear-reference" data-action="v413-unlink-ingredient-carrefour" data-id="'+html(id)+'">✕ Retirer la référence Carrefour de cet ingrédient</button>':'')+
    '</div>';
  }else{
@@ -1568,24 +1569,108 @@ function catalogueIconV418(name,category){
 // N'indiquer « associée » pour un ingrédient Carrefour que si sa référence
 // est réellement liée. Les achats du quotidien sont des fiches produits :
 // leur lien Carrefour est un renseignement distinct de la liaison d'ingrédient.
+// V41.22.1 — diagnostics Carrefour, sans accéder à des données privées
+// et surtout sans suppression, fusion ou migration automatique des fiches.
+function carrefourEanV41221(p){
+ const ean=String(p?.ean||'').trim();
+ if(/^\d{13}$/.test(ean))return ean;
+ return String(p?.url||'').match(/(?:-|\/)(\d{13})(?:[/?#]|$)/)?.[1]||'';
+}
+function carrefourCandidateKeyV41221(value){
+ // Tolère les pluriels usuels (cordon bleu / cordons bleus), accents et tirets.
+ return norm(value).replace(/[^a-z0-9]+/g,' ').split(' ')
+  .filter(Boolean).map(word=>word.length>4&&word.endsWith('s')?word.slice(0,-1):word)
+  .join(' ');
+}
+function carrefourReferenceCandidatesV41221(ingredient){
+ const name=carrefourCandidateKeyV41221(ingredient?.name);
+ if(name.length<5)return [];
+ const words=name.split(' ');
+ return (state.products||[]).filter(p=>{
+  if(!p?.id||p.id===ingredient?.productId||p.store==='grandfrais')return false;
+  const other=carrefourCandidateKeyV41221(p.name);
+  return other===name||other.startsWith(name+' ')||
+   (words.length>=2&&words.every(word=>other.split(' ').includes(word)));
+ }).sort((a,b)=>{
+  const rank=p=>carrefourCandidateKeyV41221(p.name)===name?0:1;
+  return rank(a)-rank(b)||Number(Boolean(carrefourEanV41221(b)))-Number(Boolean(carrefourEanV41221(a)))||
+   a.name.localeCompare(b.name,'fr',{sensitivity:'base'});
+ }).slice(0,8);
+}
+function carrefourIngredientDiagnosisV41221(ing,linked){
+ if(!ing)return '';
+ const ean=carrefourEanV41221(linked);
+ const suggestions=!ean?carrefourReferenceCandidatesV41221(ing):[];
+ let out='<div class="v41221-diagnosis" role="group" aria-label="Diagnostic de la référence Carrefour">';
+ if(linked){
+  out+='<strong>'+(ean?'✓ Référence rattachée à cet ingrédient':'⚠️ Référence rattachée, mais EAN manquant')+'</strong>'+
+   '<p>Fiche Carrefour : « '+html(linked.name)+' ».'+
+   (ean?' Code-barres utilisable dans Mon Drive.':
+    ' Le lien seul ne suffit pas toujours pour préparer le panier. Ouvre la fiche de référence et complète son EAN-13.')+
+   ' La fiche Carrefour peut être masquée dans Produits pour ne pas apparaître deux fois.</p>';
+ }else{
+  out+='<strong>⚠️ Aucune référence Carrefour rattachée</strong>'+
+   '<p>Une fiche Carrefour peut déjà exister, y compris si elle n’apparaît pas séparément dans Produits. Aucune fiche ne sera supprimée automatiquement.</p>';
+ }
+ if(suggestions.length){
+  out+='<strong>Fiches Carrefour existantes à vérifier</strong>'+
+   '<div class="v41221-candidates">'+suggestions.map(p=>{
+    const otherUsers=(state.ingredientCatalog||[]).filter(x=>x.id!==ing.id&&x.productId===p.id);
+    return '<button type="button" class="btn secondary v41221-candidate" data-action="v41221-link-carrefour" data-id="'+html(p.id)+
+      '" data-ingredient="'+html(ing.id)+'">'+
+      '<span>'+html(p.name)+'</span><small>'+(carrefourEanV41221(p)?'EAN disponible':'EAN à compléter')+
+      (otherUsers.length?' · aussi lié à '+html(otherUsers.map(x=>x.name).join(', ')):'')+
+      '</small></button>';
+   }).join('')+'</div>'+
+   '<small>Ces noms sont seulement des suggestions : vérifie le produit avant de l’associer.</small>';
+ }
+ return out+'</div>';
+}
+function linkExistingCarrefourV41221(ingredientId,productId){
+ const ing=ingredientById(ingredientId),p=productById(productId);
+ if(!ing||!p||!carrefourReferenceCandidatesV41221(ing).some(x=>x.id===productId)){
+  toast('Association indisponible : actualise la fiche pour vérifier la référence.');return false
+ }
+ const current=productById(ing.productId),
+  others=(state.ingredientCatalog||[]).filter(x=>x.id!==ing.id&&x.productId===p.id);
+ const info='Associer la référence « '+p.name+' » à « '+ing.name+' » ? '+
+  (current?'La référence précédente « '+current.name+' » sera conservée sans suppression. ':'')+
+  (others.length?'Cette référence est aussi utilisée par '+others.map(x=>x.name).join(', ')+'. ':'')+
+  (carrefourEanV41221(p)?'Son EAN est utilisable dans Mon Drive.':
+    'Son EAN devra encore être complété dans sa fiche pour le Drive.')+
+  ' Les recettes, courses et stocks ne seront pas supprimés.';
+ if(!confirm(info))return false;
+ checkpoint('Avant rattachement de référence Carrefour');
+ ing.productId=p.id;ing.store='carrefour';
+ (state.recipes||[]).forEach(r=>(r.ingredients||[]).forEach(x=>{
+  if(x.ingredientId===ing.id||(!x.ingredientId&&norm(x.name)===norm(ing.name))){
+   x.ingredientId=ing.id;x.productId=p.id
+  }
+ }));
+ // Les lignes de courses déjà générées utilisent ingredientId ; l'association
+ // active sera résolue au prochain affichage sans réécrire l'historique.
+ persist();closeModal();render(true);
+ toast(carrefourEanV41221(p)?'Référence Carrefour associée !':'Fiche associée : renseigne encore son EAN Carrefour.');
+ return true
+}
+
 function catalogueReferenceV418(item,linkedProduct){
  const isIngredient=item.type==='ingredient',p=linkedProduct;
- if(item.store==='grandfrais')return {
-  kind:'grandfrais',label:'Liste Grand Frais',
-  detail:'Aucune référence Carrefour nécessaire'
- };
+ if(item.store==='grandfrais')return {kind:'grandfrais',label:'Liste Grand Frais',
+  detail:'Aucune référence Carrefour nécessaire'};
+ const ean=carrefourEanV41221(p);
  if(isIngredient){
   if(!p)return {kind:'missing',label:'Référence à associer',
-    detail:'Aucune référence Carrefour liée'};
-  return {kind:'linked',label:'Référence associée',
-    detail:'Carrefour : '+p.name+
-      (Number(p.packAmount)>0?' · '+quantity(p.packAmount,p.packUnit):' · conditionnement à préciser')};
+   detail:'Aucune référence Carrefour liée à cet ingrédient'};
+  if(!ean)return {kind:'incomplete',label:'Code-barres Carrefour à compléter',
+   detail:'Fiche liée : '+p.name+' · EAN-13 absent ou invalide'};
+  return {kind:'linked',label:'Référence Carrefour prête',
+   detail:'Carrefour : '+p.name+(Number(p.packAmount)>0?' · '+quantity(p.packAmount,p.packUnit):' · conditionnement à vérifier')};
  }
- const details=[p?.brand,p?.packaging].filter(Boolean).join(' · ')||
-  quantity(p?.qty||1,p?.unit||'paquet');
- return p?.url?
-  {kind:'linked',label:'Lien Carrefour enregistré',detail:details}:
-  {kind:'missing',label:'Lien Carrefour à renseigner',detail:details};
+ const details=[p?.brand,p?.packaging].filter(Boolean).join(' · ')||quantity(p?.qty||1,p?.unit||'paquet');
+ if(ean)return {kind:'linked',label:'Référence Carrefour prête',detail:details};
+ if(p?.url)return {kind:'incomplete',label:'Lien enregistré, EAN à compléter',detail:details};
+ return {kind:'missing',label:'Référence Carrefour à renseigner',detail:details};
 }
 function unifiedCatalogueRows(){
  const items=unifiedCatalogueItems();
@@ -2366,15 +2451,20 @@ function listText(){return shopping().filter(x=>!x.checked&&!x.excluded&&!x.cove
 function driveTransferRows(){
  return shopping().filter(x=>!x.checked&&!x.excluded&&!x.covered&&x.store==='carrefour').map(x=>{
   const p=productById(x.productId);
-  const matchedEan=(p?.ean&&/^\d{13}$/.test(String(p.ean)))?String(p.ean):((p?.url||'').match(/(?:-|\/)(\d{13})(?:[/?#]|$)/)?.[1]||'');
+  const matchedEan=carrefourEanV41221(p);
   const qty=Number(x.qty),unit=x.unit;
-  // Les unités de masse/volume ne représentent pas une quantité de colis.
   const isCountable=Boolean(p)&&['pièce','paquet','boîte','rouleau','bouteille','pot','sachet'].includes(unit)
     &&unit===p.unit&&Number.isInteger(qty)&&qty>0&&qty<=999;
   let reason='';
-  if(!matchedEan)reason='Référence Carrefour à associer';
-  else if(!isCountable)reason='Unité à acheter incompatible ou conditionnement à préciser';
-  return {id:x.id,ingredientId:x.ingredientId||null,productId:x.productId||null,name:x.name.slice(0,120),qty,unit,ean:matchedEan,url:p?.url||'',brand:p?.brand||'',
+  if(!p)reason=x.ingredientId?'Référence non liée à cet ingrédient. Vérifie les fiches Carrefour existantes.':
+    'Aucune référence Carrefour associée à cette ligne de courses.';
+  else if(!matchedEan)reason=p.url?
+    'Lien Carrefour enregistré, mais EAN-13 absent ou invalide dans la fiche liée.':
+    'Fiche Carrefour associée, mais code-barres EAN-13 manquant.';
+  else if(!isCountable)reason='EAN enregistré, mais quantité ou unité incompatible avec l’unité d’achat de la fiche Carrefour ('+
+    String(p.unit||'non renseignée')+').';
+  return {id:x.id,ingredientId:x.ingredientId||null,productId:x.productId||null,
+   name:x.name.slice(0,120),qty,unit,ean:matchedEan,url:p?.url||'',brand:p?.brand||'',
    packaging:p?.packaging||'',needed:x.needed||'',ready:Boolean(!reason),reason};
  });
 }
@@ -4208,6 +4298,7 @@ document.addEventListener('click',e=>{
   else if(mode==='v41153-reuse-carrefour')continueCarrefourExistingReferenceV41153(id);
   else if(mode==='v41153-remove-orphan-carrefour')removeOrphanCarrefourReferenceOnImportV41153(id);
   else if(mode==='v413-unlink-ingredient-carrefour')unlinkIngredientCarrefourV413(id);
+  else if(mode==='v41221-link-carrefour')linkExistingCarrefourV41221(a.dataset.ingredient,id);
   else if(mode==='v413-clear-daily-carrefour')clearDailyCarrefourV413(id);
 
 

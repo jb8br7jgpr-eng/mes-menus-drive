@@ -1583,3 +1583,10 @@
  padding:10px!important}
 .v41221-candidate span{font-size:12px;font-weight:750;overflow-wrap:anywhere}
 .v41221-candidate small{font-size:10.5px;color:#5a765f;line-height:1.35}
+
+/* V41.22.2 — guide contextuel depuis « Références à compléter ». */
+.v41222-drive-help{margin:0 0 13px;padding:13px 12px;border:1px solid #efd5a9;
+ background:#fffaef;border-radius:12px;color:#6b4d26;min-width:0}
+.v41222-drive-help strong{display:block;font-size:12px;line-height:1.45}
+.v41222-drive-help p{margin:9px 0 6px;font-size:12px;line-height:1.6}
+.v41222-drive-help small{font-size:10.5px;line-height:1.45;color:#766b55}

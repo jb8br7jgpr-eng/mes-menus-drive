@@ -57,7 +57,7 @@ test('V41.9 : Ail et Beurre ont une illustration distincte et une identité maga
  assert.match(carrefour,/v418-store-badge--carrefour/);
  assert.match(carrefour,/🛒<\/span> Carrefour Drive/);
  assert.match(carrefour,/v418-reference-badge--linked/);
- assert.match(carrefour,/Référence Carrefour prête/);
+ assert.match(carrefour,/EAN Carrefour enregistré/);
  assert.match(carrefour,/Beurre Carrefour · 250 g/);
 });
 test('V41.9 : référence Carrefour manquante visible, sans bloquer les cases à cocher',()=>{
@@ -80,7 +80,7 @@ test('V41.9 : achats quotidiens avec ou sans lien Carrefour sont distingués',()
  assert.match(pq,/Référence Carrefour à renseigner/);
  assert.match(pq,/v418-reference-badge--missing/);
  assert.match(huile,/🫒/);
- assert.match(huile,/Référence Carrefour prête/);
+ assert.match(huile,/EAN Carrefour enregistré/);
  assert.match(huile,/v418-reference-badge--linked/);
 });
 test('V41.9 : nombre de contrôles, identifiants et quantités inchangés',()=>{

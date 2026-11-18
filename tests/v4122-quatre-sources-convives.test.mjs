@@ -69,9 +69,9 @@ test('Navigation quatre sources, options spéciales et cache iPhone séparé',()
  assert.match(block,/data-action="v41171-mark-ordered"/);
  assert.match(css,/grid-template-columns:repeat\(4,minmax\(0,1fr\)\)/);
  for(const file of [index,sw]){
-  assert.match(file,/styles\.css\?v=20261118-41-22-1-carrefour/);
-  assert.match(file,/app\.js\?v=20261118-41-22-1-carrefour/);
+  assert.match(file,/styles\.css\?v=20261118-41-22-2-conditionnement/);
+  assert.match(file,/app\.js\?v=20261118-41-22-2-conditionnement/);
  }
- assert.match(sw,/menus-drive-v41-22-1-carrefour-20261118/);
+ assert.match(sw,/menus-drive-v41-22-2-pack-20261118/);
  assert.doesNotThrow(()=>new Function(app));
 });

@@ -1664,11 +1664,11 @@ function catalogueReferenceV418(item,linkedProduct){
    detail:'Aucune référence Carrefour liée à cet ingrédient'};
   if(!ean)return {kind:'incomplete',label:'Code-barres Carrefour à compléter',
    detail:'Fiche liée : '+p.name+' · EAN-13 absent ou invalide'};
-  return {kind:'linked',label:'Référence Carrefour prête',
+  return {kind:'linked',label:'EAN Carrefour enregistré',
    detail:'Carrefour : '+p.name+(Number(p.packAmount)>0?' · '+quantity(p.packAmount,p.packUnit):' · conditionnement à vérifier')};
  }
  const details=[p?.brand,p?.packaging].filter(Boolean).join(' · ')||quantity(p?.qty||1,p?.unit||'paquet');
- if(ean)return {kind:'linked',label:'Référence Carrefour prête',detail:details};
+ if(ean)return {kind:'linked',label:'EAN Carrefour enregistré',detail:details};
  if(p?.url)return {kind:'incomplete',label:'Lien enregistré, EAN à compléter',detail:details};
  return {kind:'missing',label:'Référence Carrefour à renseigner',detail:details};
 }
@@ -2448,6 +2448,50 @@ async function copyGrandFrais(){
  catch(err){showModal('Liste Grand Frais à copier','<p class="helper">Sélectionne tout ce texte puis copie-le dans Notes :</p><textarea class="text-input" style="height:220px" readonly>'+html(value)+'</textarea>')}
 }
 function listText(){return shopping().filter(x=>!x.checked&&!x.excluded&&!x.covered).map(x=>x.name+' — '+quantity(x.qty,x.unit)+(x.needed?' (besoin : '+x.needed+')':'')).join('\n')}
+// V41.22.2 — le code-barres identifie un produit ; il ne définit pas la
+// quantité d'articles contenus dans un paquet. Ne jamais inventer le contenu.
+function driveConditioningHelpV41222(item,product){
+ const purchaseUnit=product?.unit||'paquet';
+ const needUnit=item.unit||'pièce';
+ const need=quantity(item.qty,needUnit);
+ const contentAmount=Number(product?.packAmount);
+ const contentUnit=product?.packUnit||'';
+ const contentOK=contentAmount>0&&converted(contentAmount,contentUnit)[1]===converted(item.qty,needUnit)[1];
+ let explanation='';
+ if(needUnit!==purchaseUnit){
+  explanation='La liste de courses demande <strong>'+html(need)+'</strong>, alors que Carrefour vend ce produit par <strong>'+html(purchaseUnit)+'</strong>. '+
+   (contentOK?'Le contenu enregistré correspond à cette unité : vérifie si un autre ajout de la semaine utilise une unité différente.':
+    'Dans « Contenu d’une unité achetée », indique le nombre réel d’articles contenus dans un '+html(purchaseUnit)+
+    ', et choisis « '+html(needUnit)+' » comme unité du contenu. Si le paquet contient deux pièces, saisis 2 pièces.')+
+   ' Speedrive pourra alors calculer le nombre entier de '+html(purchaseUnit)+'s à acheter.';
+ }else{
+  explanation='La liste demande <strong>'+html(need)+'</strong>, dans la même unité que l’achat Carrefour ('+html(purchaseUnit)+
+   '). Le panier exige un nombre entier positif d’unités achetées (maximum 999). '+
+   'Si cet achat a été ajouté manuellement, vérifie sa quantité dans Courses. Aucun nombre ne sera arrondi silencieusement.';
+ }
+ return '<div class="v41222-drive-help" role="status" aria-live="polite">'+
+  '<strong>🛒 Pourquoi « Cordon bleu » ou cet article n’est pas encore transférable ?</strong>'+
+  '<p>'+explanation+'</p>'+
+  '<small>L’EAN Carrefour est enregistré : il ne faut ni supprimer ni recréer la fiche. Cette aide ne modifie aucune donnée.</small></div>';
+}
+function fixDriveItemV41222(id){
+ const item=shopping().find(row=>row.id===id);
+ if(!item)return false;
+ if(item.productId){
+  const product=productById(item.productId);
+  if(!product)return false;
+  productEditor(product.id);
+  const form=$('#catalogueEditorForm');
+  if(form){
+   form.insertAdjacentHTML('afterbegin',driveConditioningHelpV41222(item,product));
+   form.querySelector('.v38-pack-details')?.setAttribute('open','');
+  }
+  return true
+ }
+ if(item.ingredientId){ingredientEditor(item.ingredientId);return true}
+ ingredientEditor(null,item.name);return true
+}
+
 function driveTransferRows(){
  return shopping().filter(x=>!x.checked&&!x.excluded&&!x.covered&&x.store==='carrefour').map(x=>{
   const p=productById(x.productId);
@@ -3889,13 +3933,7 @@ document.addEventListener('click',e=>{
   else if(mode==='go-drive')switchTabV33('drive');
   else if(mode==='go-menus')switchTabV33('menus');
   else if(mode==='go-products')switchTabV33('produits')
-  else if(mode==='fix-drive-item'){
-   const x=shopping().find(i=>i.id===id);
-   if(!x)return;
-   if(x.productId){productEditor(x.productId);return}
-   if(x.ingredientId){ingredientEditor(x.ingredientId);return}
-   ingredientEditor(null,x.name)
-  }
+  else if(mode==='fix-drive-item')fixDriveItemV41222(id);
   else if(mode==='edit-shopping-item')editShoppingItemModal(id);
   else if(mode==='home-stock'){
    if(stockModulesV41&&!state.stockV41){

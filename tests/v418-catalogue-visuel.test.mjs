@@ -35,9 +35,9 @@ const sample=[
  {type:'ingredient',id:'boeuf',name:'Boeuf',category:'Autres',store:'grandfrais',item:{name:'Boeuf'}}
 ];
 const products=[
- {id:'p-beurre',name:'Beurre doux',packAmount:250,packUnit:'g',url:''},
+ {id:'p-beurre',name:'Beurre doux',packAmount:250,packUnit:'g',url:'',ean:'3560070123456'},
  {id:'p-lessive',name:'Lessive',category:'Entretien et nettoyage',store:'carrefour',url:''},
- {id:'p-sopalin',name:'Sopalin',category:'Papier et consommables',store:'carrefour',url:'https://www.carrefour.fr/p/123'},
+ {id:'p-sopalin',name:'Sopalin',category:'Papier et consommables',store:'carrefour',url:'https://www.carrefour.fr/p/123',ean:'3560070654321'},
 ];
 test('V41.8 : différentes icônes pour les ingrédients historiques Autres',()=>{
  const {ui}=makeUI(sample,products);
@@ -69,7 +69,7 @@ test('V41.8 : ingrédients Carrefour — référence liée ou réellement absent
  const {ui}=makeUI(sample,products);
  const linked=ui.catalogueReferenceV418(sample[3],products[0]);
  assert.equal(linked.kind,'linked');
- assert.equal(linked.label,'Référence associée');
+ assert.equal(linked.label,'Référence Carrefour prête');
  assert.match(linked.detail,/Beurre doux · 250 g/);
  const absent=ui.catalogueReferenceV418(sample[2],null);
  assert.equal(absent.kind,'missing');
@@ -87,9 +87,9 @@ test('V41.8 : achat quotidien — lien réel et absence de lien ne sont pas conf
  const {ui}=makeUI([linked,unlinked],products);
  assert.deepEqual(
   {kind:ui.catalogueReferenceV418(linked,products[2]).kind,label:ui.catalogueReferenceV418(linked,products[2]).label},
-  {kind:'linked',label:'Lien Carrefour enregistré'}
+  {kind:'linked',label:'Référence Carrefour prête'}
  );
- assert.equal(ui.catalogueReferenceV418(unlinked,products[1]).label,'Lien Carrefour à renseigner');
+ assert.equal(ui.catalogueReferenceV418(unlinked,products[1]).label,'Référence Carrefour à renseigner');
  const html=ui.unifiedCatalogueRows();
  assert.match(html,/data-action="edit-unified-product" data-kind="daily"/);
  assert.match(html,/data-action="add-unified-courses" data-kind="daily"/);
@@ -106,7 +106,7 @@ test('V41.8 : catalogue non modifié, boutons et compte toujours présents',()=>
  assert.ok(unchanged(),'rendu en lecture seule');
  assert.match(app,/out\+='<div class="section-head"><h2>Votre catalogue<\/h2><span class="pill" id="catalogueCount">/);
  assert.match(app,/function refreshCatalogueV40\(\)/);
- const visualLogic=source.slice(0,source.indexOf('function unifiedCatalogueRows()'));
+ const visualLogic=source.slice(source.indexOf('function catalogueReferenceV418('),source.indexOf('function unifiedCatalogueRows()'));
  assert.doesNotMatch(visualLogic,/\bpersist\s*\(/);
  assert.doesNotMatch(visualLogic,/\bstate\.(?:products|ingredientCatalog)\s*=/);
 });
@@ -125,7 +125,7 @@ test('V41.8 : styles mobiles et contrastes différenciés sans scroll interne',(
   '.catalogue-unified-card.v418-card','.v418-card--grandfrais',
   '.v418-card--carrefour','.v418-store-badge--grandfrais',
   '.v418-store-badge--carrefour','.v418-reference-badge--linked',
-  '.v418-reference-badge--missing','.v418-reference-badge--grandfrais'
+  '.v418-reference-badge--missing','.v418-reference-badge--incomplete','.v418-reference-badge--grandfrais'
  ])assert.ok(styles.includes(cls),'classe absente '+cls);
  assert.match(styles,/@media\(max-width:370px\)/);
  assert.match(styles,/\.v418-card \.v418-card-meta|\.v418-card \.v418-product-name/);

@@ -19,9 +19,9 @@ const ingredients=[
  {id:'poulet',name:'Blanc de poulet',category:'Autres',store:'carrefour'}
 ];
 const products=[
- {id:'ref-beurre',name:'Beurre Carrefour',packAmount:250,packUnit:'g'},
+ {id:'ref-beurre',name:'Beurre Carrefour',packAmount:250,packUnit:'g',ean:'3560070123456'},
  {id:'pq',name:'Papier toilette',category:'Papier et consommables',unit:'paquet',qty:2,store:'carrefour'},
- {id:'huile',name:'Huile de tournesol',category:'Huiles et vinaigres',unit:'bouteille',qty:1,store:'carrefour',url:'https://www.carrefour.fr/p/123456'}
+ {id:'huile',name:'Huile de tournesol',category:'Huiles et vinaigres',unit:'bouteille',qty:1,store:'carrefour',url:'https://www.carrefour.fr/p/123456',ean:'3560070654321'}
 ];
 const norm=v=>String(v??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim().replace(/\s+/g,' ').toLowerCase();
 const html=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -57,7 +57,7 @@ test('V41.9 : Ail et Beurre ont une illustration distincte et une identité maga
  assert.match(carrefour,/v418-store-badge--carrefour/);
  assert.match(carrefour,/🛒<\/span> Carrefour Drive/);
  assert.match(carrefour,/v418-reference-badge--linked/);
- assert.match(carrefour,/Référence associée/);
+ assert.match(carrefour,/Référence Carrefour prête/);
  assert.match(carrefour,/Beurre Carrefour · 250 g/);
 });
 test('V41.9 : référence Carrefour manquante visible, sans bloquer les cases à cocher',()=>{
@@ -77,10 +77,10 @@ test('V41.9 : achats quotidiens avec ou sans lien Carrefour sont distingués',()
  const pq=logic.bulkCatalogueItemV419(srcFor('daily','pq'));
  const huile=logic.bulkCatalogueItemV419(srcFor('daily','huile'));
  assert.match(pq,/🧻/);
- assert.match(pq,/Lien Carrefour à renseigner/);
+ assert.match(pq,/Référence Carrefour à renseigner/);
  assert.match(pq,/v418-reference-badge--missing/);
  assert.match(huile,/🫒/);
- assert.match(huile,/Lien Carrefour enregistré/);
+ assert.match(huile,/Référence Carrefour prête/);
  assert.match(huile,/v418-reference-badge--linked/);
 });
 test('V41.9 : nombre de contrôles, identifiants et quantités inchangés',()=>{

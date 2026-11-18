@@ -74,8 +74,8 @@ test('Le sélecteur et les actions de repas historiques restent accessibles',()=
 });
 test('Le cache iPhone reference les nouveaux JS et CSS',()=>{
  for(const file of [index,sw]){
-  assert.match(file,/styles\.css\?v=20261118-41-22-1-carrefour/);
-  assert.match(file,/app\.js\?v=20261118-41-22-1-carrefour/);
+  assert.match(file,/styles\.css\?v=20261118-41-22-2-conditionnement/);
+  assert.match(file,/app\.js\?v=20261118-41-22-2-conditionnement/);
  }
- assert.match(sw,/menus-drive-v41-22-1-carrefour-20261118/);
+ assert.match(sw,/menus-drive-v41-22-2-pack-20261118/);
 });
